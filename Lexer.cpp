@@ -253,8 +253,8 @@ std::vector<Token> Lexer::tokenize() {
                     break;
                 }
                 default:
-                    std::cerr << "Error Lexico en L" << startLine << ":C" << startCol 
-                              << " - Caracter invalido '" << c << "'" << std::endl;
+                    std::cerr << "Lexical Error at L" << startLine << ":C" << startCol 
+                              << " - Invalid character '" << c << "'" << std::endl;
                     tokens.push_back(createToken(TokenType::ERROR_TOKEN, lexeme, startLine, startCol));
                     break;
             }

@@ -1,0 +1,48 @@
+Context-Free Grammar (CFG) for Cis-QL
+
+Terminals (Tokens):
+
+LOAD, SEQUENCE, STRING, AS, ID, SEMICOLON, FIND, MOTIF, WITHIN, NUM,
+FROM, GENE, PROMOTER, ENHANCER, EXON, INTRON, UTR, TSS, REGION, STRAND,
+POSITIVE, NEGATIVE, CHR, EXTRACT, WHERE, INTERSECT, UNION, EXCEPT, AND,
+OR, NOT, LPAREN, RPAREN, LENGTH, SIMILARITY, GREATER, LESS, GREATER_EQ,
+LESS_EQ, ASSIGN, FLOAT, PERCENT, BP, KB, MB, UPSTREAM, DOWNSTREAM.
+
+Grammar:
+
+Program         -> StatementList
+StatementList   -> Statement StatementList | ε
+
+Statement       -> LoadStmt | FindStmt | ExtractStmt | SetOperationStmt
+
+LoadStmt        -> LOAD SEQUENCE STRING AS ID SEMICOLON
+
+FindStmt        -> FIND MOTIF STRING FindOpts SEMICOLON
+FindOpts        -> FindOpt FindOpts | ε
+FindOpt         -> WITHIN NUM Unit Direction FROM Entity STRING
+                 | STRAND StrandType
+                 | CHR STRING
+
+SetOperationStmt-> SetOp Entity AND Entity WhereClause SEMICOLON
+SetOp           -> INTERSECT | UNION | EXCEPT
+
+ExtractStmt     -> EXTRACT Entity WhereClause SEMICOLON
+
+WhereClause     -> WHERE Condition | ε
+
+/* Boolean expressions with cascading precedence */
+Condition       -> Term ConditionPrime
+ConditionPrime  -> OR Term ConditionPrime | ε
+Term            -> Factor TermPrime
+TermPrime       -> AND Factor TermPrime | ε
+Factor          -> NOT Factor | SimpleCondition | LPAREN Condition RPAREN
+
+SimpleCondition -> Property RelOp Value
+Property        -> LENGTH | SIMILARITY
+RelOp           -> GREATER | LESS | GREATER_EQ | LESS_EQ | ASSIGN
+Value           -> NUM Unit | FLOAT PERCENT | NUM | STRING
+
+Unit            -> BP | KB | MB | ε
+Direction       -> UPSTREAM | DOWNSTREAM
+Entity          -> GENE | PROMOTER | ENHANCER | EXON | INTRON | UTR | TSS | REGION
+StrandType      -> POSITIVE | NEGATIVE

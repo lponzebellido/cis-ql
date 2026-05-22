@@ -17,8 +17,8 @@ int main() {
 
   std::vector<Token> tokens = lexer.tokenize();
 
-  std::cout << "\n\n### ANALISIS LEXICO ###\n\n";
-  std::cout << "TIPO\t\t| LEXEMA\t\t| POSICION" << std::endl;
+  std::cout << "\n\n### LEXICAL ANALYSIS ###\n\n";
+  std::cout << "TYPE\t\t| LEXEME\t\t| POSITION" << std::endl;
   std::cout << "---------------------------------------------------"
             << std::endl;
   for (const Token &t : tokens) {
@@ -43,18 +43,18 @@ int main() {
     std::cout << "L" << t.line << ":C" << t.column << std::endl;
   }
 
-  // symbolTable.print(); // Opcional, comentar para no saturar la salida
+  symbolTable.print();
 
-  std::cout << "\n\n### ANALISIS SINTACTICO ###\n\n";
+  std::cout << "\n\n### SYNTAX ANALYSIS ###\n\n";
   Parser parser(tokens);
   auto ast = parser.parse();
 
   if (!parser.hadError()) {
-      std::cout << "El analisis sintactico termino sin errores.\n\n";
-      std::cout << "--- Arbol Sintactico Abstracto (AST) ---\n";
-      ast->print();
+    std::cout << "Syntax analysis completed without errors.\n\n";
+    std::cout << "--- Abstract Syntax Tree (AST) ---\n";
+    ast->print();
   } else {
-      std::cout << "\nEl analisis sintactico termino CON ERRORES.\n";
+    std::cout << "\nSyntax analysis finished WITH ERRORS.\n";
   }
 
   return 0;
