@@ -44,7 +44,7 @@ void printSyntaxAnalysis(const Parser &parser,
 }
 
 int main() {
-  std::string filename = "prueba.dsl";
+  std::string filename = "prueba.cql";
   std::ifstream file(filename);
 
   if (!file.is_open()) {

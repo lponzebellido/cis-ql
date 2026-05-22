@@ -19,7 +19,6 @@ enum class TokenType {
     FLOAT,     
     STRING,
 
-    // Symbols
     SEMICOLON, // ;
     COMMA,     // ,
     ASSIGN,    // =
