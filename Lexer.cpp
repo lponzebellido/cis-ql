@@ -28,6 +28,7 @@ void Lexer::initKeywords() {
     keywords["AT"] = TokenType::AT;
     keywords["BP"] = TokenType::BP;
     keywords["KB"] = TokenType::KB;
+    keywords["MB"] = TokenType::MB;
     keywords["AND"] = TokenType::AND;
     keywords["OR"] = TokenType::OR;
     keywords["NOT"] = TokenType::NOT;
@@ -285,6 +286,7 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::AT: return "AT";
         case TokenType::BP: return "BP";
         case TokenType::KB: return "KB";
+        case TokenType::MB: return "MB";
         case TokenType::AND: return "AND";
         case TokenType::OR: return "OR";
         case TokenType::NOT: return "NOT";

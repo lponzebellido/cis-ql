@@ -2,7 +2,7 @@ CXX = g++
 CXXFLAGS = -std=c++11 -Wall
 TARGET = lexer
 
-SRCS = main.cpp Lexer.cpp
+SRCS = main.cpp Lexer.cpp Parser.cpp AST.cpp
 OBJS = $(SRCS:.cpp=.o)
 all: $(TARGET)
 $(TARGET): $(OBJS)

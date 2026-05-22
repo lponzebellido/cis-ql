@@ -1,0 +1,240 @@
+Compiladores 
+ 
+Analizador Sintáctico 
+ 
+1. El proceso de análisis sintáctico 
+Son funciones del analizador sintáctico: 
+- Comprobar si la cadena de componentes léxicos proporcionada por el analizador 
+léxico puede ser generada por la gramática que define el lenguaje fuente 
+(Gramática Independiente del Contexto, GIC). 
+- Construir el árbol de análisis sintáctico que define la estructura jerárquica de un 
+programa y obtener la serie de derivaciones para generar la cadena de 
+componentes léxicos.  
+- Informar de los errores sintácticos de forma precisa y significativa y deberá estar 
+dotado de un mecanismo de recuperación de errores para continuar con el 
+análisis. 
+ 
+El análisis sintáctico se puede considerar como una funci ón que toma como entrada la 
+secuencia de componentes l éxicos producida por el an álisis l éxico y produce como  
+salida el árbol sint áctico. En la realidad, el an álisis sint áctico hace una petici ón al 
+análisis léxico del componente l éxico siguiente en la entrada conforme lo va 
+necesitando en el proceso de análisis, conforme se mueve a lo largo de la gramática. 
+ 
+2. Especificación sintáctica de los lenguajes de programación 
+La mayor ía de las construcciones de los lenguajes de programaci ón se pueden 
+representar con una gram ática independiente del contexto (GIC). La mayor ía de las 
+construcciones de los lenguajes de programación implican recursividad y anidamientos. 
+G={S,VT,VNT,P} 
+S: el axioma o símbolo de inicio 
+VT: conjunto de terminales, los componentes léxicos 
+
+Compiladores 
+ 
+VNT: conjunto de de no-terminales 
+P: conjunto de reglas de producción de la forma  
+VNT → X1,…,Xn , con Xi ϵ (VT U VNT) 
+¿Expresiones regulares o gram áticas independientes del  contexto? Las expresiones 
+regulares no permiten construcciones anidadas  tan comunes en los lenguajes de 
+programación: par éntesis equilibrados, concordancia de pares de p alabras clave como  
+begin - end, do - while, etc. Por ejemplo: consideremos el problema de los par éntesis 
+equilibrados en una expresi ón aritmética. El hecho de que haya un  paréntesis abierto 
+obliga a que haya un paréntesis cerrado. Si intentamos escribir una expresión regular, lo 
+más próximo sería: {a∗ba∗} pero no se garantiza que el n úmero de a’s antes y  después 
+sea el mismo. Las expresiones regulares NO SABEN contar. NO es posible especificar 
+la estructura de un lenguaje de programación con sólo expresiones regulares. 
+¿Son suficientes las gram áticas independientes del con -texto? NO, existen ciertos 
+aspectos de los lenguajes de programaci ón que no se pueden representar con una GIC. 
+A estos aspectos se les llama aspectos semánticos, son aspectos en general dependientes 
+del contexto.  Por ejemplo, el prob lema de declaraci ón de los identificadores  antes de 
+usarlos. 
+¿Por qué no usar gramáticas contextuales? Su reconocimiento es demasiado complejo 
+para ser eficiente en un problema práctico. 
+ 
+3. Derivaciones 
+Dada α,β ϵ (VT U VNT)* cadenas arbitrarias de símbolos gramaticales, se dice que 
+     
+∗
+       es una derivación, si existe una producción    . 
+Sea  
+∗
+  ,  
+si α ϵ (VT U VNT)* se dice que α es una forma de frase o forma sentencial. 
+Si α ϵ (VT)* se dice que α es una frase o sentencia. 
+Existen dos tipos de derivaciones: 
+- Derivación más a la izquierda: se sustituye en cada paso el  no-terminal más a la 
+izquierda de la forma de frase. La denotaremos por:  
+∗   
+     
+- Derivación más a la derecha: se su stituye en cada paso el  no-terminal más a la 
+derecha de la forma de frase. La denotaremos por:  
+∗   
+     
+ 
+ 
+ 
+Compiladores 
+ 
+Por ejemplo para la gramática: 
+ 
+E→ id | num | E + E | ( E ) | - E 
+ 
+Si queremos derivar la frase –(id+id), entonces una derivación más a la izquierda 
+es: 
+  
+ 
+   
+ 
+       
+ 
+        
+ 
+          
+ 
+Y una derivación más a la derecha es: 
+  
+ 
+   
+ 
+       
+ 
+        
+ 
+          
+ 
+3.1. Arboles de análisis sintáctico 
+ 
+Un árbol de análisis sintáctico indica cómo a partir del axioma de la gramática se deriva 
+una frase (cadena) del lenguaje. Dada  una gram ática independiente del contexto, un  
+árbol de análisis sintáctico es un árbol tal que: 
+ 
+1. La raíz está etiquetada con el símbolo inicial. 
+2. Cada hoja est á etiquetada con un componente l éxico. Las hojas de izquierda a 
+derecha forman la frase (el programa fuente). 
+3. Cada nodo interior está etiquetado con un no-terminal. 
+4. Si A es un no -terminal yX1, X 2, . . . , X n son sus hijos de  izquierda a derecha, 
+entonces existe la producción A→X1, X2, . . . , Xn, con Xi∈(VT∪VNT). 
+ 
+El árbol de an álisis sint áctico contiene en general mucha m ás informaci ón que la 
+estrictamente necesaria para generar el c ódigo. Se puede construir una estructura m ás 
+sencilla, los árboles abstractos de análisis sint áctico o simplemente árbol sintáctico . 
+Ejemplo: expresiones aritméticas (la misma semántica pero con menor complejidad) 
+Compiladores 
+ 
+ 
+ 
+4. Gramáticas limpias y bien formadas 
+Llamamos símbolo vivo  al símbolo a partir del cual se puede  derivar una cadena de 
+terminales. Llamamos símbolo muerto a los símbolos no-vivos, no generan una cadena 
+del lenguaje. Llamamos símbolo inaccesible si nunca aparece en la parte derecha de una 
+producción. A las gram áticas que contienen estos tipos de  símbolos se les llama  
+gramáticas sucias. 
+Teorema 1: si todos los símbolos de la parte derecha de  una producción son símbolos 
+vivos, entonces el símbolo de la parte izquierda también lo es. 
+Algoritmo para detectar símbolos muertos 
+1. Hacer una lista de no -terminales que tengan al menos una  producción con sólo 
+símbolos terminales en la parte derecha. 
+2. Dada una producción, si todos los no-terminales de la parte derecha pertenecen a 
+la lista, entonces podemos incluir en la  lista al no-terminal de la parte izquierda 
+de la producción. 
+3. Cuando ya no se puedan inc luir más símbolos en la lista mediante la aplicaci ón 
+del paso 2, la lista contendr á los símbolos no-terminales vivos y el resto ser án 
+símbolos muertos. 
+Teorema 2 : si el símbolo no -terminal de la parte izquierda de una producci ón es 
+accesible, entonces todos los símbolos de la parte derecha también lo son. 
+Algoritmo para detectar símbolos inaccesibles 
+
+Compiladores 
+ 
+1. Se inicializa una lista de no -terminales que sabemos que son  accesibles con el 
+axioma. 
+2. Si la parte izquierda de una producci ón está en la lista, entonces se incluye en la 
+misma al no-terminal que aparece en la parte derecha de la producción. 
+3. Cuando ya no se pueden incluir m ás símbolos a la lista mediante la aplicaci ón 
+del paso 2, entonces la lista contendrá todos los símbolos accesibles y el resto de 
+los no-terminales serán inaccesibles. 
+Para limpiar una gram ática primero se eliminan los símbolos muertos y despu és los 
+símbolos inaccesibles. 
+Una gramática está bien formada si es limpia y además no contiene producciones-ϵ. 
+Ejemplo: limpiar la gramática 
+S → a A B | A 
+A → c B d 
+B → e | f S 
+C → g D | h D t 
+D → x | y | z 
+ 
+5. Gramáticas ambiguas 
+Una gramática es ambigua cuando para una determinada sentencia produce m ás de un 
+árbol de derivación. 
+La gramática siguiente es ambigua: 
+E→ id | num | E + E | E * E | ( E ) | - E 
+Supongamos la sentencia: id + id * id 
+ 
+El significado sem ántico es DIFERENTE. No existe una única traducción posible. Se 
+genera código diferente. 
+
+Compiladores 
+ 
+No existe un algoritmo que determine con certeza en un plazo  finito de tiempo si una 
+gramática es ambigua o no. A lo sumo que  se ha llegado en el estudio de la ambigüedad 
+es que hay algunas condiciones que de cumplirse determinan la ambig üedad, pero en el 
+caso de no cumplirse no se puede decir que la gramática es no ambigua. 
+Necesidad de evitar las gramáticas ambiguas. ¿Cómo? 
+- Transformando la gramática o 
+- Estableciendo precedencias entre operadores y de asociatividad. 
+Se puede eliminar la ambig üedad transformando la gram ática, agrupando todos los 
+operadores de igual precedencia en grupos  y asociando a cada uno una regla, de forma 
+que los que tengan  menor precedencia aparezcan m ás cercanos al s ímbolo de inicio,  
+precedencia en cascada. Esto conlleva el aumento de la complejidad de  la gramática y 
+con ello en la del árbol sintáctico. La gramática deja de ser intuitiva. 
+Ejemplo: 
+Sea la gramática ambigua: 
+E → num | E + E | E - E | E * E | E / E  
+Si transformamos la gramática de expresiones aritméticas, ésta dejará de ser ambigua. 
+ exp → exp + term | exp – term | term 
+ term → term * factor | term / factor | factor 
+ factor → (exp) | num 
+ 
+6. Clasificación de métodos de análisis sintáctico 
+Atendiendo a la forma en que se c onstruye el árbol de análisis sintáctico los métodos de 
+análisis sintáctico se clasifican: 
+- Métodos descendentes:  se parte del s ímbolo de inicio de la  gramática que se 
+coloca en la raíz y se va construyendo el  árbol desde arriba hacia abajo hasta las 
+hojas, eligiendo la derivación que da lugar a una concordancia con la cadena  de 
+entrada. Se basa en la idea de  predice una derivaci ón y establece una  
+concordancia con el símbolo de la entra da (predict/match). El análisis sintáctico 
+descendente corresponde con un recorrido prefijo del árbol de análisis sintáctico 
+(primero expandimos el nodo que visitamos y luego procesamos los hijos). 
+- Métodos ascendentes: se construye el árbol de análisis sintáctico desde las hojas 
+hasta la ra íz. En las hojas est á la cadena  a analizar y se intenta reducirla al 
+símbolo de inicio de la  gramática que está en la raíz. Se trata de desplazar-se en 
+la cadena de entrada y encontrar una subcadena para aplicar  una reducción(una 
+regla de producción a la inversa), (shift-reduce). El análisis sintáctico ascendente 
+Compiladores 
+ 
+corresponde con un  recorrido postorden del árbol (primero reconocemos los 
+hijos y luego mediante una reducción reconocemos el padre). 
+ 
+Atendiendo a la forma en que procesan la cadena de entrada se clasifican en: 
+- Métodos direccionales: procesan la cadena de entrada s ímbolo a s ímbolo de 
+izquierda a derecha. 
+- Métodos no -direccionales: acceden a cualquier lugar de la ca dena de entrada 
+para construir el árbol. Necesitan tener toda  la cadena de componentes l éxicos 
+en memoria. Más costosos, no se suelen implementar. 
+Atendiendo al número de alternativas posibles en una derivación se clasifican en: 
+- Métodos deterministas:  dado un s ímbolo de la cadena de  entrada se puede 
+decidir en cada paso cu ál es la alterna tiva/derivación adecuada a aplicar, s ólo 
+hay una posible. No se produce retroceso y el costo el lineal. 
+- Métodos no-deterministas: en cada paso de la construcci ón del árbol se deben 
+probar diferentes alternativas/derivaciones  para ver cual es la adecuada, con el  
+correspondiente aumento del costo. 
+ 
+ 
+ Descendentes  Ascendentes 
+No direccionales Unger  CYK 
+Direccionales No deterministas Predice/Concuerda Desplaza/Reduce 
+  1º en anchura 1º en anchura 
+  1º en profundidad 1º en profundidad 
+ Deterministas Predice/Concuerda Desplaza/Reduce 
+  Gram. LL(1) Gram. LR(K) 
+   LR(0),SLR(1),LALR(1) 
+ 
