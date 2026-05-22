@@ -25,7 +25,7 @@ public:
   }
 
   void print() const {
-    std::cout << "\n ### SYMBOL TABLE ###" << std::endl;
+    std::cout << "\nSYMBOL TABLE" << std::endl;
     for (const auto &par : table) {
       std::cout << "Lexeme: " << par.first << "\t| Type: " << par.second.type
                 << std::endl;
