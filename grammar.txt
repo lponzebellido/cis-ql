@@ -11,14 +11,14 @@ LESS_EQ, ASSIGN, FLOAT, PERCENT, BP, KB, MB, UPSTREAM, DOWNSTREAM.
 Grammar:
 
 Program         -> StatementList
-StatementList   -> Statement StatementList | ε
+StatementList   -> Statement StatementList | λ
 
 Statement       -> LoadStmt | FindStmt | ExtractStmt | SetOperationStmt
 
 LoadStmt        -> LOAD SEQUENCE STRING AS ID SEMICOLON
 
 FindStmt        -> FIND MOTIF STRING FindOpts SEMICOLON
-FindOpts        -> FindOpt FindOpts | ε
+FindOpts        -> FindOpt FindOpts | λ
 FindOpt         -> WITHIN NUM Unit Direction FROM Entity STRING
                  | STRAND StrandType
                  | CHR STRING
@@ -28,13 +28,13 @@ SetOp           -> INTERSECT | UNION | EXCEPT
 
 ExtractStmt     -> EXTRACT Entity WhereClause SEMICOLON
 
-WhereClause     -> WHERE Condition | ε
+WhereClause     -> WHERE Condition | λ
 
 /* Boolean expressions with cascading precedence */
 Condition       -> Term ConditionPrime
-ConditionPrime  -> OR Term ConditionPrime | ε
+ConditionPrime  -> OR Term ConditionPrime | λ
 Term            -> Factor TermPrime
-TermPrime       -> AND Factor TermPrime | ε
+TermPrime       -> AND Factor TermPrime | λ
 Factor          -> NOT Factor | SimpleCondition | LPAREN Condition RPAREN
 
 SimpleCondition -> Property RelOp Value
@@ -42,7 +42,7 @@ Property        -> LENGTH | SIMILARITY
 RelOp           -> GREATER | LESS | GREATER_EQ | LESS_EQ | ASSIGN
 Value           -> NUM Unit | FLOAT PERCENT | NUM | STRING
 
-Unit            -> BP | KB | MB | ε
+Unit            -> BP | KB | MB | λ
 Direction       -> UPSTREAM | DOWNSTREAM
 Entity          -> GENE | PROMOTER | ENHANCER | EXON | INTRON | UTR | TSS | REGION
 StrandType      -> POSITIVE | NEGATIVE

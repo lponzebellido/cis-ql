@@ -3,21 +3,8 @@
 #include <fstream>
 #include <iostream>
 
-int main() {
-  std::string filename = "prueba.dsl";
-  std::ifstream file(filename);
-
-  if (!file.is_open()) {
-    std::cerr << "Error: No se pudo abrir " << filename << std::endl;
-    return 1;
-  }
-
-  SymbolTable symbolTable;
-  Lexer lexer(file, &symbolTable);
-
-  std::vector<Token> tokens = lexer.tokenize();
-
-  std::cout << "\n\n### LEXICAL ANALYSIS ###\n\n";
+void printLexicalAnalysis(const std::vector<Token> &tokens) {
+  std::cout << "\n\nLEXICAL ANALYSIS:\n\n";
   std::cout << "TYPE\t\t| LEXEME\t\t| POSITION" << std::endl;
   std::cout << "---------------------------------------------------"
             << std::endl;
@@ -42,20 +29,41 @@ int main() {
 
     std::cout << "L" << t.line << ":C" << t.column << std::endl;
   }
+}
 
-  symbolTable.print();
-
-  std::cout << "\n\n### SYNTAX ANALYSIS ###\n\n";
-  Parser parser(tokens);
-  auto ast = parser.parse();
-
+void printSyntaxAnalysis(const Parser &parser,
+                         const std::unique_ptr<ProgramNode> &ast) {
+  std::cout << "\n\nSYNTAX ANALYSIS:\n\n";
   if (!parser.hadError()) {
     std::cout << "Syntax analysis completed without errors.\n\n";
-    std::cout << "--- Abstract Syntax Tree (AST) ---\n";
+    std::cout << "Abstract Syntax Tree (AST):\n";
     ast->print();
   } else {
     std::cout << "\nSyntax analysis finished WITH ERRORS.\n";
   }
+}
+
+int main() {
+  std::string filename = "prueba.dsl";
+  std::ifstream file(filename);
+
+  if (!file.is_open()) {
+    std::cerr << "Error: Could not open " << filename << std::endl;
+    return 1;
+  }
+
+  // 1. Lexical
+  SymbolTable symbolTable;
+  Lexer lexer(file, &symbolTable);
+  std::vector<Token> tokens = lexer.tokenize();
+
+  // 2. Syntax
+  Parser parser(tokens);
+  auto ast = parser.parse();
+
+  printLexicalAnalysis(tokens);
+  symbolTable.print();
+  printSyntaxAnalysis(parser, ast);
 
   return 0;
 }
