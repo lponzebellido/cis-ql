@@ -4,31 +4,35 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <iostream>
 #include "Token.h"
 #include "SymbolTable.h"
 
+#define MAXLENBUF 1024
+
 class Lexer {
 private:
-    std::string source;
-    size_t pos;
+    std::istream& in;
+    char buffer[MAXLENBUF];
+    int colIndex;
     int line;
-    int column;
+    int bufferLen;
+    bool eofReached;
     std::unordered_map<std::string, TokenType> keywords;
     SymbolTable* symbolTable;
 
     void initKeywords();
-    char advance();
-    char peek();
-    char peekNext();
-    void skipWhitespace();
+    char getChar();
+    void ungetChar();
+    void skipWhitespaceAndComments();
     
-    Token createToken(TokenType type, const std::string& lexeme);
-    Token identifierOrKeyword();
-    Token number();
-    Token stringLiteral();
+    Token createToken(TokenType type, const std::string& lexeme, int startLine, int startCol);
+    Token identifierOrKeyword(char firstChar, int startLine, int startCol);
+    Token number(char firstChar, int startLine, int startCol);
+    Token stringLiteral(int startLine, int startCol);
 
 public:
-    Lexer(const std::string& sourceCode, SymbolTable* st);
+    Lexer(std::istream& inputStream, SymbolTable* st);
     std::vector<Token> tokenize();
 };
 

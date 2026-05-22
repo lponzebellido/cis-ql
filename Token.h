@@ -9,11 +9,17 @@ enum class TokenType {
     UPSTREAM, DOWNSTREAM, WITHIN, FROM, AT,
     BP, KB,
     AND, OR, NOT, WHERE, LENGTH, AS,
+    EXON, INTRON, UTR, TSS,
+    CHR, CHROMOSOME, STRAND, POSITIVE, NEGATIVE,
+    INTERSECT, UNION, EXCEPT, OVERLAPS,
+    SIMILARITY, REVERSE_COMPLEMENT,
 
     ID,
-    NUM,
+    NUM,       
+    FLOAT,     
     STRING,
 
+    // Symbols
     SEMICOLON, // ;
     COMMA,     // ,
     ASSIGN,    // =
@@ -23,9 +29,11 @@ enum class TokenType {
     LESS_EQ,   // <=
     LPAREN,    // (
     RPAREN,    // )
+    PERCENT,   // %
 
     END_OF_FILE,
-    UNKNOWN
+    UNKNOWN,
+    ERROR_TOKEN
 };
 
 struct Token {

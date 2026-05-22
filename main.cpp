@@ -12,12 +12,8 @@ int main() {
         return 1;
     }
     
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string sourceCode = buffer.str();
-    
     SymbolTable symbolTable;
-    Lexer lexer(sourceCode, &symbolTable);
+    Lexer lexer(file, &symbolTable);
     
     std::vector<Token> tokens = lexer.tokenize();
     
