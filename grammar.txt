@@ -30,7 +30,6 @@ ExtractStmt     -> EXTRACT Entity WhereClause SEMICOLON
 
 WhereClause     -> WHERE Condition | λ
 
-/* Boolean expressions with cascading precedence */
 Condition       -> Term ConditionPrime
 ConditionPrime  -> OR Term ConditionPrime | λ
 Term            -> Factor TermPrime
