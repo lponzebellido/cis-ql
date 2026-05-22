@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = -std=c++11 -Wall
-TARGET = lexer
+TARGET = cisql
 
 SRCS = main.cpp Lexer.cpp Parser.cpp AST.cpp
 OBJS = $(SRCS:.cpp=.o)

@@ -3,7 +3,7 @@ LOAD SEQUENCE "genome.fasta" AS genome_data;
 FIND MOTIF "MYB" WITHIN 2000 BP UPSTREAM FROM GENE "X";
 EXTRACT PROMOTER WHERE LENGTH > 500 BP;
 
-/* Probando las nuevas entidades y operaciones */
+/* Comentariooooos */
 INTERSECT EXON AND INTRON WHERE SIMILARITY >= 90.5%;
 FIND MOTIF "X" STRAND POSITIVE CHR "1";
 
