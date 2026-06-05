@@ -29,7 +29,19 @@ void SemanticAnalyzer::visit(ProgramNode* node) {
   }
 }
 
+#include <fstream>
+
 void SemanticAnalyzer::visit(LoadStmtNode* node) {
+  std::string actualFilename = node->filename;
+  if (actualFilename.size() >= 2 && actualFilename.front() == '"' && actualFilename.back() == '"') {
+      actualFilename = actualFilename.substr(1, actualFilename.size() - 2);
+  }
+
+  std::ifstream file(actualFilename);
+  if (!file.good()) {
+      reportError("File '" + actualFilename + "' not found or cannot be opened.");
+  }
+
   if (symbolTable.lookup(node->alias)) {
     reportError("Alias '" + node->alias + "' is already defined.");
   } else {
