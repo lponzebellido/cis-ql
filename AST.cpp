@@ -70,3 +70,13 @@ void ProgramNode::print(int indent) const {
         stmt->print(indent + 1);
     }
 }
+
+void SimpleConditionNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
+void BinaryConditionNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
+void NotConditionNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
+void LoadStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
+void FindOptNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
+void FindStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
+void ExtractStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
+void SetOpStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
+void ProgramNode::accept(ASTVisitor& visitor) { visitor.visit(this); }

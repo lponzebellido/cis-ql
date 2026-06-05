@@ -1,5 +1,6 @@
 #include "Lexer.h"
 #include "Parser.h"
+#include "SemanticAnalyzer.h"
 #include <fstream>
 #include <iostream>
 
@@ -43,6 +44,15 @@ void printSyntaxAnalysis(const Parser &parser,
   }
 }
 
+void printSemanticAnalysis(const SemanticAnalyzer &semantic) {
+  std::cout << "\n\nSEMANTIC ANALYSIS:\n\n";
+  if (!semantic.hadError()) {
+    std::cout << "Semantic analysis completed without errors. Program is valid.\n";
+  } else {
+    std::cout << "\nSemantic analysis finished WITH ERRORS.\n";
+  }
+}
+
 int main() {
   std::string filename = "prueba.cql";
   std::ifstream file(filename);
@@ -62,8 +72,20 @@ int main() {
   auto ast = parser.parse();
 
   printLexicalAnalysis(tokens);
+  
+  if (!parser.hadError()) {
+    printSyntaxAnalysis(parser, ast);
+    
+    // 3. Semantic
+    SemanticAnalyzer semantic(symbolTable);
+    semantic.analyze(ast.get());
+    
+    printSemanticAnalysis(semantic);
+  } else {
+    printSyntaxAnalysis(parser, ast);
+  }
+
   symbolTable.print();
-  printSyntaxAnalysis(parser, ast);
 
   return 0;
 }

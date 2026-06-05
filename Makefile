@@ -2,7 +2,7 @@ CXX = g++
 CXXFLAGS = -std=c++11 -Wall
 TARGET = cisql
 
-SRCS = main.cpp Lexer.cpp Parser.cpp AST.cpp
+SRCS = main.cpp Lexer.cpp Parser.cpp AST.cpp SemanticAnalyzer.cpp
 OBJS = $(SRCS:.cpp=.o)
 all: $(TARGET)
 $(TARGET): $(OBJS)

@@ -1,5 +1,5 @@
 // Archivo de prueba para Cis-QL
-LOAD SEQUENCE "genome.fasta" AS genome_data;
+LOAD SEQUENCE "ecoli.fasta" AS ecoli_genome;
 FIND MOTIF "MYB" WITHIN 2000 BP UPSTREAM FROM GENE "X";
 EXTRACT PROMOTER WHERE LENGTH > 500 BP;
 

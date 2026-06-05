@@ -151,7 +151,6 @@ Token Lexer::identifierOrKeyword(char firstChar, int startLine, int startCol) {
         return createToken(keywords[lexeme], lexeme, startLine, startCol);
     }
     
-    symbolTable->insert(lexeme, "ID");
     return createToken(TokenType::ID, lexeme, startLine, startCol);
 }
 
@@ -193,7 +192,6 @@ Token Lexer::stringLiteral(int startLine, int startCol) {
         }
         lexeme += c;
     }
-    symbolTable->insert(lexeme, "LITERAL_STRING");
     return createToken(TokenType::STRING, "\"" + lexeme + "\"", startLine, startCol);
 }
 
