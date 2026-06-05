@@ -1,32 +1,29 @@
 #include "AST.h"
 #include <iostream>
 
-void SimpleConditionNode::print(int indent) const {
-    printIndent(indent);
-    std::cout << "SimpleCondition(" << property << " " << op << " " << value << ")" << std::endl;
+void SimpleConditionNode::print(std::string prefix, bool isLast) const {
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "SimpleCondition(" << property << " " << op << " " << value << ")" << std::endl;
 }
 
-void BinaryConditionNode::print(int indent) const {
-    printIndent(indent);
-    std::cout << "BinaryCondition(" << op << ")" << std::endl;
-    if (left) left->print(indent + 1);
-    if (right) right->print(indent + 1);
+void BinaryConditionNode::print(std::string prefix, bool isLast) const {
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "BinaryCondition(" << op << ")" << std::endl;
+    std::string childPrefix = prefix + (isLast ? "    " : "│   ");
+    if (left) left->print(childPrefix, right == nullptr);
+    if (right) right->print(childPrefix, true);
 }
 
-void NotConditionNode::print(int indent) const {
-    printIndent(indent);
-    std::cout << "NotCondition" << std::endl;
-    if (condition) condition->print(indent + 1);
+void NotConditionNode::print(std::string prefix, bool isLast) const {
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "NotCondition" << std::endl;
+    std::string childPrefix = prefix + (isLast ? "    " : "│   ");
+    if (condition) condition->print(childPrefix, true);
 }
 
-void LoadStmtNode::print(int indent) const {
-    printIndent(indent);
-    std::cout << "LoadStmt(File: " << filename << ", Alias: " << alias << ")" << std::endl;
+void LoadStmtNode::print(std::string prefix, bool isLast) const {
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "LoadStmt(File: " << filename << ", Alias: " << alias << ")" << std::endl;
 }
 
-void FindOptNode::print(int indent) const {
-    printIndent(indent);
-    std::cout << "FindOpt(" << type;
+void FindOptNode::print(std::string prefix, bool isLast) const {
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "FindOpt(" << type;
     if (!value1.empty()) std::cout << ", " << value1;
     if (!value2.empty()) std::cout << " " << value2;
     if (!value3.empty()) std::cout << " " << value3;
@@ -35,39 +32,41 @@ void FindOptNode::print(int indent) const {
     std::cout << ")" << std::endl;
 }
 
-void FindStmtNode::print(int indent) const {
-    printIndent(indent);
-    std::cout << "FindStmt(Motif: " << motif << ")" << std::endl;
-    for (const auto& opt : opts) {
-        opt->print(indent + 1);
+void FindStmtNode::print(std::string prefix, bool isLast) const {
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "FindStmt(Motif: " << motif << ")" << std::endl;
+    std::string childPrefix = prefix + (isLast ? "    " : "│   ");
+    for (size_t i = 0; i < opts.size(); ++i) {
+        opts[i]->print(childPrefix, i == opts.size() - 1);
     }
 }
 
-void ExtractStmtNode::print(int indent) const {
-    printIndent(indent);
-    std::cout << "ExtractStmt(Entity: " << entity << ")" << std::endl;
+void ExtractStmtNode::print(std::string prefix, bool isLast) const {
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "ExtractStmt(Entity: " << entity << ")" << std::endl;
+    std::string childPrefix = prefix + (isLast ? "    " : "│   ");
     if (whereClause) {
-        printIndent(indent + 1);
-        std::cout << "Where:" << std::endl;
-        whereClause->print(indent + 2);
+        std::cout << childPrefix << "└── Where:" << std::endl;
+        whereClause->print(childPrefix + "    ", true);
     }
 }
 
-void SetOpStmtNode::print(int indent) const {
-    printIndent(indent);
-    std::cout << "SetOperationStmt(" << op << " " << entity1 << " AND " << entity2 << ")" << std::endl;
+void SetOpStmtNode::print(std::string prefix, bool isLast) const {
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "SetOperationStmt(" << op << " " << entity1 << " AND " << entity2 << ")" << std::endl;
+    std::string childPrefix = prefix + (isLast ? "    " : "│   ");
     if (whereClause) {
-        printIndent(indent + 1);
-        std::cout << "Where:" << std::endl;
-        whereClause->print(indent + 2);
+        std::cout << childPrefix << "└── Where:" << std::endl;
+        whereClause->print(childPrefix + "    ", true);
     }
 }
 
-void ProgramNode::print(int indent) const {
-    printIndent(indent);
-    std::cout << "Program" << std::endl;
-    for (const auto& stmt : statements) {
-        stmt->print(indent + 1);
+void ProgramNode::print(std::string prefix, bool isLast) const {
+    if (prefix.empty()) {
+        std::cout << "Program" << std::endl;
+    } else {
+        std::cout << prefix << (isLast ? "└── " : "├── ") << "Program" << std::endl;
+    }
+    std::string childPrefix = prefix.empty() ? "" : prefix + (isLast ? "    " : "│   ");
+    for (size_t i = 0; i < statements.size(); ++i) {
+        statements[i]->print(childPrefix, i == statements.size() - 1);
     }
 }
 

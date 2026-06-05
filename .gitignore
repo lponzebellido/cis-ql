@@ -4,3 +4,5 @@
 *.a
 *.pdf
 cisql
+cmake-build-debug
+pdf/
