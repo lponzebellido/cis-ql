@@ -7,4 +7,6 @@ EXTRACT PROMOTER WHERE LENGTH > 500 BP;
 INTERSECT EXON AND INTRON WHERE SIMILARITY >= 90.5%;
 FIND MOTIF "X" STRAND POSITIVE CHR "1";
 
+/* Comentariooooos 2 */
+
 @ // Esto deberia generar un TKN_ERROR pero continuar
