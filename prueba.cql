@@ -1,6 +1,6 @@
 // Cis-QL test program for E. coli K-12 genome
-LOAD SEQUENCE "ecoli.fasta" AS ecoli_genome;
-LOAD ANNOTATION "ecoli.gff3" AS ecoli_annot;
+LOAD SEQUENCE "examples/ecoli2.fna" AS ecoli_genome;
+LOAD ANNOTATION "examples/genomic.gff" AS ecoli_annot;
 FIND MOTIF "TATAAT" WITHIN 500 BP UPSTREAM FROM GENE "thrA";
 EXTRACT PROMOTER WHERE LENGTH > 100 BP;
 INTERSECT GENE AND CDS WHERE SIMILARITY >= 90.5%;
