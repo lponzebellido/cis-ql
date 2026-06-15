@@ -153,7 +153,7 @@ std::unique_ptr<FindStmtNode> Parser::parseFind() {
       if (match(TokenType::GENE) || match(TokenType::PROMOTER) ||
           match(TokenType::ENHANCER) || match(TokenType::EXON) ||
           match(TokenType::INTRON) || match(TokenType::UTR) ||
-          match(TokenType::TSS) || match(TokenType::REGION)) {
+          match(TokenType::TSS) || match(TokenType::CDS) || match(TokenType::REGION)) {
         opt->value4 = previous().lexeme;
       } else {
         reportError(peek(), "Expected a biological entity.");
@@ -189,7 +189,7 @@ std::unique_ptr<ExtractStmtNode> Parser::parseExtract() {
   if (match(TokenType::GENE) || match(TokenType::PROMOTER) ||
       match(TokenType::ENHANCER) || match(TokenType::EXON) ||
       match(TokenType::INTRON) || match(TokenType::UTR) ||
-      match(TokenType::TSS) || match(TokenType::REGION)) {
+      match(TokenType::TSS) || match(TokenType::CDS) || match(TokenType::REGION)) {
     std::string entity = previous().lexeme;
     auto whereClause = parseWhereClause();
     consume(TokenType::SEMICOLON, "Expected ';' at the end of EXTRACT.");
@@ -212,7 +212,7 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
   if (match(TokenType::GENE) || match(TokenType::PROMOTER) ||
       match(TokenType::ENHANCER) || match(TokenType::EXON) ||
       match(TokenType::INTRON) || match(TokenType::UTR) ||
-      match(TokenType::TSS) || match(TokenType::REGION)) {
+      match(TokenType::TSS) || match(TokenType::CDS) || match(TokenType::REGION)) {
     std::string e1 = previous().lexeme;
 
     std::string sepError =
@@ -225,7 +225,7 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
     if (match(TokenType::GENE) || match(TokenType::PROMOTER) ||
         match(TokenType::ENHANCER) || match(TokenType::EXON) ||
         match(TokenType::INTRON) || match(TokenType::UTR) ||
-        match(TokenType::TSS) || match(TokenType::REGION)) {
+        match(TokenType::TSS) || match(TokenType::CDS) || match(TokenType::REGION)) {
       std::string e2 = previous().lexeme;
       auto whereClause = parseWhereClause();
       consume(TokenType::SEMICOLON,

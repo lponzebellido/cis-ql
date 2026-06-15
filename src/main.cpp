@@ -1,11 +1,11 @@
-#include "Lexer.h"
-#include "Parser.h"
-#include "SemanticAnalyzer.h"
-#include "IRGenerator.h"
-#include "Interpreter.h"
+#include "backend/IRGenerator.h"
+#include "backend/Interpreter.h"
+#include "backend/SemanticAnalyzer.h"
+#include "frontend/Lexer.h"
+#include "frontend/Parser.h"
 #include <fstream>
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 
 void printLexicalAnalysis(const std::vector<Token> &tokens) {
   std::cout << "\n\nLEXICAL ANALYSIS:\n\n";
@@ -50,7 +50,8 @@ void printSyntaxAnalysis(const Parser &parser,
 void printSemanticAnalysis(const SemanticAnalyzer &semantic) {
   std::cout << "\n\nSEMANTIC ANALYSIS:\n\n";
   if (!semantic.hadError()) {
-    std::cout << "Semantic analysis completed without errors. Program is valid.\n";
+    std::cout
+        << "Semantic analysis completed without errors. Program is valid.\n";
   } else {
     std::cout << "\nSemantic analysis finished WITH ERRORS.\n";
   }
@@ -59,17 +60,23 @@ void printSemanticAnalysis(const SemanticAnalyzer &semantic) {
 void printIRCode(const std::vector<IRInstruction> &ir) {
   std::cout << "\n\nINTERMEDIATE CODE:\n\n";
   for (size_t i = 0; i < ir.size(); i++) {
-    std::cout << "[" << std::setw(3) << i << "] " << irOpcodeToString(ir[i].opcode);
-    if (!ir[i].arg1.empty()) std::cout << "\t" << ir[i].arg1;
-    if (!ir[i].arg2.empty()) std::cout << "\t" << ir[i].arg2;
-    if (!ir[i].arg3.empty()) std::cout << "\t" << ir[i].arg3;
-    if (!ir[i].arg4.empty()) std::cout << "\t" << ir[i].arg4;
-    if (!ir[i].arg5.empty()) std::cout << "\t" << ir[i].arg5;
+    std::cout << "[" << std::setw(3) << i << "] "
+              << irOpcodeToString(ir[i].opcode);
+    if (!ir[i].arg1.empty())
+      std::cout << "\t" << ir[i].arg1;
+    if (!ir[i].arg2.empty())
+      std::cout << "\t" << ir[i].arg2;
+    if (!ir[i].arg3.empty())
+      std::cout << "\t" << ir[i].arg3;
+    if (!ir[i].arg4.empty())
+      std::cout << "\t" << ir[i].arg4;
+    if (!ir[i].arg5.empty())
+      std::cout << "\t" << ir[i].arg5;
     std::cout << std::endl;
   }
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   std::string filename = "prueba.cql";
   if (argc > 1) {
     filename = argv[1];
@@ -103,7 +110,7 @@ int main(int argc, char* argv[]) {
     if (!semantic.hadError()) {
       // 4. IR Generation
       IRGenerator irGen;
-      const auto& ir = irGen.generate(ast.get());
+      const auto &ir = irGen.generate(ast.get());
       printIRCode(ir);
 
       // 5. Execution

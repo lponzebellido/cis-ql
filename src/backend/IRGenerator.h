@@ -1,7 +1,7 @@
 #ifndef IR_GENERATOR_H
 #define IR_GENERATOR_H
 
-#include "AST.h"
+#include "../frontend/AST.h"
 #include <string>
 #include <vector>
 
@@ -44,18 +44,20 @@ private:
 public:
   IRGenerator();
 
-  const std::vector<IRInstruction>& generate(ProgramNode* node);
-  const std::vector<IRInstruction>& getInstructions() const { return instructions; }
+  const std::vector<IRInstruction> &generate(ProgramNode *node);
+  const std::vector<IRInstruction> &getInstructions() const {
+    return instructions;
+  }
 
-  void visit(SimpleConditionNode* node) override;
-  void visit(BinaryConditionNode* node) override;
-  void visit(NotConditionNode* node) override;
-  void visit(LoadStmtNode* node) override;
-  void visit(FindOptNode* node) override;
-  void visit(FindStmtNode* node) override;
-  void visit(ExtractStmtNode* node) override;
-  void visit(SetOpStmtNode* node) override;
-  void visit(ProgramNode* node) override;
+  void visit(SimpleConditionNode *node) override;
+  void visit(BinaryConditionNode *node) override;
+  void visit(NotConditionNode *node) override;
+  void visit(LoadStmtNode *node) override;
+  void visit(FindOptNode *node) override;
+  void visit(FindStmtNode *node) override;
+  void visit(ExtractStmtNode *node) override;
+  void visit(SetOpStmtNode *node) override;
+  void visit(ProgramNode *node) override;
 };
 
 #endif
