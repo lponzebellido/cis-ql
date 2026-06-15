@@ -19,7 +19,7 @@ void NotConditionNode::print(std::string prefix, bool isLast) const {
 }
 
 void LoadStmtNode::print(std::string prefix, bool isLast) const {
-    std::cout << prefix << (isLast ? "└── " : "├── ") << "LoadStmt(File: " << filename << ", Alias: " << alias << ")" << std::endl;
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "LoadStmt(" << loadType << " File: " << filename << ", Alias: " << alias << ")" << std::endl;
 }
 
 void FindOptNode::print(std::string prefix, bool isLast) const {

@@ -18,6 +18,7 @@ void Lexer::initKeywords() {
     keywords["MOTIF"] = TokenType::MOTIF;
     keywords["GENE"] = TokenType::GENE;
     keywords["SEQUENCE"] = TokenType::SEQUENCE;
+    keywords["ANNOTATION"] = TokenType::ANNOTATION;
     keywords["REGION"] = TokenType::REGION;
     keywords["PROMOTER"] = TokenType::PROMOTER;
     keywords["ENHANCER"] = TokenType::ENHANCER;
@@ -274,6 +275,7 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::MOTIF: return "MOTIF";
         case TokenType::GENE: return "GENE";
         case TokenType::SEQUENCE: return "SEQUENCE";
+        case TokenType::ANNOTATION: return "ANNOTATION";
         case TokenType::REGION: return "REGION";
         case TokenType::PROMOTER: return "PROMOTER";
         case TokenType::ENHANCER: return "ENHANCER";

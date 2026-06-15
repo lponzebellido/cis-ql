@@ -1,12 +1,7 @@
-// Archivo de prueba para Cis-QL
+// Cis-QL test program for E. coli K-12 genome
 LOAD SEQUENCE "ecoli.fasta" AS ecoli_genome;
-FIND MOTIF "MYB" WITHIN 2000 BP UPSTREAM FROM GENE "X";
-EXTRACT PROMOTER WHERE LENGTH > 500 BP;
-
-/* Comentariooooos */
-INTERSECT EXON AND INTRON WHERE SIMILARITY >= 90.5%;
-FIND MOTIF "X" STRAND POSITIVE CHR "1";
-
-/* Comentariooooos 2 */
-
-@ // Esto deberia generar un TKN_ERROR pero continuar
+LOAD ANNOTATION "ecoli.gff3" AS ecoli_annot;
+FIND MOTIF "TATAAT" WITHIN 500 BP UPSTREAM FROM GENE "thrA";
+EXTRACT PROMOTER WHERE LENGTH > 100 BP;
+INTERSECT GENE AND CDS WHERE SIMILARITY >= 90.5%;
+FIND MOTIF "ATGCGA" STRAND POSITIVE;

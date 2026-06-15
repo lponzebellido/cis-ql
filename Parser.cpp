@@ -104,7 +104,15 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
 }
 
 std::unique_ptr<LoadStmtNode> Parser::parseLoad() {
-  consume(TokenType::SEQUENCE, "Expected 'SEQUENCE' after LOAD.");
+  std::string loadType;
+  if (match(TokenType::SEQUENCE)) {
+    loadType = "SEQUENCE";
+  } else if (match(TokenType::ANNOTATION)) {
+    loadType = "ANNOTATION";
+  } else {
+    reportError(peek(), "Expected 'SEQUENCE' or 'ANNOTATION' after LOAD.");
+    throw std::runtime_error("Parse error");
+  }
   consume(TokenType::STRING, "Expected a file name (string).");
   std::string file = previous().lexeme;
   consume(TokenType::AS, "Expected 'AS' after the file name.");
@@ -112,7 +120,7 @@ std::unique_ptr<LoadStmtNode> Parser::parseLoad() {
   std::string alias = previous().lexeme;
   consume(TokenType::SEMICOLON,
           "Expected ';' at the end of the LOAD statement.");
-  return std::unique_ptr<LoadStmtNode>(new LoadStmtNode(file, alias));
+  return std::unique_ptr<LoadStmtNode>(new LoadStmtNode(loadType, file, alias));
 }
 
 std::unique_ptr<FindStmtNode> Parser::parseFind() {

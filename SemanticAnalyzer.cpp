@@ -1,8 +1,9 @@
 #include "SemanticAnalyzer.h"
+#include <fstream>
 #include <iostream>
 
 SemanticAnalyzer::SemanticAnalyzer(SymbolTable& symTab)
-    : symbolTable(symTab), hasError(false) {}
+    : symbolTable(symTab), hasError(false), annotationLoaded(false) {}
 
 void SemanticAnalyzer::reportError(const std::string& message) {
   std::cerr << "Semantic Error: " << message << std::endl;
@@ -29,23 +30,26 @@ void SemanticAnalyzer::visit(ProgramNode* node) {
   }
 }
 
-#include <fstream>
-
 void SemanticAnalyzer::visit(LoadStmtNode* node) {
   std::string actualFilename = node->filename;
   if (actualFilename.size() >= 2 && actualFilename.front() == '"' && actualFilename.back() == '"') {
-      actualFilename = actualFilename.substr(1, actualFilename.size() - 2);
+    actualFilename = actualFilename.substr(1, actualFilename.size() - 2);
   }
 
   std::ifstream file(actualFilename);
   if (!file.good()) {
-      reportError("File '" + actualFilename + "' not found or cannot be opened.");
+    reportError("File '" + actualFilename + "' not found or cannot be opened.");
   }
 
   if (symbolTable.lookup(node->alias)) {
     reportError("Alias '" + node->alias + "' is already defined.");
   } else {
-    symbolTable.insert(node->alias, "GENOME_DATA");
+    if (node->loadType == "SEQUENCE") {
+      symbolTable.insert(node->alias, "GENOME_DATA");
+    } else if (node->loadType == "ANNOTATION") {
+      symbolTable.insert(node->alias, "ANNOTATION_DATA");
+      annotationLoaded = true;
+    }
   }
 }
 
@@ -61,16 +65,25 @@ void SemanticAnalyzer::visit(FindOptNode* node) {
     if (distance < 0) {
       reportError("Distance in WITHIN option cannot be negative.");
     }
+    if (!node->value4.empty() && !annotationLoaded) {
+      reportError("WITHIN ... FROM " + node->value4 + " requires annotation data. Use: LOAD ANNOTATION \"file.gff3\" AS alias;");
+    }
   }
 }
 
 void SemanticAnalyzer::visit(ExtractStmtNode* node) {
+  if (!annotationLoaded) {
+    reportError("EXTRACT " + node->entity + " requires annotation data. Use: LOAD ANNOTATION \"file.gff3\" AS alias;");
+  }
   if (node->whereClause) {
     node->whereClause->accept(*this);
   }
 }
 
 void SemanticAnalyzer::visit(SetOpStmtNode* node) {
+  if (!annotationLoaded) {
+    reportError("Set operation " + node->op + " requires annotation data. Use: LOAD ANNOTATION \"file.gff3\" AS alias;");
+  }
   if (node->whereClause) {
     node->whereClause->accept(*this);
   }

@@ -76,9 +76,11 @@ class StatementNode : public ASTNode {};
 
 class LoadStmtNode : public StatementNode {
 public:
+  std::string loadType;
   std::string filename;
   std::string alias;
-  LoadStmtNode(std::string f, std::string a) : filename(f), alias(a) {}
+  LoadStmtNode(std::string lt, std::string f, std::string a)
+      : loadType(lt), filename(f), alias(a) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;
 };

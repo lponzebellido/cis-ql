@@ -1,8 +1,11 @@
 #include "Lexer.h"
 #include "Parser.h"
 #include "SemanticAnalyzer.h"
+#include "IRGenerator.h"
+#include "Interpreter.h"
 #include <fstream>
 #include <iostream>
+#include <iomanip>
 
 void printLexicalAnalysis(const std::vector<Token> &tokens) {
   std::cout << "\n\nLEXICAL ANALYSIS:\n\n";
@@ -53,34 +56,61 @@ void printSemanticAnalysis(const SemanticAnalyzer &semantic) {
   }
 }
 
-int main() {
-  std::string filename = "prueba.cql";
-  std::ifstream file(filename);
+void printIRCode(const std::vector<IRInstruction> &ir) {
+  std::cout << "\n\nINTERMEDIATE CODE:\n\n";
+  for (size_t i = 0; i < ir.size(); i++) {
+    std::cout << "[" << std::setw(3) << i << "] " << irOpcodeToString(ir[i].opcode);
+    if (!ir[i].arg1.empty()) std::cout << "\t" << ir[i].arg1;
+    if (!ir[i].arg2.empty()) std::cout << "\t" << ir[i].arg2;
+    if (!ir[i].arg3.empty()) std::cout << "\t" << ir[i].arg3;
+    if (!ir[i].arg4.empty()) std::cout << "\t" << ir[i].arg4;
+    if (!ir[i].arg5.empty()) std::cout << "\t" << ir[i].arg5;
+    std::cout << std::endl;
+  }
+}
 
+int main(int argc, char* argv[]) {
+  std::string filename = "prueba.cql";
+  if (argc > 1) {
+    filename = argv[1];
+  }
+
+  std::ifstream file(filename);
   if (!file.is_open()) {
     std::cerr << "Error: Could not open " << filename << std::endl;
     return 1;
   }
 
-  // 1. Lexical
+  // 1. Lexical Analysis
   SymbolTable symbolTable;
   Lexer lexer(file, &symbolTable);
   std::vector<Token> tokens = lexer.tokenize();
 
-  // 2. Syntax
+  // 2. Syntax Analysis
   Parser parser(tokens);
   auto ast = parser.parse();
 
   printLexicalAnalysis(tokens);
-  
+
   if (!parser.hadError()) {
     printSyntaxAnalysis(parser, ast);
-    
-    // 3. Semantic
+
+    // 3. Semantic Analysis
     SemanticAnalyzer semantic(symbolTable);
     semantic.analyze(ast.get());
-    
     printSemanticAnalysis(semantic);
+
+    if (!semantic.hadError()) {
+      // 4. IR Generation
+      IRGenerator irGen;
+      const auto& ir = irGen.generate(ast.get());
+      printIRCode(ir);
+
+      // 5. Execution
+      std::cout << "\n\nEXECUTION:\n\n";
+      Interpreter interpreter;
+      interpreter.execute(ir);
+    }
   } else {
     printSyntaxAnalysis(parser, ast);
   }
