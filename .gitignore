@@ -6,3 +6,5 @@
 cisql
 cmake-build-debug
 pdf/
+venv/*
+tools/*
