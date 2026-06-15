@@ -77,9 +77,22 @@ void printIRCode(const std::vector<IRInstruction> &ir) {
 }
 
 int main(int argc, char *argv[]) {
-  std::string filename = "prueba.cql";
-  if (argc > 1) {
-    filename = argv[1];
+  std::string filename = "";
+  bool debugMode = false;
+
+  for (int i = 1; i < argc; ++i) {
+    std::string arg = argv[i];
+    if (arg == "--debug" || arg == "-d") {
+      debugMode = true;
+    } else {
+      filename = arg;
+    }
+  }
+
+  if (filename.empty()) {
+    std::cerr << "Usage: " << argv[0] << " <filename.cql> [--debug]"
+              << std::endl;
+    return 1;
   }
 
   std::ifstream file(filename);
@@ -93,36 +106,42 @@ int main(int argc, char *argv[]) {
   Lexer lexer(file, &symbolTable);
   std::vector<Token> tokens = lexer.tokenize();
 
+  if (debugMode)
+    printLexicalAnalysis(tokens);
+
   // 2. Syntax Analysis
   Parser parser(tokens);
   auto ast = parser.parse();
 
-  printLexicalAnalysis(tokens);
-
   if (!parser.hadError()) {
-    printSyntaxAnalysis(parser, ast);
+    if (debugMode)
+      printSyntaxAnalysis(parser, ast);
 
     // 3. Semantic Analysis
     SemanticAnalyzer semantic(symbolTable);
     semantic.analyze(ast.get());
-    printSemanticAnalysis(semantic);
+
+    if (debugMode)
+      printSemanticAnalysis(semantic);
 
     if (!semantic.hadError()) {
       // 4. IR Generation
       IRGenerator irGen;
       const auto &ir = irGen.generate(ast.get());
-      printIRCode(ir);
+      if (debugMode)
+        printIRCode(ir);
 
       // 5. Execution
-      std::cout << "\n\nEXECUTION:\n\n";
       Interpreter interpreter;
       interpreter.execute(ir);
     }
   } else {
-    printSyntaxAnalysis(parser, ast);
+    if (debugMode)
+      printSyntaxAnalysis(parser, ast);
   }
 
-  symbolTable.print();
+  if (debugMode)
+    symbolTable.print();
 
   return 0;
 }
