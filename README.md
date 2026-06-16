@@ -55,6 +55,40 @@ Use the `--debug` flag to see the underlying AST (Abstract Syntax Tree), Symbol 
 
 Cis-QL reads like SQL but is tailored for genomics.
 
+### Formal Grammar (CFG)
+
+| Non-Terminal | | Expansion |
+| :--- | :---: | :--- |
+| `Program` | → | `StatementList` |
+| `StatementList` | → | `Statement` `StatementList` <br> \| `λ` (epsilon) |
+| `Statement` | → | `LoadStmt` \| `FindStmt` \| `ExtractStmt` \| `SetOperationStmt` |
+| `LoadStmt` | → | **`LOAD`** (**`SEQUENCE`** \| **`ANNOTATION`**) *`STRING`* **`AS`** *`ID`* **`;`** |
+| `FindStmt` | → | **`FIND MOTIF`** *`STRING`* `FindOpts` `AliasOpt` `WhereClause` **`;`** |
+| `FindOpts` | → | `FindOpt` `FindOpts` <br> \| `λ` |
+| `FindOpt` | → | **`WITHIN`** *`NUM`* `Unit` `Direction` **`FROM`** `EntityRef` `EntityName` <br> \| **`STRAND`** `StrandType` <br> \| **`CHR`** *`STRING`* |
+| `AliasOpt` | → | **`AS`** *`ID`* <br> \| `λ` |
+| `SetOperationStmt`| → | `SetOp` `EntityRef` **`AND`** `EntityRef` `WhereClause` **`;`** |
+| `SetOp` | → | **`INTERSECT`** \| **`UNION`** \| **`EXCEPT`** |
+| `ExtractStmt` | → | **`EXTRACT`** `EntityRef` `WhereClause` **`;`** |
+| `WhereClause` | → | **`WHERE`** `Condition` <br> \| `λ` |
+| `Condition` | → | `Term` `ConditionPrime` |
+| `ConditionPrime`| → | **`OR`** `Term` `ConditionPrime` <br> \| `λ` |
+| `Term` | → | `Factor` `TermPrime` |
+| `TermPrime` | → | **`AND`** `Factor` `TermPrime` <br> \| `λ` |
+| `Factor` | → | **`NOT`** `Factor` <br> \| `SimpleCondition` <br> \| **`(`** `Condition` **`)`** |
+| `SimpleCondition`| → | `Property` `RelOp` `Value` |
+| `Property` | → | **`LENGTH`** \| **`SIMILARITY`** |
+| `RelOp` | → | **`>`** \| **`<`** \| **`>=`** \| **`<=`** \| **`=`** |
+| `Value` | → | *`NUM`* `Unit` <br> \| *`FLOAT`* **`%`** <br> \| *`NUM`* <br> \| *`STRING`* |
+| `Unit` | → | **`BP`** \| **`KB`** \| **`MB`** <br> \| `λ` |
+| `Direction` | → | **`UPSTREAM`** \| **`DOWNSTREAM`** |
+| `Entity` | → | **`GENE`** \| **`PROMOTER`** \| **`ENHANCER`** \| **`EXON`** \| **`INTRON`** \| **`UTR`** \| **`TSS`** \| **`CDS`** \| **`REGION`** |
+| `EntityRef` | → | `Entity` \| *`ID`* |
+| `EntityName` | → | *`STRING`* <br> \| `λ` |
+| `StrandType` | → | **`POSITIVE`** \| **`NEGATIVE`** |
+
+*(Keywords and terminals are highlighted in **`bold code`**. Identifiers and literals are in *`italic code`*. Non-terminals are in `regular code`)*
+
 ### 1. Loading Data
 You can load sequence data (FASTA) and/or annotation data (GFF3).
 ```sql
