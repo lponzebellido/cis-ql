@@ -1,4 +1,4 @@
-LOAD SEQUENCE "examples/test.fasta" AS ambiente_1;
+LOAD SEQUENCE "data_examples/ecoli.fasta" AS ambiente_1;
 
 FIND MOTIF "TATA[AT]A[AT]" STRAND POSITIVE AS putative_promoters;
 

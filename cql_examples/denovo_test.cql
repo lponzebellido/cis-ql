@@ -1,3 +1,2 @@
-// De Novo Discovery Test
-LOAD SEQUENCE "examples/ecoli.fasta" AS ecoli;
-FIND MOTIF "ATGGGGGG" STRAND POSITIVE AS Met;
+LOAD SEQUENCE "data_examples/test.fasta" AS seq;
+FIND MOTIF "TT" STRAND POSITIVE AS P;
