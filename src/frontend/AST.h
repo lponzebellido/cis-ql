@@ -101,7 +101,10 @@ class FindStmtNode : public StatementNode {
 public:
   std::string motif;
   std::vector<std::unique_ptr<FindOptNode>> opts;
-  FindStmtNode(std::string m) : motif(m) {}
+  std::string alias;
+  std::unique_ptr<ConditionNode> whereClause;
+  FindStmtNode(std::string m, std::string a = "")
+      : motif(m), alias(a) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;
 };

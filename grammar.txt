@@ -2,8 +2,8 @@ Context-Free Grammar (CFG) for Cis-QL
 
 Terminals (Tokens):
 
-LOAD, SEQUENCE, STRING, AS, ID, SEMICOLON, FIND, MOTIF, WITHIN, NUM,
-FROM, GENE, PROMOTER, ENHANCER, EXON, INTRON, UTR, TSS, REGION, STRAND,
+LOAD, SEQUENCE, ANNOTATION, STRING, AS, ID, SEMICOLON, FIND, MOTIF, WITHIN, NUM,
+FROM, GENE, PROMOTER, ENHANCER, EXON, INTRON, UTR, TSS, CDS, REGION, STRAND,
 POSITIVE, NEGATIVE, CHR, EXTRACT, WHERE, INTERSECT, UNION, EXCEPT, AND,
 OR, NOT, LPAREN, RPAREN, LENGTH, SIMILARITY, GREATER, LESS, GREATER_EQ,
 LESS_EQ, ASSIGN, FLOAT, PERCENT, BP, KB, MB, UPSTREAM, DOWNSTREAM.
@@ -15,18 +15,19 @@ StatementList   -> Statement StatementList | λ
 
 Statement       -> LoadStmt | FindStmt | ExtractStmt | SetOperationStmt
 
-LoadStmt        -> LOAD SEQUENCE STRING AS ID SEMICOLON
+LoadStmt        -> LOAD (SEQUENCE | ANNOTATION) STRING AS ID SEMICOLON
 
-FindStmt        -> FIND MOTIF STRING FindOpts SEMICOLON
+FindStmt        -> FIND MOTIF STRING FindOpts AliasOpt WhereClause SEMICOLON
 FindOpts        -> FindOpt FindOpts | λ
-FindOpt         -> WITHIN NUM Unit Direction FROM Entity STRING
+FindOpt         -> WITHIN NUM Unit Direction FROM EntityRef EntityName
                  | STRAND StrandType
                  | CHR STRING
+AliasOpt        -> AS ID | λ
 
-SetOperationStmt-> SetOp Entity AND Entity WhereClause SEMICOLON
+SetOperationStmt-> SetOp EntityRef AND EntityRef WhereClause SEMICOLON
 SetOp           -> INTERSECT | UNION | EXCEPT
 
-ExtractStmt     -> EXTRACT Entity WhereClause SEMICOLON
+ExtractStmt     -> EXTRACT EntityRef WhereClause SEMICOLON
 
 WhereClause     -> WHERE Condition | λ
 
@@ -43,5 +44,7 @@ Value           -> NUM Unit | FLOAT PERCENT | NUM | STRING
 
 Unit            -> BP | KB | MB | λ
 Direction       -> UPSTREAM | DOWNSTREAM
-Entity          -> GENE | PROMOTER | ENHANCER | EXON | INTRON | UTR | TSS | REGION
+Entity          -> GENE | PROMOTER | ENHANCER | EXON | INTRON | UTR | TSS | CDS | REGION
+EntityRef       -> Entity | ID
+EntityName      -> STRING | λ
 StrandType      -> POSITIVE | NEGATIVE

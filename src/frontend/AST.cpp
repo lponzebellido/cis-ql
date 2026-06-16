@@ -33,10 +33,17 @@ void FindOptNode::print(std::string prefix, bool isLast) const {
 }
 
 void FindStmtNode::print(std::string prefix, bool isLast) const {
-    std::cout << prefix << (isLast ? "└── " : "├── ") << "FindStmt(Motif: " << motif << ")" << std::endl;
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "FindStmt(Motif: " << motif;
+    if (!alias.empty()) std::cout << ", AS: " << alias;
+    std::cout << ")" << std::endl;
     std::string childPrefix = prefix + (isLast ? "    " : "│   ");
+    bool hasWhere = whereClause != nullptr;
     for (size_t i = 0; i < opts.size(); ++i) {
-        opts[i]->print(childPrefix, i == opts.size() - 1);
+        opts[i]->print(childPrefix, !hasWhere && i == opts.size() - 1);
+    }
+    if (hasWhere) {
+        std::cout << childPrefix << "└── Where:" << std::endl;
+        whereClause->print(childPrefix + "    ", true);
     }
 }
 

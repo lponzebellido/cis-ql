@@ -129,7 +129,8 @@ std::unique_ptr<FindStmtNode> Parser::parseFind() {
   auto node =
       std::unique_ptr<FindStmtNode>(new FindStmtNode(previous().lexeme));
 
-  while (!check(TokenType::SEMICOLON) && !isAtEnd()) {
+  while (!check(TokenType::SEMICOLON) && !check(TokenType::AS) &&
+         !check(TokenType::WHERE) && !isAtEnd()) {
     auto opt = std::unique_ptr<FindOptNode>(new FindOptNode());
     if (match(TokenType::WITHIN)) {
       opt->type = "WITHIN";
@@ -153,15 +154,18 @@ std::unique_ptr<FindStmtNode> Parser::parseFind() {
       if (match(TokenType::GENE) || match(TokenType::PROMOTER) ||
           match(TokenType::ENHANCER) || match(TokenType::EXON) ||
           match(TokenType::INTRON) || match(TokenType::UTR) ||
-          match(TokenType::TSS) || match(TokenType::CDS) || match(TokenType::REGION)) {
+          match(TokenType::TSS) || match(TokenType::CDS) ||
+          match(TokenType::REGION) || match(TokenType::ID)) {
         opt->value4 = previous().lexeme;
       } else {
-        reportError(peek(), "Expected a biological entity.");
+        reportError(peek(), "Expected a biological entity or alias.");
         throw std::runtime_error("Parse error");
       }
 
-      consume(TokenType::STRING, "Expected the entity name.");
-      opt->value5 = previous().lexeme;
+      if (check(TokenType::STRING)) {
+        consume(TokenType::STRING, "Expected the entity name.");
+        opt->value5 = previous().lexeme;
+      }
 
     } else if (match(TokenType::STRAND)) {
       opt->type = "STRAND";
@@ -176,11 +180,18 @@ std::unique_ptr<FindStmtNode> Parser::parseFind() {
       consume(TokenType::STRING, "Expected the chromosome name.");
       opt->value1 = previous().lexeme;
     } else {
-      reportError(peek(), "Unrecognized option in FIND.");
-      throw std::runtime_error("Parse error");
+      break;
     }
     node->opts.push_back(std::move(opt));
   }
+
+  if (match(TokenType::AS)) {
+    consume(TokenType::ID, "Expected an alias identifier after AS.");
+    node->alias = previous().lexeme;
+  }
+
+  node->whereClause = parseWhereClause();
+
   consume(TokenType::SEMICOLON, "Expected ';' at the end of FIND.");
   return node;
 }
@@ -189,14 +200,15 @@ std::unique_ptr<ExtractStmtNode> Parser::parseExtract() {
   if (match(TokenType::GENE) || match(TokenType::PROMOTER) ||
       match(TokenType::ENHANCER) || match(TokenType::EXON) ||
       match(TokenType::INTRON) || match(TokenType::UTR) ||
-      match(TokenType::TSS) || match(TokenType::CDS) || match(TokenType::REGION)) {
+      match(TokenType::TSS) || match(TokenType::CDS) ||
+      match(TokenType::REGION) || match(TokenType::ID)) {
     std::string entity = previous().lexeme;
     auto whereClause = parseWhereClause();
     consume(TokenType::SEMICOLON, "Expected ';' at the end of EXTRACT.");
     return std::unique_ptr<ExtractStmtNode>(
         new ExtractStmtNode(entity, std::move(whereClause)));
   }
-  reportError(peek(), "Expected an entity for EXTRACT.");
+  reportError(peek(), "Expected an entity or alias for EXTRACT.");
   throw std::runtime_error("Parse error");
 }
 
@@ -212,7 +224,8 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
   if (match(TokenType::GENE) || match(TokenType::PROMOTER) ||
       match(TokenType::ENHANCER) || match(TokenType::EXON) ||
       match(TokenType::INTRON) || match(TokenType::UTR) ||
-      match(TokenType::TSS) || match(TokenType::CDS) || match(TokenType::REGION)) {
+      match(TokenType::TSS) || match(TokenType::CDS) ||
+      match(TokenType::REGION) || match(TokenType::ID)) {
     std::string e1 = previous().lexeme;
 
     std::string sepError =
@@ -225,7 +238,8 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
     if (match(TokenType::GENE) || match(TokenType::PROMOTER) ||
         match(TokenType::ENHANCER) || match(TokenType::EXON) ||
         match(TokenType::INTRON) || match(TokenType::UTR) ||
-        match(TokenType::TSS) || match(TokenType::CDS) || match(TokenType::REGION)) {
+        match(TokenType::TSS) || match(TokenType::CDS) ||
+        match(TokenType::REGION) || match(TokenType::ID)) {
       std::string e2 = previous().lexeme;
       auto whereClause = parseWhereClause();
       consume(TokenType::SEMICOLON,
@@ -234,7 +248,7 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
           new SetOpStmtNode(op, e1, e2, std::move(whereClause)));
     }
   }
-  reportError(peek(), "Expected an entity in the set operation.");
+  reportError(peek(), "Expected an entity or alias in the set operation.");
   throw std::runtime_error("Parse error");
 }
 

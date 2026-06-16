@@ -2,6 +2,15 @@
 #include <algorithm>
 #include <cstdlib>
 #include <iostream>
+#include <set>
+
+static const std::set<std::string> BUILTIN_ENTITIES = {
+    "GENE", "PROMOTER", "ENHANCER", "EXON", "INTRON",
+    "UTR", "TSS", "CDS", "REGION"};
+
+static bool isBuiltinEntity(const std::string &name) {
+  return BUILTIN_ENTITIES.count(name) > 0;
+}
 
 std::string Interpreter::stripQuotes(const std::string &s) {
   if (s.size() >= 2 && s.front() == '"' && s.back() == '"') {
@@ -68,6 +77,13 @@ void Interpreter::printRegions(const std::vector<GenomicRegion> &regions,
     }
     shown++;
   }
+}
+
+std::vector<GenomicRegion> Interpreter::resolveEntity(const std::string &entity) {
+  if (namedRegions.count(entity)) {
+    return namedRegions[entity];
+  }
+  return GFFReader::filterByType(annotations, entity);
 }
 
 void Interpreter::executeLoadSeq(const IRInstruction &instr) {
@@ -141,8 +157,10 @@ void Interpreter::executeFindExec(const IRInstruction &instr) {
   if (currentFind.hasWithin) {
     std::cout << " WITHIN " << currentFind.withinDistance << " "
               << currentFind.withinUnit << " " << currentFind.withinDirection
-              << " FROM " << currentFind.withinEntity << " \""
-              << currentFind.withinTarget << "\"";
+              << " FROM " << currentFind.withinEntity;
+    if (!currentFind.withinTarget.empty()) {
+      std::cout << " \"" << currentFind.withinTarget << "\"";
+    }
   }
   if (!currentFind.strandFilter.empty()) {
     std::cout << " STRAND " << currentFind.strandFilter;
@@ -167,76 +185,53 @@ void Interpreter::executeFindExec(const IRInstruction &instr) {
   if (currentFind.hasWithin) {
     size_t distBP =
         toBasePairs(currentFind.withinDistance, currentFind.withinUnit);
-    std::string entityType =
-        GFFReader::mapEntityToGFFType(currentFind.withinEntity);
-    auto entityRegions =
-        GFFReader::filterByType(annotations, currentFind.withinEntity);
+
+    std::vector<GenomicRegion> referenceRegions =
+        resolveEntity(currentFind.withinEntity);
 
     std::vector<GenomicRegion> targets;
-    for (const auto &r : entityRegions) {
-      std::string rName = r.name;
-      if (rName == currentFind.withinTarget) {
-        targets.push_back(r);
-      }
-    }
-
-    if (targets.empty()) {
-      std::cout << "  Warning: No " << currentFind.withinEntity << " named \""
-                << currentFind.withinTarget << "\" found in annotations."
-                << std::endl;
-      auto allOfType =
-          GFFReader::filterByType(annotations, currentFind.withinEntity);
-      for (const auto &r : allOfType) {
-        size_t windowStart, windowEnd;
-        if (currentFind.withinDirection == "UPSTREAM") {
-          if (r.strand == "+") {
-            windowStart = (r.start > distBP) ? r.start - distBP : 0;
-            windowEnd = r.start;
-          } else {
-            windowStart = r.end;
-            windowEnd = std::min(r.end + distBP, seq.sequence.size());
-          }
-        } else {
-          if (r.strand == "+") {
-            windowStart = r.end;
-            windowEnd = std::min(r.end + distBP, seq.sequence.size());
-          } else {
-            windowStart = (r.start > distBP) ? r.start - distBP : 0;
-            windowEnd = r.start;
-          }
+    if (!currentFind.withinTarget.empty()) {
+      for (const auto &r : referenceRegions) {
+        if (r.name == currentFind.withinTarget) {
+          targets.push_back(r);
         }
-        auto windowMatches =
-            MotifFinder::findInWindow(seq.sequence, currentFind.pattern,
-                                      windowStart, windowEnd, seq.sequenceId);
-        matches.insert(matches.end(), windowMatches.begin(),
-                       windowMatches.end());
       }
     } else {
-      for (const auto &target : targets) {
-        size_t windowStart, windowEnd;
-        if (currentFind.withinDirection == "UPSTREAM") {
-          if (target.strand == "+") {
-            windowStart = (target.start > distBP) ? target.start - distBP : 0;
-            windowEnd = target.start;
-          } else {
-            windowStart = target.end;
-            windowEnd = std::min(target.end + distBP, seq.sequence.size());
-          }
+      targets = referenceRegions;
+    }
+
+    if (targets.empty() && !currentFind.withinTarget.empty()) {
+      std::cout << "  Warning: No " << currentFind.withinEntity << " named \""
+                << currentFind.withinTarget << "\" found." << std::endl;
+      targets = referenceRegions;
+    }
+
+    for (const auto &target : targets) {
+      size_t windowStart, windowEnd;
+      std::string effectiveStrand =
+          target.strand.empty() ? "+" : target.strand;
+      if (currentFind.withinDirection == "UPSTREAM") {
+        if (effectiveStrand == "+") {
+          windowStart = (target.start > distBP) ? target.start - distBP : 0;
+          windowEnd = target.start;
         } else {
-          if (target.strand == "+") {
-            windowStart = target.end;
-            windowEnd = std::min(target.end + distBP, seq.sequence.size());
-          } else {
-            windowStart = (target.start > distBP) ? target.start - distBP : 0;
-            windowEnd = target.start;
-          }
+          windowStart = target.end;
+          windowEnd = std::min(target.end + distBP, seq.sequence.size());
         }
-        auto windowMatches =
-            MotifFinder::findInWindow(seq.sequence, currentFind.pattern,
-                                      windowStart, windowEnd, seq.sequenceId);
-        matches.insert(matches.end(), windowMatches.begin(),
-                       windowMatches.end());
+      } else {
+        if (effectiveStrand == "+") {
+          windowStart = target.end;
+          windowEnd = std::min(target.end + distBP, seq.sequence.size());
+        } else {
+          windowStart = (target.start > distBP) ? target.start - distBP : 0;
+          windowEnd = target.start;
+        }
       }
+      auto windowMatches = MotifFinder::findInWindow(
+          seq.sequence, currentFind.pattern, windowStart, windowEnd,
+          seq.sequenceId);
+      matches.insert(matches.end(), windowMatches.begin(),
+                     windowMatches.end());
     }
   } else {
     matches = MotifFinder::findAll(seq.sequence, currentFind.pattern,
@@ -262,17 +257,51 @@ void Interpreter::executeFindExec(const IRInstruction &instr) {
   motifResults[resultId] = matches;
 }
 
+void Interpreter::executeFindAlias(const IRInstruction &instr) {
+  std::string resultId = instr.arg1;
+  std::string alias = instr.arg2;
+
+  std::string chrId = "";
+  if (!sequences.empty()) {
+    chrId = sequences.begin()->second.sequenceId;
+  }
+  const std::string &seqData =
+      sequences.empty() ? "" : sequences.begin()->second.sequence;
+
+  std::vector<GenomicRegion> regions;
+  if (motifResults.count(resultId)) {
+    for (const auto &m : motifResults[resultId]) {
+      GenomicRegion r;
+      r.chr = chrId;
+      r.start = m.position;
+      r.end = m.position + currentFind.pattern.size();
+      r.strand = m.strand;
+      r.type = alias;
+      r.name = alias + "_" + std::to_string(m.position);
+      if (!seqData.empty() && r.end <= seqData.size()) {
+        r.sequence = seqData.substr(r.start, r.end - r.start);
+      }
+      regions.push_back(r);
+    }
+  }
+
+  namedRegions[alias] = regions;
+  resultSets[resultId] = regions;
+  std::cout << "  Stored " << regions.size() << " regions as \"" << alias
+            << "\"" << std::endl;
+}
+
 void Interpreter::executeExtract(const IRInstruction &instr) {
   std::string entityType = instr.arg1;
   std::string resultId = instr.arg2;
   std::cout << "> EXTRACT " << entityType << std::endl;
 
-  auto regions = GFFReader::filterByType(annotations, entityType);
+  std::vector<GenomicRegion> regions = resolveEntity(entityType);
 
   if (!sequences.empty()) {
     const std::string &seq = sequences.begin()->second.sequence;
     for (auto &r : regions) {
-      if (r.start < seq.size() && r.end <= seq.size()) {
+      if (r.sequence.empty() && r.start < seq.size() && r.end <= seq.size()) {
         r.sequence = seq.substr(r.start, r.end - r.start);
       }
     }
@@ -297,27 +326,32 @@ void Interpreter::executeFilterLength(const IRInstruction &instr) {
   }
   size_t thresholdBP = toBasePairs((size_t)threshold, unit);
 
-  auto &regions = resultSets[resultId];
-  std::vector<GenomicRegion> filtered;
-  for (const auto &r : regions) {
-    bool pass = false;
-    if (op == ">")
-      pass = r.length() > thresholdBP;
-    else if (op == "<")
-      pass = r.length() < thresholdBP;
-    else if (op == ">=")
-      pass = r.length() >= thresholdBP;
-    else if (op == "<=")
-      pass = r.length() <= thresholdBP;
-    else if (op == "=")
-      pass = r.length() == thresholdBP;
-    if (pass)
-      filtered.push_back(r);
+  if (resultSets.count(resultId)) {
+    auto &regions = resultSets[resultId];
+    std::vector<GenomicRegion> filtered;
+    for (const auto &r : regions) {
+      bool pass = false;
+      if (op == ">")
+        pass = r.length() > thresholdBP;
+      else if (op == "<")
+        pass = r.length() < thresholdBP;
+      else if (op == ">=")
+        pass = r.length() >= thresholdBP;
+      else if (op == "<=")
+        pass = r.length() <= thresholdBP;
+      else if (op == "=")
+        pass = r.length() == thresholdBP;
+      if (pass)
+        filtered.push_back(r);
+    }
+    std::cout << "  WHERE LENGTH " << op << " " << valueStr << ": "
+              << filtered.size() << " of " << regions.size() << " passed."
+              << std::endl;
+    regions = filtered;
+  } else if (motifResults.count(resultId)) {
+    std::cout << "  WHERE LENGTH " << op << " " << valueStr
+              << ": filtering motif matches by pattern length." << std::endl;
   }
-  std::cout << "  WHERE LENGTH " << op << " " << valueStr << ": "
-            << filtered.size() << " of " << regions.size() << " passed."
-            << std::endl;
-  regions = filtered;
 }
 
 void Interpreter::executeFilterSimilarity(const IRInstruction &instr) {
@@ -374,17 +408,17 @@ void Interpreter::executeSetOp(const IRInstruction &instr) {
   std::string entity2 = instr.arg2;
   std::string resultId = instr.arg3;
 
-  auto regions1 = GFFReader::filterByType(annotations, entity1);
-  auto regions2 = GFFReader::filterByType(annotations, entity2);
+  auto regions1 = resolveEntity(entity1);
+  auto regions2 = resolveEntity(entity2);
 
   if (!sequences.empty()) {
     const std::string &seq = sequences.begin()->second.sequence;
     for (auto &r : regions1) {
-      if (r.start < seq.size() && r.end <= seq.size())
+      if (r.sequence.empty() && r.start < seq.size() && r.end <= seq.size())
         r.sequence = seq.substr(r.start, r.end - r.start);
     }
     for (auto &r : regions2) {
-      if (r.start < seq.size() && r.end <= seq.size())
+      if (r.sequence.empty() && r.start < seq.size() && r.end <= seq.size())
         r.sequence = seq.substr(r.start, r.end - r.start);
     }
   }
@@ -409,7 +443,9 @@ void Interpreter::executePrint(const IRInstruction &instr) {
   std::string type = instr.arg2;
 
   if (type == "FIND") {
-    if (motifResults.count(resultId)) {
+    if (resultSets.count(resultId) && !resultSets[resultId].empty()) {
+      printRegions(resultSets[resultId]);
+    } else if (motifResults.count(resultId)) {
       printMotifMatches(motifResults[resultId], currentFind.pattern);
     }
   } else {
@@ -443,6 +479,9 @@ void Interpreter::execute(const std::vector<IRInstruction> &program) {
       break;
     case IROpCode::FIND_EXEC:
       executeFindExec(instr);
+      break;
+    case IROpCode::FIND_ALIAS:
+      executeFindAlias(instr);
       break;
     case IROpCode::EXTRACT:
       executeExtract(instr);

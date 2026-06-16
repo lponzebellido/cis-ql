@@ -9,6 +9,7 @@ std::string irOpcodeToString(IROpCode op) {
     case IROpCode::FIND_OPT_STRAND:  return "FIND_OPT_STRAND";
     case IROpCode::FIND_OPT_CHR:     return "FIND_OPT_CHR";
     case IROpCode::FIND_EXEC:        return "FIND_EXEC";
+    case IROpCode::FIND_ALIAS:       return "FIND_ALIAS";
     case IROpCode::EXTRACT:          return "EXTRACT";
     case IROpCode::FILTER_LENGTH:    return "FILTER_LENGTH";
     case IROpCode::FILTER_SIMILARITY:return "FILTER_SIMILARITY";
@@ -68,6 +69,18 @@ void IRGenerator::visit(FindStmtNode* node) {
   execInstr.opcode = IROpCode::FIND_EXEC;
   execInstr.arg1 = currentTemp;
   instructions.push_back(execInstr);
+
+  if (!node->alias.empty()) {
+    IRInstruction aliasInstr;
+    aliasInstr.opcode = IROpCode::FIND_ALIAS;
+    aliasInstr.arg1 = currentTemp;
+    aliasInstr.arg2 = node->alias;
+    instructions.push_back(aliasInstr);
+  }
+
+  if (node->whereClause) {
+    node->whereClause->accept(*this);
+  }
 
   IRInstruction printInstr;
   printInstr.opcode = IROpCode::PRINT_RESULTS;

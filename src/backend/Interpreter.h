@@ -30,12 +30,14 @@ private:
   std::vector<GenomicRegion> annotations;
   std::unordered_map<std::string, std::vector<GenomicRegion>> resultSets;
   std::unordered_map<std::string, std::vector<MotifMatch>> motifResults;
+  std::unordered_map<std::string, std::vector<GenomicRegion>> namedRegions;
 
   FindContext currentFind;
   std::string activeSequenceAlias;
 
   std::string stripQuotes(const std::string &s);
   size_t toBasePairs(size_t value, const std::string &unit);
+  std::vector<GenomicRegion> resolveEntity(const std::string &entity);
   void printRegions(const std::vector<GenomicRegion> &regions,
                     int maxShow = 20);
   void printMotifMatches(const std::vector<MotifMatch> &matches,
@@ -48,6 +50,7 @@ private:
   void executeFindOptStrand(const IRInstruction &instr);
   void executeFindOptChr(const IRInstruction &instr);
   void executeFindExec(const IRInstruction &instr);
+  void executeFindAlias(const IRInstruction &instr);
   void executeExtract(const IRInstruction &instr);
   void executeFilterLength(const IRInstruction &instr);
   void executeFilterSimilarity(const IRInstruction &instr);
