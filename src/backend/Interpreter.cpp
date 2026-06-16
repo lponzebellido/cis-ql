@@ -274,7 +274,7 @@ void Interpreter::executeFindAlias(const IRInstruction &instr) {
       GenomicRegion r;
       r.chr = chrId;
       r.start = m.position;
-      r.end = m.position + currentFind.pattern.size();
+      r.end = m.position + m.matchLength;
       r.strand = m.strand;
       r.type = alias;
       r.name = alias + "_" + std::to_string(m.position);
