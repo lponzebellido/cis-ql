@@ -8,17 +8,19 @@ std::vector<GenomicRegion> SetOperations::intersect(
   std::sort(b.begin(), b.end());
 
   for (const auto& ra : a) {
+    bool foundOverlap = false;
     for (const auto& rb : b) {
       if (ra.overlaps(rb)) {
-        GenomicRegion overlap;
-        overlap.chr = ra.chr;
-        overlap.start = std::max(ra.start, rb.start);
-        overlap.end = std::min(ra.end, rb.end);
-        overlap.strand = ra.strand;
-        overlap.type = ra.type + " ∩ " + rb.type;
-        overlap.name = ra.name + " ∩ " + rb.name;
-        result.push_back(overlap);
+        foundOverlap = true;
+        break;
       }
+    }
+    if (foundOverlap) {
+      GenomicRegion overlappingA = ra;
+      if (!b.empty()) {
+        overlappingA.type = ra.type + " ∩ " + b[0].type;
+      }
+      result.push_back(overlappingA);
     }
   }
   return result;
