@@ -133,7 +133,7 @@ int main(int argc, char *argv[]) {
 
       // 5. Execution
       Interpreter interpreter;
-      interpreter.execute(ir);
+      interpreter.execute(ir, debugMode);
     }
   } else {
     if (debugMode)

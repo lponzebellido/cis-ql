@@ -5,8 +5,8 @@
 #include <set>
 
 static const std::set<std::string> BUILTIN_ENTITIES = {
-    "GENE", "PROMOTER", "ENHANCER", "EXON", "INTRON",
-    "UTR", "TSS", "CDS", "REGION"};
+    "GENE", "PROMOTER", "ENHANCER", "EXON",  "INTRON",
+    "UTR",  "TSS",      "CDS",      "REGION"};
 
 static bool isBuiltinEntity(const std::string &name) {
   return BUILTIN_ENTITIES.count(name) > 0;
@@ -79,7 +79,8 @@ void Interpreter::printRegions(const std::vector<GenomicRegion> &regions,
   }
 }
 
-std::vector<GenomicRegion> Interpreter::resolveEntity(const std::string &entity) {
+std::vector<GenomicRegion>
+Interpreter::resolveEntity(const std::string &entity) {
   if (namedRegions.count(entity)) {
     return namedRegions[entity];
   }
@@ -89,8 +90,10 @@ std::vector<GenomicRegion> Interpreter::resolveEntity(const std::string &entity)
 void Interpreter::executeLoadSeq(const IRInstruction &instr) {
   std::string filename = stripQuotes(instr.arg1);
   std::string alias = instr.arg2;
-  std::cout << "> LOAD SEQUENCE \"" << filename << "\" AS " << alias
-            << std::endl;
+  if (debugMode) {
+    std::cout << "> LOAD SEQUENCE \"" << filename << "\" AS " << alias
+              << std::endl;
+  }
 
   auto records = FastaReader::read(filename);
   if (records.empty()) {
@@ -100,31 +103,38 @@ void Interpreter::executeLoadSeq(const IRInstruction &instr) {
 
   sequences[alias] = records[0];
   activeSequenceAlias = alias;
-  std::cout << "  Loaded " << records[0].sequence.size() << " base pairs from "
-            << filename << " (" << records[0].sequenceId << ")" << std::endl;
-  if (records.size() > 1) {
-    std::cout << "  (File contains " << records.size()
-              << " sequences, using first: " << records[0].sequenceId << ")"
-              << std::endl;
+  if (debugMode) {
+    std::cout << "  Loaded " << records[0].sequence.size()
+              << " base pairs from " << filename << " ("
+              << records[0].sequenceId << ")" << std::endl;
+    if (records.size() > 1) {
+      std::cout << "  (File contains " << records.size()
+                << " sequences, using first: " << records[0].sequenceId << ")"
+                << std::endl;
+    }
   }
 }
 
 void Interpreter::executeLoadAnnot(const IRInstruction &instr) {
   std::string filename = stripQuotes(instr.arg1);
   std::string alias = instr.arg2;
-  std::cout << "> LOAD ANNOTATION \"" << filename << "\" AS " << alias
-            << std::endl;
+  if (debugMode) {
+    std::cout << "> LOAD ANNOTATION \"" << filename << "\" AS " << alias
+              << std::endl;
+  }
 
   annotations = GFFReader::read(filename);
-  std::cout << "  Loaded " << annotations.size() << " annotation features from "
-            << filename << std::endl;
+  if (debugMode) {
+    std::cout << "  Loaded " << annotations.size()
+              << " annotation features from " << filename << std::endl;
 
-  std::unordered_map<std::string, int> typeCounts;
-  for (const auto &a : annotations) {
-    typeCounts[a.type]++;
-  }
-  for (const auto &pair : typeCounts) {
-    std::cout << "    " << pair.first << ": " << pair.second << std::endl;
+    std::unordered_map<std::string, int> typeCounts;
+    for (const auto &a : annotations) {
+      typeCounts[a.type]++;
+    }
+    for (const auto &pair : typeCounts) {
+      std::cout << "    " << pair.first << ": " << pair.second << std::endl;
+    }
   }
 }
 
@@ -153,22 +163,24 @@ void Interpreter::executeFindOptChr(const IRInstruction &instr) {
 
 void Interpreter::executeFindExec(const IRInstruction &instr) {
   std::string resultId = instr.arg1;
-  std::cout << "> FIND MOTIF \"" << currentFind.pattern << "\"";
-  if (currentFind.hasWithin) {
-    std::cout << " WITHIN " << currentFind.withinDistance << " "
-              << currentFind.withinUnit << " " << currentFind.withinDirection
-              << " FROM " << currentFind.withinEntity;
-    if (!currentFind.withinTarget.empty()) {
-      std::cout << " \"" << currentFind.withinTarget << "\"";
+  if (debugMode) {
+    std::cout << "> FIND MOTIF \"" << currentFind.pattern << "\"";
+    if (currentFind.hasWithin) {
+      std::cout << " WITHIN " << currentFind.withinDistance << " "
+                << currentFind.withinUnit << " " << currentFind.withinDirection
+                << " FROM " << currentFind.withinEntity;
+      if (!currentFind.withinTarget.empty()) {
+        std::cout << " \"" << currentFind.withinTarget << "\"";
+      }
     }
+    if (!currentFind.strandFilter.empty()) {
+      std::cout << " STRAND " << currentFind.strandFilter;
+    }
+    if (!currentFind.chrFilter.empty()) {
+      std::cout << " CHR \"" << currentFind.chrFilter << "\"";
+    }
+    std::cout << std::endl;
   }
-  if (!currentFind.strandFilter.empty()) {
-    std::cout << " STRAND " << currentFind.strandFilter;
-  }
-  if (!currentFind.chrFilter.empty()) {
-    std::cout << " CHR \"" << currentFind.chrFilter << "\"";
-  }
-  std::cout << std::endl;
 
   if (sequences.empty()) {
     std::cerr << "  Error: No sequence loaded." << std::endl;
@@ -208,8 +220,7 @@ void Interpreter::executeFindExec(const IRInstruction &instr) {
 
     for (const auto &target : targets) {
       size_t windowStart, windowEnd;
-      std::string effectiveStrand =
-          target.strand.empty() ? "+" : target.strand;
+      std::string effectiveStrand = target.strand.empty() ? "+" : target.strand;
       if (currentFind.withinDirection == "UPSTREAM") {
         if (effectiveStrand == "+") {
           windowStart = (target.start > distBP) ? target.start - distBP : 0;
@@ -227,11 +238,10 @@ void Interpreter::executeFindExec(const IRInstruction &instr) {
           windowEnd = target.start;
         }
       }
-      auto windowMatches = MotifFinder::findInWindow(
-          seq.sequence, currentFind.pattern, windowStart, windowEnd,
-          seq.sequenceId);
-      matches.insert(matches.end(), windowMatches.begin(),
-                     windowMatches.end());
+      auto windowMatches =
+          MotifFinder::findInWindow(seq.sequence, currentFind.pattern,
+                                    windowStart, windowEnd, seq.sequenceId);
+      matches.insert(matches.end(), windowMatches.begin(), windowMatches.end());
     }
   } else {
     matches = MotifFinder::findAll(seq.sequence, currentFind.pattern,
@@ -287,14 +297,18 @@ void Interpreter::executeFindAlias(const IRInstruction &instr) {
 
   namedRegions[alias] = regions;
   resultSets[resultId] = regions;
-  std::cout << "  Stored " << regions.size() << " regions as \"" << alias
-            << "\"" << std::endl;
+  if (debugMode) {
+    std::cout << "  Stored " << regions.size() << " regions as \"" << alias
+              << "\"" << std::endl;
+  }
 }
 
 void Interpreter::executeExtract(const IRInstruction &instr) {
   std::string entityType = instr.arg1;
   std::string resultId = instr.arg2;
-  std::cout << "> EXTRACT " << entityType << std::endl;
+  if (debugMode) {
+    std::cout << "> EXTRACT " << entityType << std::endl;
+  }
 
   std::vector<GenomicRegion> regions = resolveEntity(entityType);
 
@@ -344,13 +358,17 @@ void Interpreter::executeFilterLength(const IRInstruction &instr) {
       if (pass)
         filtered.push_back(r);
     }
-    std::cout << "  WHERE LENGTH " << op << " " << valueStr << ": "
-              << filtered.size() << " of " << regions.size() << " passed."
-              << std::endl;
+    if (debugMode) {
+      std::cout << "  WHERE LENGTH " << op << " " << valueStr << ": "
+                << filtered.size() << " of " << regions.size() << " passed."
+                << std::endl;
+    }
     regions = filtered;
   } else if (motifResults.count(resultId)) {
-    std::cout << "  WHERE LENGTH " << op << " " << valueStr
-              << ": filtering motif matches by pattern length." << std::endl;
+    if (debugMode) {
+      std::cout << "  WHERE LENGTH " << op << " " << valueStr
+                << ": filtering motif matches by pattern length." << std::endl;
+    }
   }
 }
 
@@ -397,9 +415,11 @@ void Interpreter::executeFilterSimilarity(const IRInstruction &instr) {
     if (pass)
       filtered.push_back(regions[i]);
   }
-  std::cout << "  WHERE SIMILARITY " << op << " " << valueStr << ": "
-            << filtered.size() << " of " << regions.size() << " passed."
-            << std::endl;
+  if (debugMode) {
+    std::cout << "  WHERE SIMILARITY " << op << " " << valueStr << ": "
+              << filtered.size() << " of " << regions.size() << " passed."
+              << std::endl;
+  }
   regions = filtered;
 }
 
@@ -425,13 +445,19 @@ void Interpreter::executeSetOp(const IRInstruction &instr) {
 
   std::vector<GenomicRegion> result;
   if (instr.opcode == IROpCode::SET_INTERSECT) {
-    std::cout << "> INTERSECT " << entity1 << " AND " << entity2 << std::endl;
+    if (debugMode) {
+      std::cout << "> INTERSECT " << entity1 << " AND " << entity2 << std::endl;
+    }
     result = SetOperations::intersect(regions1, regions2);
   } else if (instr.opcode == IROpCode::SET_UNION) {
-    std::cout << "> UNION " << entity1 << " AND " << entity2 << std::endl;
+    if (debugMode) {
+      std::cout << "> UNION " << entity1 << " AND " << entity2 << std::endl;
+    }
     result = SetOperations::unite(regions1, regions2);
   } else {
-    std::cout << "> EXCEPT " << entity1 << " FROM " << entity2 << std::endl;
+    if (debugMode) {
+      std::cout << "> EXCEPT " << entity1 << " FROM " << entity2 << std::endl;
+    }
     result = SetOperations::except(regions1, regions2);
   }
 
@@ -439,6 +465,12 @@ void Interpreter::executeSetOp(const IRInstruction &instr) {
 }
 
 void Interpreter::executePrint(const IRInstruction &instr) {
+  if (!debugMode && currentPrintIndex < lastPrintIndex) {
+    currentPrintIndex++;
+    return;
+  }
+  currentPrintIndex++;
+
   std::string resultId = instr.arg1;
   std::string type = instr.arg2;
 
@@ -456,7 +488,20 @@ void Interpreter::executePrint(const IRInstruction &instr) {
   std::cout << std::endl;
 }
 
-void Interpreter::execute(const std::vector<IRInstruction> &program) {
+void Interpreter::execute(const std::vector<IRInstruction> &program,
+                          bool debug) {
+  debugMode = debug;
+  currentPrintIndex = 0;
+
+  lastPrintIndex = -1;
+  int printIdx = 0;
+  for (const auto &instr : program) {
+    if (instr.opcode == IROpCode::PRINT_RESULTS) {
+      lastPrintIndex = printIdx;
+      printIdx++;
+    }
+  }
+
   for (const auto &instr : program) {
     switch (instr.opcode) {
     case IROpCode::LOAD_SEQ:

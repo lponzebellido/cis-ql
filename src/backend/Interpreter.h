@@ -34,6 +34,9 @@ private:
 
   FindContext currentFind;
   std::string activeSequenceAlias;
+  bool debugMode;
+  int lastPrintIndex;
+  int currentPrintIndex;
 
   std::string stripQuotes(const std::string &s);
   size_t toBasePairs(size_t value, const std::string &unit);
@@ -58,7 +61,7 @@ private:
   void executePrint(const IRInstruction &instr);
 
 public:
-  void execute(const std::vector<IRInstruction> &program);
+  void execute(const std::vector<IRInstruction> &program, bool debug = false);
 };
 
 #endif
