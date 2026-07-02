@@ -20,16 +20,16 @@ enum class TokenType {
     FLOAT,     
     STRING,
 
-    SEMICOLON, // ;
-    COMMA,     // ,
-    ASSIGN,    // =
-    GREATER,   // >
-    LESS,      // <
-    GREATER_EQ,// >=
-    LESS_EQ,   // <=
-    LPAREN,    // (
-    RPAREN,    // )
-    PERCENT,   // %
+    SEMICOLON, 
+    COMMA,     
+    ASSIGN,    
+    GREATER,   
+    LESS,      
+    GREATER_EQ,
+    LESS_EQ,   
+    LPAREN,    
+    RPAREN,    
+    PERCENT,   
 
     END_OF_FILE,
     UNKNOWN,

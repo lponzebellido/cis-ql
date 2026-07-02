@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  // 1. Lexical Analysis
+  
   SymbolTable symbolTable;
   Lexer lexer(file, &symbolTable);
   std::vector<Token> tokens = lexer.tokenize();
@@ -109,7 +109,7 @@ int main(int argc, char *argv[]) {
   if (debugMode)
     printLexicalAnalysis(tokens);
 
-  // 2. Syntax Analysis
+  
   Parser parser(tokens);
   auto ast = parser.parse();
 
@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
     if (debugMode)
       printSyntaxAnalysis(parser, ast);
 
-    // 3. Semantic Analysis
+    
     SemanticAnalyzer semantic(symbolTable);
     semantic.analyze(ast.get());
 
@@ -125,13 +125,13 @@ int main(int argc, char *argv[]) {
       printSemanticAnalysis(semantic);
 
     if (!semantic.hadError()) {
-      // 4. IR Generation
+      
       IRGenerator irGen;
       const auto &ir = irGen.generate(ast.get());
       if (debugMode)
         printIRCode(ir);
 
-      // 5. Execution
+      
       Interpreter interpreter;
       interpreter.execute(ir, debugMode);
     }

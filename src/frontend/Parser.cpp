@@ -257,14 +257,14 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
 }
 
 std::unique_ptr<ScanStmtNode> Parser::parseScan() {
-  // SCAN ID ScanOpts AliasOpt WhereClause SEMICOLON
+  
   consume(TokenType::ID, "Expected a matrix alias after SCAN.");
   std::string matrixAlias = previous().lexeme;
 
   std::string strandFilter;
   std::string threshold;
 
-  // Parse options: STRAND and/or THRESHOLD (in any order)
+  
   while (!check(TokenType::SEMICOLON) && !check(TokenType::AS) &&
          !check(TokenType::WHERE) && !isAtEnd()) {
     if (match(TokenType::STRAND)) {
@@ -289,14 +289,14 @@ std::unique_ptr<ScanStmtNode> Parser::parseScan() {
     }
   }
 
-  // AliasOpt
+  
   std::string alias;
   if (match(TokenType::AS)) {
     consume(TokenType::ID, "Expected an alias identifier after AS.");
     alias = previous().lexeme;
   }
 
-  // WhereClause
+  
   auto whereClause = parseWhereClause();
 
   consume(TokenType::SEMICOLON, "Expected ';' at the end of SCAN.");

@@ -184,7 +184,7 @@ void IRGenerator::visit(NotConditionNode* node) {
 void IRGenerator::visit(ScanStmtNode* node) {
   currentTemp = newTemp();
 
-  // Strand option
+  
   if (!node->strandFilter.empty()) {
     IRInstruction strandInstr;
     strandInstr.opcode = IROpCode::SCAN_OPT_STRAND;
@@ -192,7 +192,7 @@ void IRGenerator::visit(ScanStmtNode* node) {
     instructions.push_back(strandInstr);
   }
 
-  // Threshold option
+  
   if (!node->threshold.empty()) {
     IRInstruction threshInstr;
     threshInstr.opcode = IROpCode::SCAN_OPT_THRESHOLD;
@@ -200,14 +200,14 @@ void IRGenerator::visit(ScanStmtNode* node) {
     instructions.push_back(threshInstr);
   }
 
-  // Execute scan
+  
   IRInstruction scanInstr;
   scanInstr.opcode = IROpCode::SCAN_EXEC;
   scanInstr.arg1 = node->matrixAlias;
   scanInstr.arg2 = currentTemp;
   instructions.push_back(scanInstr);
 
-  // Alias
+  
   if (!node->alias.empty()) {
     IRInstruction aliasInstr;
     aliasInstr.opcode = IROpCode::SCAN_ALIAS;
@@ -216,12 +216,12 @@ void IRGenerator::visit(ScanStmtNode* node) {
     instructions.push_back(aliasInstr);
   }
 
-  // Where clause
+  
   if (node->whereClause) {
     node->whereClause->accept(*this);
   }
 
-  // Print results
+  
   IRInstruction printInstr;
   printInstr.opcode = IROpCode::PRINT_RESULTS;
   printInstr.arg1 = currentTemp;

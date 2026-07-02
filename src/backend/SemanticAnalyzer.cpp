@@ -162,13 +162,13 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
 }
 
 void SemanticAnalyzer::visit(ScanStmtNode *node) {
-  // Validate matrix alias is defined
+  
   if (!symbolTable.lookup(node->matrixAlias)) {
     reportError("Matrix alias '" + node->matrixAlias +
                 "' is not defined. Use: LOAD MATRIX \"file.pwm\" AS alias;");
   }
 
-  // Validate threshold if provided
+  
   if (!node->threshold.empty()) {
     double threshold = parseValue(node->threshold);
     if (threshold < 0 || threshold > 100) {
@@ -176,7 +176,7 @@ void SemanticAnalyzer::visit(ScanStmtNode *node) {
     }
   }
 
-  // Register alias
+  
   if (!node->alias.empty()) {
     if (symbolTable.lookup(node->alias)) {
       reportError("Alias '" + node->alias + "' is already defined.");

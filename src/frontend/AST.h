@@ -136,10 +136,10 @@ public:
 
 class ScanStmtNode : public StatementNode {
 public:
-  std::string matrixAlias;    // alias of the loaded PWM
-  std::string strandFilter;   // POSITIVE, NEGATIVE, or "" (both)
-  std::string threshold;      // e.g. "80.0 %"
-  std::string alias;          // AS alias
+  std::string matrixAlias;    
+  std::string strandFilter;   
+  std::string threshold;      
+  std::string alias;          
   std::unique_ptr<ConditionNode> whereClause;
   ScanStmtNode(std::string ma, std::string sf, std::string th,
                std::string a, std::unique_ptr<ConditionNode> w)

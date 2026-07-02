@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <set>
+#include <fstream>
 
 static const std::set<std::string> BUILTIN_ENTITIES = {
     "GENE", "PROMOTER", "ENHANCER", "EXON",  "INTRON",
@@ -519,7 +520,7 @@ void Interpreter::executeScanOptStrand(const IRInstruction &instr) {
 
 void Interpreter::executeScanOptThreshold(const IRInstruction &instr) {
   std::string valueStr = instr.arg1;
-  // Parse: "80.0 %" or "80" or "80.0"
+  
   size_t spacePos = valueStr.find(' ');
   if (spacePos != std::string::npos) {
     currentScan.threshold = std::atof(valueStr.substr(0, spacePos).c_str());
@@ -532,7 +533,7 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
   std::string matrixAlias = instr.arg1;
   std::string resultId = instr.arg2;
 
-  // Apply default threshold if not set
+  
   if (currentScan.threshold <= 0.0) {
     currentScan.threshold = 75.0;
   }
@@ -575,7 +576,7 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
               << currentScan.threshold << "% threshold." << std::endl;
   }
 
-  // Reset scan context for next scan
+  
   currentScan = ScanContext();
 }
 
@@ -613,6 +614,36 @@ void Interpreter::executeScanAlias(const IRInstruction &instr) {
     std::cout << "  Stored " << regions.size() << " regions as \"" << alias
               << "\"" << std::endl;
   }
+}
+
+void Interpreter::dumpResultsJSON() const {
+  std::ofstream out(".cisql_results.json");
+  if (!out.is_open()) return;
+
+  out << "{\n  \"resultSets\": {\n";
+  bool firstSet = true;
+  for (const auto &pair : resultSets) {
+    if (!firstSet) out << ",\n";
+    firstSet = false;
+    out << "    \"" << pair.first << "\": [\n";
+    
+    bool firstRegion = true;
+    for (const auto &r : pair.second) {
+      if (!firstRegion) out << ",\n";
+      firstRegion = false;
+      out << "      {\n"
+          << "        \"chr\": \"" << r.chr << "\",\n"
+          << "        \"start\": " << r.start << ",\n"
+          << "        \"end\": " << r.end << ",\n"
+          << "        \"strand\": \"" << r.strand << "\",\n"
+          << "        \"type\": \"" << r.type << "\",\n"
+          << "        \"name\": \"" << r.name << "\",\n"
+          << "        \"sequence\": \"" << r.sequence << "\"\n"
+          << "      }";
+    }
+    out << "\n    ]";
+  }
+  out << "\n  }\n}";
 }
 
 void Interpreter::execute(const std::vector<IRInstruction> &program,
@@ -689,4 +720,7 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
       break;
     }
   }
+
+  
+  dumpResultsJSON();
 }

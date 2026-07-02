@@ -26,8 +26,8 @@ struct FindContext {
 };
 
 struct ScanContext {
-  std::string strandFilter;   // POSITIVE, NEGATIVE, or "" (both)
-  double threshold;           // 0-100%, default 75%
+  std::string strandFilter;   
+  double threshold;           
 };
 
 class Interpreter {
@@ -73,6 +73,8 @@ private:
   void executeScanOptThreshold(const IRInstruction &instr);
   void executeScanExec(const IRInstruction &instr);
   void executeScanAlias(const IRInstruction &instr);
+  
+  void dumpResultsJSON() const;
 
 public:
   void execute(const std::vector<IRInstruction> &program, bool debug = false);

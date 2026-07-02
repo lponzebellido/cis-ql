@@ -1,10 +1,39 @@
+# Compiled C++ files
 *.out
 *.exe
 *.o
 *.a
-*.pdf
 cisql
-cmake-build-debug
+cmake-build-debug/
 pdf/
-venv/*
-tools/*
+tools/
+
+# Python Virtual Environments
+venv/
+.venv/
+ENV/
+env/
+
+# Node/React dependencies and builds
+**/node_modules/
+node_modules/
+dist/
+**/dist/
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Electron & OS files
+.DS_Store
+Thumbs.db
+*.log
+
+# Studio Temporary files
+.cisql_results.json
+temp_script.cql
