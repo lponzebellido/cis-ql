@@ -7,6 +7,7 @@
 #include "../bioinfo/MotifFinder.h"
 #include "../bioinfo/SetOperations.h"
 #include "../bioinfo/SmithWaterman.h"
+#include "../bioinfo/PWMScanner.h"
 #include "IRGenerator.h"
 #include <string>
 #include <unordered_map>
@@ -24,6 +25,11 @@ struct FindContext {
   std::string withinTarget;
 };
 
+struct ScanContext {
+  std::string strandFilter;   // POSITIVE, NEGATIVE, or "" (both)
+  double threshold;           // 0-100%, default 75%
+};
+
 class Interpreter {
 private:
   std::unordered_map<std::string, FastaRecord> sequences;
@@ -31,8 +37,11 @@ private:
   std::unordered_map<std::string, std::vector<GenomicRegion>> resultSets;
   std::unordered_map<std::string, std::vector<MotifMatch>> motifResults;
   std::unordered_map<std::string, std::vector<GenomicRegion>> namedRegions;
+  std::unordered_map<std::string, PWMatrix> loadedMatrices;
+  std::unordered_map<std::string, PSSM> loadedPSSMs;
 
   FindContext currentFind;
+  ScanContext currentScan;
   std::string activeSequenceAlias;
   bool debugMode;
   int lastPrintIndex;
@@ -59,6 +68,11 @@ private:
   void executeFilterSimilarity(const IRInstruction &instr);
   void executeSetOp(const IRInstruction &instr);
   void executePrint(const IRInstruction &instr);
+  void executeLoadMatrix(const IRInstruction &instr);
+  void executeScanOptStrand(const IRInstruction &instr);
+  void executeScanOptThreshold(const IRInstruction &instr);
+  void executeScanExec(const IRInstruction &instr);
+  void executeScanAlias(const IRInstruction &instr);
 
 public:
   void execute(const std::vector<IRInstruction> &program, bool debug = false);

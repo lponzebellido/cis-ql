@@ -488,6 +488,133 @@ void Interpreter::executePrint(const IRInstruction &instr) {
   std::cout << std::endl;
 }
 
+void Interpreter::executeLoadMatrix(const IRInstruction &instr) {
+  std::string filename = stripQuotes(instr.arg1);
+  std::string alias = instr.arg2;
+  if (debugMode) {
+    std::cout << "> LOAD MATRIX \"" << filename << "\" AS " << alias
+              << std::endl;
+  }
+
+  PWMatrix pwm = PWMScanner::loadJASPAR(filename);
+  if (pwm.length == 0) {
+    std::cerr << "  Error: Failed to load PWM from " << filename << std::endl;
+    return;
+  }
+
+  PSSM pssm = PWMScanner::computePSSM(pwm);
+  loadedMatrices[alias] = pwm;
+  loadedPSSMs[alias] = pssm;
+
+  if (debugMode) {
+    std::cout << "  Loaded PWM \"" << pssm.name << "\" (" << pssm.length
+              << " positions, score range: " << pssm.minScore << " to "
+              << pssm.maxScore << ")" << std::endl;
+  }
+}
+
+void Interpreter::executeScanOptStrand(const IRInstruction &instr) {
+  currentScan.strandFilter = instr.arg1;
+}
+
+void Interpreter::executeScanOptThreshold(const IRInstruction &instr) {
+  std::string valueStr = instr.arg1;
+  // Parse: "80.0 %" or "80" or "80.0"
+  size_t spacePos = valueStr.find(' ');
+  if (spacePos != std::string::npos) {
+    currentScan.threshold = std::atof(valueStr.substr(0, spacePos).c_str());
+  } else {
+    currentScan.threshold = std::atof(valueStr.c_str());
+  }
+}
+
+void Interpreter::executeScanExec(const IRInstruction &instr) {
+  std::string matrixAlias = instr.arg1;
+  std::string resultId = instr.arg2;
+
+  // Apply default threshold if not set
+  if (currentScan.threshold <= 0.0) {
+    currentScan.threshold = 75.0;
+  }
+
+  if (debugMode) {
+    std::cout << "> SCAN " << matrixAlias;
+    if (!currentScan.strandFilter.empty()) {
+      std::cout << " STRAND " << currentScan.strandFilter;
+    }
+    std::cout << " THRESHOLD " << currentScan.threshold << "%";
+    std::cout << std::endl;
+  }
+
+  if (sequences.empty()) {
+    std::cerr << "  Error: No sequence loaded." << std::endl;
+    return;
+  }
+
+  if (!loadedPSSMs.count(matrixAlias)) {
+    std::cerr << "  Error: Matrix '" << matrixAlias << "' not loaded."
+              << std::endl;
+    return;
+  }
+
+  const FastaRecord &seq = sequences.begin()->second;
+  const PSSM &pssm = loadedPSSMs[matrixAlias];
+
+  bool searchPos = true, searchNeg = true;
+  if (currentScan.strandFilter == "POSITIVE") searchNeg = false;
+  if (currentScan.strandFilter == "NEGATIVE") searchPos = false;
+
+  std::vector<MotifMatch> matches = PWMScanner::scan(
+      seq.sequence, pssm, currentScan.threshold,
+      seq.sequenceId, searchPos, searchNeg);
+
+  motifResults[resultId] = matches;
+
+  if (debugMode) {
+    std::cout << "  PWM scan found " << matches.size() << " site(s) above "
+              << currentScan.threshold << "% threshold." << std::endl;
+  }
+
+  // Reset scan context for next scan
+  currentScan = ScanContext();
+}
+
+void Interpreter::executeScanAlias(const IRInstruction &instr) {
+  std::string resultId = instr.arg1;
+  std::string alias = instr.arg2;
+
+  std::string chrId = "";
+  if (!sequences.empty()) {
+    chrId = sequences.begin()->second.sequenceId;
+  }
+  const std::string &seqData =
+      sequences.empty() ? "" : sequences.begin()->second.sequence;
+
+  std::vector<GenomicRegion> regions;
+  if (motifResults.count(resultId)) {
+    for (const auto &m : motifResults[resultId]) {
+      GenomicRegion r;
+      r.chr = chrId;
+      r.start = m.position;
+      r.end = m.position + m.matchLength;
+      r.strand = m.strand;
+      r.type = alias;
+      r.name = alias + "_" + std::to_string(m.position);
+      if (!seqData.empty() && r.end <= seqData.size()) {
+        r.sequence = seqData.substr(r.start, r.end - r.start);
+      }
+      regions.push_back(r);
+    }
+  }
+
+  namedRegions[alias] = regions;
+  resultSets[resultId] = regions;
+  if (debugMode) {
+    std::cout << "  Stored " << regions.size() << " regions as \"" << alias
+              << "\"" << std::endl;
+  }
+}
+
 void Interpreter::execute(const std::vector<IRInstruction> &program,
                           bool debug) {
   debugMode = debug;
@@ -544,6 +671,21 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
       break;
     case IROpCode::PRINT_RESULTS:
       executePrint(instr);
+      break;
+    case IROpCode::LOAD_MATRIX:
+      executeLoadMatrix(instr);
+      break;
+    case IROpCode::SCAN_OPT_STRAND:
+      executeScanOptStrand(instr);
+      break;
+    case IROpCode::SCAN_OPT_THRESHOLD:
+      executeScanOptThreshold(instr);
+      break;
+    case IROpCode::SCAN_EXEC:
+      executeScanExec(instr);
+      break;
+    case IROpCode::SCAN_ALIAS:
+      executeScanAlias(instr);
       break;
     }
   }

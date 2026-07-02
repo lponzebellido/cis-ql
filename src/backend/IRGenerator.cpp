@@ -17,6 +17,11 @@ std::string irOpcodeToString(IROpCode op) {
     case IROpCode::SET_UNION:        return "SET_UNION";
     case IROpCode::SET_EXCEPT:       return "SET_EXCEPT";
     case IROpCode::PRINT_RESULTS:    return "PRINT_RESULTS";
+    case IROpCode::LOAD_MATRIX:      return "LOAD_MATRIX";
+    case IROpCode::SCAN_EXEC:        return "SCAN_EXEC";
+    case IROpCode::SCAN_OPT_STRAND:  return "SCAN_OPT_STRAND";
+    case IROpCode::SCAN_OPT_THRESHOLD:return "SCAN_OPT_THRESHOLD";
+    case IROpCode::SCAN_ALIAS:       return "SCAN_ALIAS";
     default: return "UNKNOWN";
   }
 }
@@ -44,6 +49,8 @@ void IRGenerator::visit(LoadStmtNode* node) {
   IRInstruction instr;
   if (node->loadType == "SEQUENCE") {
     instr.opcode = IROpCode::LOAD_SEQ;
+  } else if (node->loadType == "MATRIX") {
+    instr.opcode = IROpCode::LOAD_MATRIX;
   } else {
     instr.opcode = IROpCode::LOAD_ANNOT;
   }
@@ -172,4 +179,52 @@ void IRGenerator::visit(BinaryConditionNode* node) {
 
 void IRGenerator::visit(NotConditionNode* node) {
   if (node->condition) node->condition->accept(*this);
+}
+
+void IRGenerator::visit(ScanStmtNode* node) {
+  currentTemp = newTemp();
+
+  // Strand option
+  if (!node->strandFilter.empty()) {
+    IRInstruction strandInstr;
+    strandInstr.opcode = IROpCode::SCAN_OPT_STRAND;
+    strandInstr.arg1 = node->strandFilter;
+    instructions.push_back(strandInstr);
+  }
+
+  // Threshold option
+  if (!node->threshold.empty()) {
+    IRInstruction threshInstr;
+    threshInstr.opcode = IROpCode::SCAN_OPT_THRESHOLD;
+    threshInstr.arg1 = node->threshold;
+    instructions.push_back(threshInstr);
+  }
+
+  // Execute scan
+  IRInstruction scanInstr;
+  scanInstr.opcode = IROpCode::SCAN_EXEC;
+  scanInstr.arg1 = node->matrixAlias;
+  scanInstr.arg2 = currentTemp;
+  instructions.push_back(scanInstr);
+
+  // Alias
+  if (!node->alias.empty()) {
+    IRInstruction aliasInstr;
+    aliasInstr.opcode = IROpCode::SCAN_ALIAS;
+    aliasInstr.arg1 = currentTemp;
+    aliasInstr.arg2 = node->alias;
+    instructions.push_back(aliasInstr);
+  }
+
+  // Where clause
+  if (node->whereClause) {
+    node->whereClause->accept(*this);
+  }
+
+  // Print results
+  IRInstruction printInstr;
+  printInstr.opcode = IROpCode::PRINT_RESULTS;
+  printInstr.arg1 = currentTemp;
+  printInstr.arg2 = "SCAN";
+  instructions.push_back(printInstr);
 }

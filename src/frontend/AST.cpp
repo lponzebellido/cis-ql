@@ -65,6 +65,19 @@ void SetOpStmtNode::print(std::string prefix, bool isLast) const {
     }
 }
 
+void ScanStmtNode::print(std::string prefix, bool isLast) const {
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "ScanStmt(Matrix: " << matrixAlias;
+    if (!strandFilter.empty()) std::cout << ", Strand: " << strandFilter;
+    if (!threshold.empty()) std::cout << ", Threshold: " << threshold;
+    if (!alias.empty()) std::cout << ", AS: " << alias;
+    std::cout << ")" << std::endl;
+    std::string childPrefix = prefix + (isLast ? "    " : "│   ");
+    if (whereClause) {
+        std::cout << childPrefix << "└── Where:" << std::endl;
+        whereClause->print(childPrefix + "    ", true);
+    }
+}
+
 void ProgramNode::print(std::string prefix, bool isLast) const {
     if (prefix.empty()) {
         std::cout << "Program" << std::endl;
@@ -85,4 +98,5 @@ void FindOptNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void FindStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ExtractStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void SetOpStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
+void ScanStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ProgramNode::accept(ASTVisitor& visitor) { visitor.visit(this); }

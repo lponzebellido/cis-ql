@@ -20,7 +20,12 @@ enum class IROpCode {
   SET_INTERSECT,
   SET_UNION,
   SET_EXCEPT,
-  PRINT_RESULTS
+  PRINT_RESULTS,
+  LOAD_MATRIX,
+  SCAN_EXEC,
+  SCAN_OPT_STRAND,
+  SCAN_OPT_THRESHOLD,
+  SCAN_ALIAS
 };
 
 struct IRInstruction {
@@ -58,6 +63,7 @@ public:
   void visit(FindStmtNode *node) override;
   void visit(ExtractStmtNode *node) override;
   void visit(SetOpStmtNode *node) override;
+  void visit(ScanStmtNode *node) override;
   void visit(ProgramNode *node) override;
 };
 

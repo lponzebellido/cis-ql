@@ -56,6 +56,10 @@ void Lexer::initKeywords() {
 
     keywords["SIMILARITY"] = TokenType::SIMILARITY;
     keywords["REVERSE_COMPLEMENT"] = TokenType::REVERSE_COMPLEMENT;
+
+    keywords["MATRIX"] = TokenType::MATRIX;
+    keywords["SCAN"] = TokenType::SCAN;
+    keywords["THRESHOLD"] = TokenType::THRESHOLD;
 }
 
 char Lexer::getChar() {
@@ -310,6 +314,9 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::OVERLAPS: return "OVERLAPS";
         case TokenType::SIMILARITY: return "SIMILARITY";
         case TokenType::REVERSE_COMPLEMENT: return "REVERSE_COMPLEMENT";
+        case TokenType::MATRIX: return "MATRIX";
+        case TokenType::SCAN: return "SCAN";
+        case TokenType::THRESHOLD: return "THRESHOLD";
         case TokenType::ID: return "ID";
         case TokenType::NUM: return "NUM";
         case TokenType::FLOAT: return "FLOAT";

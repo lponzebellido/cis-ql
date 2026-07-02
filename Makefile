@@ -7,7 +7,7 @@ SRCS = src/main.cpp \
        src/frontend/Lexer.cpp src/frontend/Parser.cpp src/frontend/AST.cpp \
        src/backend/SemanticAnalyzer.cpp src/backend/IRGenerator.cpp src/backend/Interpreter.cpp \
        src/bioinfo/FastaReader.cpp src/bioinfo/GFFReader.cpp src/bioinfo/MotifFinder.cpp \
-       src/bioinfo/SmithWaterman.cpp src/bioinfo/SetOperations.cpp
+       src/bioinfo/SmithWaterman.cpp src/bioinfo/SetOperations.cpp src/bioinfo/PWMScanner.cpp
 
 OBJS = $(SRCS:.cpp=.o)
 

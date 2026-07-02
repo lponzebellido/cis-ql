@@ -28,6 +28,7 @@ public:
   void visit(FindStmtNode *node) override;
   void visit(ExtractStmtNode *node) override;
   void visit(SetOpStmtNode *node) override;
+  void visit(ScanStmtNode *node) override;
   void visit(ProgramNode *node) override;
 };
 

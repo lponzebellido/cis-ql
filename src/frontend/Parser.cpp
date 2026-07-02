@@ -93,13 +93,15 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
     current--;
     return parseSetOperation();
   }
+  if (match(TokenType::SCAN))
+    return parseScan();
 
   if (match(TokenType::ERROR_TOKEN)) {
     return nullptr;
   }
 
   reportError(peek(), "Expected start of a statement (LOAD, FIND, EXTRACT, "
-                      "INTERSECT, UNION, EXCEPT)");
+                      "INTERSECT, UNION, EXCEPT, SCAN)");
   throw std::runtime_error("Parse error");
 }
 
@@ -109,8 +111,10 @@ std::unique_ptr<LoadStmtNode> Parser::parseLoad() {
     loadType = "SEQUENCE";
   } else if (match(TokenType::ANNOTATION)) {
     loadType = "ANNOTATION";
+  } else if (match(TokenType::MATRIX)) {
+    loadType = "MATRIX";
   } else {
-    reportError(peek(), "Expected 'SEQUENCE' or 'ANNOTATION' after LOAD.");
+    reportError(peek(), "Expected 'SEQUENCE', 'ANNOTATION', or 'MATRIX' after LOAD.");
     throw std::runtime_error("Parse error");
   }
   consume(TokenType::STRING, "Expected a file name (string).");
@@ -250,6 +254,56 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
   }
   reportError(peek(), "Expected an entity or alias in the set operation.");
   throw std::runtime_error("Parse error");
+}
+
+std::unique_ptr<ScanStmtNode> Parser::parseScan() {
+  // SCAN ID ScanOpts AliasOpt WhereClause SEMICOLON
+  consume(TokenType::ID, "Expected a matrix alias after SCAN.");
+  std::string matrixAlias = previous().lexeme;
+
+  std::string strandFilter;
+  std::string threshold;
+
+  // Parse options: STRAND and/or THRESHOLD (in any order)
+  while (!check(TokenType::SEMICOLON) && !check(TokenType::AS) &&
+         !check(TokenType::WHERE) && !isAtEnd()) {
+    if (match(TokenType::STRAND)) {
+      if (match(TokenType::POSITIVE) || match(TokenType::NEGATIVE)) {
+        strandFilter = previous().lexeme;
+      } else {
+        reportError(peek(), "Expected POSITIVE or NEGATIVE after STRAND.");
+        throw std::runtime_error("Parse error");
+      }
+    } else if (match(TokenType::THRESHOLD)) {
+      if (match(TokenType::NUM) || match(TokenType::FLOAT)) {
+        threshold = previous().lexeme;
+        if (match(TokenType::PERCENT)) {
+          threshold += " %";
+        }
+      } else {
+        reportError(peek(), "Expected a numeric value for THRESHOLD.");
+        throw std::runtime_error("Parse error");
+      }
+    } else {
+      break;
+    }
+  }
+
+  // AliasOpt
+  std::string alias;
+  if (match(TokenType::AS)) {
+    consume(TokenType::ID, "Expected an alias identifier after AS.");
+    alias = previous().lexeme;
+  }
+
+  // WhereClause
+  auto whereClause = parseWhereClause();
+
+  consume(TokenType::SEMICOLON, "Expected ';' at the end of SCAN.");
+
+  return std::unique_ptr<ScanStmtNode>(
+      new ScanStmtNode(matrixAlias, strandFilter, threshold,
+                       alias, std::move(whereClause)));
 }
 
 std::unique_ptr<ConditionNode> Parser::parseWhereClause() {

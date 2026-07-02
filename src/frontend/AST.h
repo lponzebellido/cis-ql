@@ -15,6 +15,7 @@ class FindOptNode;
 class FindStmtNode;
 class ExtractStmtNode;
 class SetOpStmtNode;
+class ScanStmtNode;
 class ProgramNode;
 
 class ASTVisitor {
@@ -28,6 +29,7 @@ public:
   virtual void visit(FindStmtNode* node) = 0;
   virtual void visit(ExtractStmtNode* node) = 0;
   virtual void visit(SetOpStmtNode* node) = 0;
+  virtual void visit(ScanStmtNode* node) = 0;
   virtual void visit(ProgramNode* node) = 0;
 };
 
@@ -128,6 +130,21 @@ public:
   SetOpStmtNode(std::string o, std::string e1, std::string e2,
                 std::unique_ptr<ConditionNode> w)
       : op(o), entity1(e1), entity2(e2), whereClause(std::move(w)) {}
+  void print(std::string prefix = "", bool isLast = true) const override;
+  void accept(ASTVisitor& visitor) override;
+};
+
+class ScanStmtNode : public StatementNode {
+public:
+  std::string matrixAlias;    // alias of the loaded PWM
+  std::string strandFilter;   // POSITIVE, NEGATIVE, or "" (both)
+  std::string threshold;      // e.g. "80.0 %"
+  std::string alias;          // AS alias
+  std::unique_ptr<ConditionNode> whereClause;
+  ScanStmtNode(std::string ma, std::string sf, std::string th,
+               std::string a, std::unique_ptr<ConditionNode> w)
+      : matrixAlias(ma), strandFilter(sf), threshold(th),
+        alias(a), whereClause(std::move(w)) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;
 };
