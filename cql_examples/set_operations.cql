@@ -1,14 +1,21 @@
-LOAD SEQUENCE "data_examples/ecoli.fasta" AS ecoli_genome;
-LOAD ANNOTATION "data_examples/genomic.gff" AS ecoli_annot;
+// set_operations.cql
+// Demonstrates INTERSECT, UNION, and EXCEPT on motif search results.
+// Expect: overlapping Pribnow/conserved hits, a merged track, and a filtered set minus exons.
 
-// Encuentra motivos reguladores
-FIND MOTIF "TATAAT" WITHIN 500 BP UPSTREAM FROM GENE AS promoters;
+LOAD SEQUENCE "data_examples/ecoli.fasta" AS genome;
+LOAD ANNOTATION "data_examples/genomic.gff" AS annot;
 
-// Encuentra regiones conservadas
-FIND MOTIF "GATAAG" STRAND POSITIVE AS conserved_regions;
+// Sigma-70 -10 box candidates
+FIND MOTIF "TATAAT" STRAND POSITIVE AS pribnow;
 
-// Intersección: promotores que además están en una región conservada
-INTERSECT promoters AND conserved_regions WHERE LENGTH > 10 BP;
+// Conserved bacterial regulatory element (riboswitch-like)
+FIND MOTIF "GATAAG" STRAND POSITIVE AS conserved;
 
-// Diferencia: promotores que NO están en un exón (para filtrar falsos positivos)
-EXCEPT promoters FROM EXON WHERE SIMILARITY >= 90.0%;
+// INTERSECT: positions where both motifs co-occur (potential dual-regulated regions)
+INTERSECT pribnow AND conserved WHERE LENGTH > 5 BP;
+
+// UNION: all hits from either motif in a single combined track
+UNION pribnow AND conserved;
+
+// EXCEPT: remove Pribnow hits that fall inside annotated exons (likely false positives)
+EXCEPT pribnow FROM EXON;

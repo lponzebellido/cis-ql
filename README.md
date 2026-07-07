@@ -263,3 +263,15 @@ Current working features:
 - `--debug` mode exposing the full compilation pipeline (tokens, AST, IR, intermediate results).
 
 *Note: This language is a research project and compiler design implementation. Expect syntax expansions and further optimizations in future releases.*
+
+---
+
+## Output Naming & Intermediate Results
+
+When a query is executed without an explicit `AS <alias>` clause, Cis-QL automatically generates a descriptive track name for the result set. This provides much clearer context when visualizing the tracks in Cis-QL Studio.
+
+Examples of automatic naming:
+- `EXTRACT PROMOTER;` -> `Extract_PROMOTER_0`
+- `FIND MOTIF "GCGCG";` -> `Find_GCGCG_1`
+- `INTERSECT GENE AND CDS;` -> `INTERSECT_GENE_CDS_2`
+- `SCAN tata_pwm;` -> `Scan_tata_pwm_3`

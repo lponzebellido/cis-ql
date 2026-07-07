@@ -45,7 +45,7 @@ private:
   int tempCounter;
   std::string currentTemp;
 
-  std::string newTemp();
+  std::string newTemp(const std::string& prefix = "t");
 
 public:
   IRGenerator();

@@ -1,4 +1,5 @@
 #include "IRGenerator.h"
+#include <algorithm>
 
 std::string irOpcodeToString(IROpCode op) {
   switch (op) {
@@ -28,8 +29,10 @@ std::string irOpcodeToString(IROpCode op) {
 
 IRGenerator::IRGenerator() : tempCounter(0) {}
 
-std::string IRGenerator::newTemp() {
-  return "t" + std::to_string(tempCounter++);
+std::string IRGenerator::newTemp(const std::string& prefix) {
+  std::string sanitized = prefix;
+  sanitized.erase(std::remove(sanitized.begin(), sanitized.end(), '"'), sanitized.end());
+  return sanitized + "_" + std::to_string(tempCounter++);
 }
 
 const std::vector<IRInstruction>& IRGenerator::generate(ProgramNode* node) {
@@ -60,7 +63,7 @@ void IRGenerator::visit(LoadStmtNode* node) {
 }
 
 void IRGenerator::visit(FindStmtNode* node) {
-  currentTemp = newTemp();
+  currentTemp = newTemp("Find_" + node->motif);
 
   IRInstruction findInstr;
   findInstr.opcode = IROpCode::FIND_MOTIF;
@@ -91,7 +94,7 @@ void IRGenerator::visit(FindStmtNode* node) {
 
   IRInstruction printInstr;
   printInstr.opcode = IROpCode::PRINT_RESULTS;
-  printInstr.arg1 = currentTemp;
+  printInstr.arg1 = node->alias.empty() ? currentTemp : node->alias;
   printInstr.arg2 = "FIND";
   instructions.push_back(printInstr);
 }
@@ -116,7 +119,7 @@ void IRGenerator::visit(FindOptNode* node) {
 }
 
 void IRGenerator::visit(ExtractStmtNode* node) {
-  currentTemp = newTemp();
+  currentTemp = newTemp("Extract_" + node->entity);
 
   IRInstruction extractInstr;
   extractInstr.opcode = IROpCode::EXTRACT;
@@ -136,7 +139,7 @@ void IRGenerator::visit(ExtractStmtNode* node) {
 }
 
 void IRGenerator::visit(SetOpStmtNode* node) {
-  currentTemp = newTemp();
+  currentTemp = newTemp(node->op + "_" + node->entity1 + "_" + node->entity2);
 
   IRInstruction setInstr;
   if (node->op == "INTERSECT") setInstr.opcode = IROpCode::SET_INTERSECT;
@@ -182,7 +185,7 @@ void IRGenerator::visit(NotConditionNode* node) {
 }
 
 void IRGenerator::visit(ScanStmtNode* node) {
-  currentTemp = newTemp();
+  currentTemp = newTemp("Scan_" + node->matrixAlias);
 
   
   if (!node->strandFilter.empty()) {
@@ -224,7 +227,7 @@ void IRGenerator::visit(ScanStmtNode* node) {
   
   IRInstruction printInstr;
   printInstr.opcode = IROpCode::PRINT_RESULTS;
-  printInstr.arg1 = currentTemp;
+  printInstr.arg1 = node->alias.empty() ? currentTemp : node->alias;
   printInstr.arg2 = "SCAN";
   instructions.push_back(printInstr);
 }

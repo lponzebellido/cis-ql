@@ -13,9 +13,9 @@ Grammar:
 Program         -> StatementList
 StatementList   -> Statement StatementList | λ
 
-Statement       -> LoadStmt | FindStmt | ExtractStmt | SetOperationStmt
+Statement       -> LoadStmt | FindStmt | ExtractStmt | SetOperationStmt | ScanStmt
 
-LoadStmt        -> LOAD (SEQUENCE | ANNOTATION) STRING AS ID SEMICOLON
+LoadStmt        -> LOAD (SEQUENCE | ANNOTATION | MATRIX) STRING AS ID SEMICOLON
 
 FindStmt        -> FIND MOTIF STRING FindOpts AliasOpt WhereClause SEMICOLON
 FindOpts        -> FindOpt FindOpts | λ
@@ -23,6 +23,11 @@ FindOpt         -> WITHIN NUM Unit Direction FROM EntityRef EntityName
                  | STRAND StrandType
                  | CHR STRING
 AliasOpt        -> AS ID | λ
+
+ScanStmt        -> SCAN ID ScanOpts AliasOpt WhereClause SEMICOLON
+ScanOpts        -> ScanOpt ScanOpts | λ
+ScanOpt         -> STRAND StrandType
+                 | THRESHOLD NUM PERCENT
 
 SetOperationStmt-> SetOp EntityRef AND EntityRef WhereClause SEMICOLON
 SetOp           -> INTERSECT | UNION | EXCEPT
@@ -48,3 +53,6 @@ Entity          -> GENE | PROMOTER | ENHANCER | EXON | INTRON | UTR | TSS | CDS 
 EntityRef       -> Entity | ID
 EntityName      -> STRING | λ
 StrandType      -> POSITIVE | NEGATIVE
+
+Note on Result Naming:
+If an `AliasOpt` (AS ID) is not provided for queries like FIND, SCAN, or for operations like EXTRACT and INTERSECT, Cis-QL automatically generates a descriptive track name to clarify the results (e.g., `Find_TATAAT_0`, `Extract_PROMOTER_1`, `INTERSECT_GENE_CDS_2`).

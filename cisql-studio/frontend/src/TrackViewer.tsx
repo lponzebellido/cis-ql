@@ -307,7 +307,7 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, onSelectRegio
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const factor = e.deltaY > 0 ? 0.85 : 1.18;
-    setZoom(prev => Math.max(0.5, Math.min(200, prev * factor)));
+    setZoom(prev => Math.max(0.5, Math.min(50000, prev * factor)));
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -371,7 +371,7 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, onSelectRegio
     const buffer = regionRange * 2;
     const center = (region.start + region.end) / 2;
     const newZoom = totalRange / (regionRange + buffer);
-    setZoom(Math.min(200, Math.max(0.5, newZoom)));
+    setZoom(Math.min(50000, Math.max(0.5, newZoom)));
     setPanOffset(center - globalMin - totalRange / (2 * newZoom));
   };
 
@@ -391,7 +391,7 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, onSelectRegio
   return (
     <div className="track-viewer-container">
       <div className="track-toolbar">
-        <button onClick={() => setZoom(prev => Math.min(200, prev * 1.5))}>+ Zoom In</button>
+        <button onClick={() => setZoom(prev => Math.min(50000, prev * 1.5))}>+ Zoom In</button>
         <button onClick={() => setZoom(prev => Math.max(0.5, prev / 1.5))}>- Zoom Out</button>
         <button onClick={() => { setZoom(1); setPanOffset(0); setSelectedRegion(null); }}>Reset</button>
         {selectedRegion && (

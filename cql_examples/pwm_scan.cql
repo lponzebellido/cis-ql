@@ -1,13 +1,15 @@
-/* Ejemplo: Búsqueda de elementos cis-reguladores con PWM (Position Weight Matrix) */
+// pwm_scan.cql
+// Probabilistic TATA-box discovery using the TBP PWM (JASPAR MA0108.1), then
+// extracted and filtered to only high-confidence sites.
+// Expect: TBP binding site predictions above 80% of the maximum PWM score.
 
-// 1. Cargar la secuencia genómica
 LOAD SEQUENCE "data_examples/ecoli.fasta" AS genome;
 
-// 2. Cargar matrices PWM de factores de transcripción (formato JASPAR)
+// Load TBP matrix (TATA-Binding Protein — core promoter element)
 LOAD MATRIX "matrices/MA0108.1_TBP.pwm" AS tata_pwm;
 
-// 3. Escanear: identificar sitios de unión a TBP (TATA box) con score >= 80%
+// Scan positive strand only — high threshold for specificity
 SCAN tata_pwm STRAND POSITIVE THRESHOLD 80% AS tata_sites;
 
-// 4. Extraer los resultados finales
+// Pull out the result for visualization
 EXTRACT tata_sites;

@@ -297,7 +297,7 @@ void Interpreter::executeFindAlias(const IRInstruction &instr) {
   }
 
   namedRegions[alias] = regions;
-  resultSets[resultId] = regions;
+  resultSets[alias] = regions;
   if (debugMode) {
     std::cout << "  Stored " << regions.size() << " regions as \"" << alias
               << "\"" << std::endl;
@@ -609,7 +609,7 @@ void Interpreter::executeScanAlias(const IRInstruction &instr) {
   }
 
   namedRegions[alias] = regions;
-  resultSets[resultId] = regions;
+  resultSets[alias] = regions;
   if (debugMode) {
     std::cout << "  Stored " << regions.size() << " regions as \"" << alias
               << "\"" << std::endl;
