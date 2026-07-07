@@ -7,6 +7,22 @@ import { FileExplorer } from './FileExplorer';
 import { SequenceViewer } from './SequenceViewer';
 import './App.css';
 
+const EXT_COLORS: Record<string, string> = {
+  cql: '#3fb950',
+  fasta: '#58a6ff',
+  fa: '#58a6ff',
+  gff3: '#d29922',
+  gff: '#d29922',
+  pwm: '#bc8cff',
+  txt: '#8b949e',
+  md: '#8b949e',
+};
+
+function getExtColor(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  return EXT_COLORS[ext] || '#8b949e';
+}
+
 function App() {
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
   const [code, setCode] = useState('');
@@ -17,11 +33,11 @@ function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [activeVisTab, setActiveVisTab] = useState<'track' | 'sequence'>('track');
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [highlightedRegion, setHighlightedRegion] = useState<any>(null);
   const monaco = useMonaco();
   const editorRef = useRef<any>(null);
 
-  
   useEffect(() => {
     fetch('http://localhost:3001/api/fs/workspace')
       .then(res => res.json())
@@ -32,56 +48,53 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    setIsDarkMode(mediaQuery.matches);
-
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    setIsDarkMode(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsDarkMode(e.matches);
-    mediaQuery.addEventListener('change', handler);
-    return () => mediaQuery.removeEventListener('change', handler);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
   }, []);
-
-  const defineThemes = (monacoInstance: any) => {
-    monacoInstance.editor.defineTheme('cql-dark', {
-      base: 'vs-dark',
-      inherit: true,
-      rules: [
-        { token: 'keyword', foreground: '569cd6', fontStyle: 'bold' },
-        { token: 'type.identifier', foreground: '4ec9b0' },
-        { token: 'string', foreground: 'ce9178' },
-        { token: 'number', foreground: 'b5cea8' },
-        { token: 'comment', foreground: '6a9955' },
-      ],
-      colors: {
-        'editor.background': '#1e1e1e',
-        'editor.lineHighlightBackground': '#2a2d2e',
-        'editorLineNumber.foreground': '#858585',
-      }
-    });
-
-    monacoInstance.editor.defineTheme('cql-light', {
-      base: 'vs',
-      inherit: true,
-      rules: [
-        { token: 'keyword', foreground: '0000ff', fontStyle: 'bold' },
-        { token: 'type.identifier', foreground: '267f99' },
-        { token: 'string', foreground: 'a31515' },
-        { token: 'number', foreground: '098658' },
-        { token: 'comment', foreground: '008000' },
-      ],
-      colors: {
-        'editor.background': '#ffffff',
-        'editor.lineHighlightBackground': '#f0f0f0',
-        'editorLineNumber.foreground': '#237893',
-      }
-    });
-  };
 
   useEffect(() => {
     if (monaco) {
       monaco.languages.register({ id: 'cql' });
       monaco.languages.setMonarchTokensProvider('cql', cqlLanguageDef as any);
-      
-      defineThemes(monaco);
+
+      monaco.editor.defineTheme('cql-dark', {
+        base: 'vs-dark',
+        inherit: true,
+        rules: [
+          { token: 'keyword', foreground: '79c0ff', fontStyle: 'bold' },
+          { token: 'type.identifier', foreground: '7ee787' },
+          { token: 'string', foreground: 'a5d6ff' },
+          { token: 'number', foreground: '79c0ff' },
+          { token: 'comment', foreground: '8b949e' },
+        ],
+        colors: {
+          'editor.background': '#0d1117',
+          'editor.lineHighlightBackground': '#161b22',
+          'editorLineNumber.foreground': '#484f58',
+          'editorLineNumber.activeForeground': '#e6edf3',
+        }
+      });
+
+      monaco.editor.defineTheme('cql-light', {
+        base: 'vs',
+        inherit: true,
+        rules: [
+          { token: 'keyword', foreground: '0550ae', fontStyle: 'bold' },
+          { token: 'type.identifier', foreground: '116329' },
+          { token: 'string', foreground: '0a3069' },
+          { token: 'number', foreground: '0550ae' },
+          { token: 'comment', foreground: '6e7781' },
+        ],
+        colors: {
+          'editor.background': '#ffffff',
+          'editor.lineHighlightBackground': '#f6f8fa',
+          'editorLineNumber.foreground': '#8b949e',
+          'editorLineNumber.activeForeground': '#1f2328',
+        }
+      });
     }
   }, [monaco]);
 
@@ -113,17 +126,15 @@ function App() {
   const handleExecute = async () => {
     setIsRunning(true);
     setStdout('Executing...\n');
-    setResults({}); 
+    setResults({});
     try {
       const response = await fetch('http://localhost:3001/api/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code })
       });
-      
       const data = await response.json();
       setStdout(data.stdout + (data.stderr ? '\n' + data.stderr : ''));
-      
       if (data.results && data.results.resultSets) {
         setResults(data.results.resultSets);
       }
@@ -141,15 +152,11 @@ function App() {
 
   const handleOpenFolder = async () => {
     let folderPath = null;
-    
-    
     if ((window as any).electronAPI) {
       folderPath = await (window as any).electronAPI.selectFolder();
     } else {
-      
-      folderPath = prompt("Enter the absolute path to your Cis-QL workspace directory:");
+      folderPath = prompt("Enter the absolute path to your workspace:");
     }
-
     if (folderPath) {
       try {
         const res = await fetch('http://localhost:3001/api/fs/workspace', {
@@ -172,68 +179,80 @@ function App() {
     setMenuOpen(null);
   };
 
+  const activeFileName = activeFile ? activeFile.split('/').pop() || '' : '';
+
   return (
     <div className="app-container" onClick={() => setMenuOpen(null)}>
-      {}
-      <header className="top-menu-bar">
+      <div className="titlebar-drag">
         <div className="menu-brand">Cis-QL Studio</div>
         <div className="menu-items">
-          <div className="menu-item-wrapper" style={{ position: 'relative' }}>
+          <div className="menu-item-wrapper">
             <div className="menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === 'file' ? null : 'file'); }}>File</div>
             {menuOpen === 'file' && (
               <div className="dropdown-menu">
-                <div className="dropdown-item" onClick={handleOpenFolder}>Open Folder...</div>
-                <div className="dropdown-item" onClick={() => { handleSave(); setMenuOpen(null); }}>Save</div>
+                <div className="dropdown-item" onClick={handleOpenFolder}>
+                  Open Folder... <span className="dropdown-shortcut">Cmd+O</span>
+                </div>
+                <div className="dropdown-item" onClick={() => { handleSave(); setMenuOpen(null); }}>
+                  Save <span className="dropdown-shortcut">Cmd+S</span>
+                </div>
               </div>
             )}
           </div>
-          <div className="menu-item-wrapper" style={{ position: 'relative' }}>
+          <div className="menu-item-wrapper">
             <div className="menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === 'run' ? null : 'run'); }}>Run</div>
             {menuOpen === 'run' && (
               <div className="dropdown-menu">
-                <div className="dropdown-item" onClick={() => { handleExecute(); setMenuOpen(null); }}>Run Code</div>
+                <div className="dropdown-item" onClick={() => { handleExecute(); setMenuOpen(null); }}>
+                  Run Code <span className="dropdown-shortcut">Cmd+Enter</span>
+                </div>
               </div>
             )}
           </div>
-          <div className="menu-item-wrapper" style={{ position: 'relative' }}>
+          <div className="menu-item-wrapper">
             <div className="menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === 'terminal' ? null : 'terminal'); }}>Terminal</div>
             {menuOpen === 'terminal' && (
               <div className="dropdown-menu">
-                <div className="dropdown-item" onClick={() => { setStdout(''); setMenuOpen(null); }}>Clear Terminal</div>
+                <div className="dropdown-item" onClick={() => { setStdout(''); setMenuOpen(null); }}>
+                  Clear Terminal
+                </div>
               </div>
             )}
           </div>
         </div>
         <div className="top-actions">
           <span className="status-text">{isSaving ? 'Saving...' : ''}</span>
-          <button 
-            className={`run-button ${isRunning ? 'running' : ''}`} 
+          <button
+            className={`run-button ${isRunning ? 'running' : ''}`}
             onClick={handleExecute}
             disabled={isRunning || !code.trim() || !activeFile}
           >
             {isRunning ? 'Running...' : 'Run'}
           </button>
         </div>
-      </header>
-      
-      <Split className="workspace" sizes={[20, 80]} minSize={150} gutterSize={4}>
-        {}
+      </div>
+
+      <Split className="workspace" sizes={[18, 82]} minSize={140} gutterSize={3}>
         <div className="sidebar">
-          <FileExplorer 
-            onFileSelect={onFileSelect} 
-            workspacePath={workspacePath} 
-            onSetWorkspace={handleOpenFolder} 
+          <FileExplorer
+            onFileSelect={onFileSelect}
+            workspacePath={workspacePath}
+            onSetWorkspace={handleOpenFolder}
           />
         </div>
 
-        {}
-        <Split className="main-content" direction="vertical" sizes={[70, 30]} minSize={100} gutterSize={4}>
-          
-          <Split className="editor-visualizer-split" direction="horizontal" sizes={[55, 45]} minSize={200} gutterSize={4}>
-            {}
+        <Split className="main-content" direction="vertical" sizes={[72, 28]} minSize={80} gutterSize={3}>
+          <Split className="editor-visualizer-split" direction="horizontal" sizes={[55, 45]} minSize={200} gutterSize={3}>
             <div className="pane editor-pane">
               <div className="pane-header">
-                {activeFile ? <div className="file-tab">{activeFile.split('/').pop()}</div> : null}
+                <div className="tab-bar">
+                  {activeFile && (
+                    <div className="file-tab">
+                      <div className="tab-dot" style={{ background: getExtColor(activeFileName) }}></div>
+                      {activeFileName}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="pane-content">
                 {activeFile ? (
@@ -246,23 +265,28 @@ function App() {
                     onMount={handleEditorDidMount}
                     options={{
                       minimap: { enabled: false },
-                      fontSize: 14,
+                      fontSize: 13,
                       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                      padding: { top: 16 },
+                      fontLigatures: true,
+                      padding: { top: 16, bottom: 16 },
                       scrollBeyondLastLine: false,
-                      wordWrap: 'on'
+                      wordWrap: 'on',
+                      renderLineHighlight: 'gutter',
+                      cursorBlinking: 'smooth',
+                      smoothScrolling: true,
                     }}
                   />
                 ) : (
                   <div className="welcome-screen">
                     <h1>Cis-QL Studio</h1>
+                    <p>Cis-Regulatory Query Language</p>
                     <div className="welcome-shortcuts">
-                      <div className="shortcut"><span>Open Folder</span><span>From File Menu</span></div>
-                      <div className="shortcut"><span>Save File</span><span>Cmd + S</span></div>
-                      <div className="shortcut"><span>Run Code</span><span>Cmd + Enter</span></div>
+                      <div className="shortcut"><span>Open Folder</span><span>Cmd+O</span></div>
+                      <div className="shortcut"><span>Save File</span><span>Cmd+S</span></div>
+                      <div className="shortcut"><span>Run Code</span><span>Cmd+Enter</span></div>
                     </div>
                     {!workspacePath && (
-                      <button className="run-button" style={{ marginTop: '16px' }} onClick={handleOpenFolder}>
+                      <button className="welcome-open-btn" onClick={handleOpenFolder}>
                         Open Folder
                       </button>
                     )}
@@ -271,40 +295,58 @@ function App() {
               </div>
             </div>
 
-            {}
             <div className="pane visualizer-pane">
-              <div className="pane-header" style={{ gap: '0' }}>
-                <div 
-                  className={`visualizer-tab ${activeVisTab === 'track' ? 'active' : ''}`}
-                  onClick={() => setActiveVisTab('track')}
-                >
-                  Track Map
-                </div>
-                <div 
-                  className={`visualizer-tab ${activeVisTab === 'sequence' ? 'active' : ''}`}
-                  onClick={() => setActiveVisTab('sequence')}
-                >
-                  Sequence
+              <div className="pane-header">
+                <div className="visualizer-tabs">
+                  <div
+                    className={`visualizer-tab ${activeVisTab === 'track' ? 'active' : ''}`}
+                    onClick={() => setActiveVisTab('track')}
+                  >
+                    Track Map
+                  </div>
+                  <div
+                    className={`visualizer-tab ${activeVisTab === 'sequence' ? 'active' : ''}`}
+                    onClick={() => setActiveVisTab('sequence')}
+                  >
+                    Sequence
+                  </div>
                 </div>
               </div>
               <div className="pane-content">
                 {activeVisTab === 'track' ? (
-                  <TrackViewer results={results} />
+                  <TrackViewer results={results} onSelectRegion={(region) => {
+                    setHighlightedRegion(region);
+                    setActiveVisTab('sequence');
+                    setTimeout(() => {
+                      const el = document.getElementById('highlighted-region');
+                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
+                  }} />
                 ) : (
-                  <SequenceViewer results={results} />
+                  <SequenceViewer results={results} highlightedRegion={highlightedRegion} />
                 )}
               </div>
             </div>
           </Split>
 
-          {}
           <div className="pane terminal-pane">
-            <div className="pane-header">TERMINAL</div>
+            <div className="pane-header">
+              <div className="pane-label">Terminal</div>
+            </div>
             <pre className="terminal-output">{stdout}</pre>
           </div>
-          
         </Split>
       </Split>
+
+      <div className="status-bar">
+        <div className="status-item">{workspacePath ? workspacePath.split('/').pop() : 'No workspace'}</div>
+        {activeFile && (
+          <div className="status-item">{activeFile}</div>
+        )}
+        <div className="spacer" />
+        <div className="status-item">UTF-8</div>
+        <div className="status-item">Cis-QL</div>
+      </div>
     </div>
   );
 }

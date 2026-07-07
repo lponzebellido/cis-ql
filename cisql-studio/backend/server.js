@@ -179,6 +179,56 @@ app.post('/api/fs/create-dir', (req, res) => {
   }
 });
 
+app.post('/api/fs/rename', (req, res) => {
+  if (!WORKING_DIR) return res.status(400).json({ error: 'No workspace opened' });
+  const { oldPath, newPath } = req.body;
+  if (!oldPath || !newPath) return res.status(400).json({ error: 'Paths not provided' });
+
+  const targetOldPath = path.join(WORKING_DIR, oldPath);
+  const targetNewPath = path.join(WORKING_DIR, newPath);
+
+  if (!targetOldPath.startsWith(WORKING_DIR) || !targetNewPath.startsWith(WORKING_DIR)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    if (!fs.existsSync(targetOldPath)) {
+      return res.status(404).json({ error: 'Source file does not exist' });
+    }
+    if (fs.existsSync(targetNewPath)) {
+      return res.status(400).json({ error: 'Destination already exists' });
+    }
+    fs.renameSync(targetOldPath, targetNewPath);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/fs/delete', (req, res) => {
+  if (!WORKING_DIR) return res.status(400).json({ error: 'No workspace opened' });
+  const { path: relPath } = req.body;
+  if (!relPath) return res.status(400).json({ error: 'No path provided' });
+
+  const targetPath = path.join(WORKING_DIR, relPath);
+  if (!targetPath.startsWith(WORKING_DIR)) return res.status(403).json({ error: 'Forbidden' });
+
+  try {
+    if (!fs.existsSync(targetPath)) {
+      return res.status(404).json({ error: 'File does not exist' });
+    }
+    const stat = fs.statSync(targetPath);
+    if (stat.isDirectory()) {
+      fs.rmSync(targetPath, { recursive: true, force: true });
+    } else {
+      fs.unlinkSync(targetPath);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Cis-QL backend server running on http://localhost:${PORT}`);
 });

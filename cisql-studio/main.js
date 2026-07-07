@@ -3,13 +3,20 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 let backendProcess;
+let frontendProcess;
+let mainWindow;
+let frontendReady = false;
+let detectedPort = 5173;
 
-function createWindow() {
-  const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    titleBarStyle: 'hiddenInset', 
-    backgroundColor: '#1e1e1e',
+function createWindow(port) {
+  mainWindow = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    minWidth: 900,
+    minHeight: 600,
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 12, y: 12 },
+    backgroundColor: '#0d1117',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -17,37 +24,65 @@ function createWindow() {
     }
   });
 
-  
-  
-  win.loadURL('http://localhost:5174');
+  mainWindow.loadURL(`http://localhost:${port}`);
 }
 
 app.whenReady().then(() => {
-  
+  // Start Backend
   backendProcess = spawn('node', ['backend/server.js'], {
-    cwd: __dirname
+    cwd: __dirname,
+    stdio: 'pipe'
   });
-
   backendProcess.stdout.on('data', (data) => console.log(`[Backend] ${data}`));
   backendProcess.stderr.on('data', (data) => console.error(`[Backend] ${data}`));
 
-  
+  // Start Frontend
+  frontendProcess = spawn('npm', ['run', 'dev'], {
+    cwd: path.join(__dirname, 'frontend'),
+    stdio: 'pipe',
+    shell: true
+  });
+
+  let stdoutBuffer = '';
+  const timeoutId = setTimeout(() => {
+    if (!frontendReady) {
+      console.error('Frontend start timed out after 20 seconds');
+      app.quit();
+    }
+  }, 20000);
+
+  frontendProcess.stdout.on('data', (data) => {
+    const str = data.toString();
+    console.log(`[Frontend] ${str}`);
+
+    if (!frontendReady) {
+      stdoutBuffer += str;
+      const match = stdoutBuffer.match(/http:\/\/localhost:(\d+)/);
+      if (match) {
+        frontendReady = true;
+        clearTimeout(timeoutId);
+        detectedPort = parseInt(match[1], 10);
+        createWindow(detectedPort);
+      }
+    }
+  });
+
+  frontendProcess.stderr.on('data', (data) => {
+    console.error(`[Frontend Error] ${data}`);
+  });
+
   ipcMain.handle('dialog:openFolder', async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       title: 'Open Workspace Folder',
       properties: ['openDirectory']
     });
-    if (canceled) {
-      return null;
-    }
+    if (canceled) return null;
     return filePaths[0];
   });
 
-  createWindow();
-
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+    if (BrowserWindow.getAllWindows().length === 0 && frontendReady) {
+      createWindow(detectedPort);
     }
   });
 });
@@ -59,7 +94,6 @@ app.on('window-all-closed', () => {
 });
 
 app.on('quit', () => {
-  if (backendProcess) {
-    backendProcess.kill();
-  }
+  if (backendProcess) backendProcess.kill();
+  if (frontendProcess) frontendProcess.kill();
 });
