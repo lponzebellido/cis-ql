@@ -95,13 +95,15 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
   }
   if (match(TokenType::SCAN))
     return parseScan();
+  if (match(TokenType::ANALYZE))
+    return parseAnalyze();
 
   if (match(TokenType::ERROR_TOKEN)) {
     return nullptr;
   }
 
   reportError(peek(), "Expected start of a statement (LOAD, FIND, EXTRACT, "
-                      "INTERSECT, UNION, EXCEPT, SCAN)");
+                      "INTERSECT, UNION, EXCEPT, SCAN, ANALYZE)");
   throw std::runtime_error("Parse error");
 }
 
@@ -392,4 +394,42 @@ std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
 
   return std::unique_ptr<SimpleConditionNode>(
       new SimpleConditionNode(prop, op, val));
+}
+
+std::unique_ptr<AnalyzeStmtNode> Parser::parseAnalyze() {
+  std::string analysisType;
+  if (match(TokenType::GC_CONTENT)) {
+    analysisType = "GC_CONTENT";
+  } else if (match(TokenType::CPG_ISLANDS)) {
+    analysisType = "CPG_ISLANDS";
+  } else {
+    reportError(peek(), "Expected 'GC_CONTENT' or 'CPG_ISLANDS' after ANALYZE.");
+    throw std::runtime_error("Parse error");
+  }
+
+  std::string windowSize;
+  if (match(TokenType::WINDOW)) {
+    if (match(TokenType::NUM)) {
+      windowSize = previous().lexeme;
+      if (match(TokenType::BP) || match(TokenType::KB) || match(TokenType::MB)) {
+        windowSize += " " + previous().lexeme;
+      }
+    } else {
+      reportError(peek(), "Expected window size (number) after WINDOW.");
+      throw std::runtime_error("Parse error");
+    }
+  }
+
+  std::string alias;
+  if (match(TokenType::AS)) {
+    consume(TokenType::ID, "Expected identifier after AS.");
+    alias = previous().lexeme;
+  }
+
+  auto where = parseWhereClause();
+
+  consume(TokenType::SEMICOLON, "Expected ';' after ANALYZE statement.");
+
+  return std::unique_ptr<AnalyzeStmtNode>(
+      new AnalyzeStmtNode(analysisType, windowSize, alias, std::move(where)));
 }

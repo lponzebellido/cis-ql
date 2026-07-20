@@ -1,15 +1,12 @@
-// 13_length_filters.cql
-// Filters annotated genomic features by length to isolate regions in specific size ranges.
-// Expect: long promoters, short CDSs, and annotated exons.
+/*
+ * 13_similarity_filter.cql
+ * 
+ * Purpose: Filters extracted features based on their sequence similarity to the first feature in the set.
+ * Expectation: A list of exon sequences that have at least 80% similarity to the first annotated exon.
+ * Why: Similarity filtering (using Smith-Waterman alignment) is essential for finding families of related genes or elements that may share a common evolutionary origin but have diverged in sequence.
+ */
 
 LOAD SEQUENCE "data_examples/ecoli.fasta" AS genome;
 LOAD ANNOTATION "data_examples/genomic.gff" AS annot;
 
-// Long promoter regions (> 150 bp)
-EXTRACT PROMOTER WHERE LENGTH > 150 BP;
-
-// Short coding sequences — candidates for small regulatory proteins
-EXTRACT CDS WHERE LENGTH < 300 BP;
-
-// All annotated exons
-EXTRACT EXON;
+EXTRACT EXON WHERE SIMILARITY >= 80 %;

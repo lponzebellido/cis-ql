@@ -615,6 +615,49 @@ void Interpreter::executeScanAlias(const IRInstruction &instr) {
               << "\"" << std::endl;
   }
 }
+void Interpreter::executeAnalyzeGC(const IRInstruction &instr) {
+  std::string windowSizeStr = instr.arg1;
+  std::string resultId = instr.arg2;
+  
+  size_t windowSize = 100;
+  if (!windowSizeStr.empty()) {
+    size_t spacePos = windowSizeStr.find(' ');
+    if (spacePos != std::string::npos) {
+      windowSize = toBasePairs(std::stoull(windowSizeStr.substr(0, spacePos)), windowSizeStr.substr(spacePos + 1));
+    } else {
+      windowSize = std::stoull(windowSizeStr);
+    }
+  }
+
+  const std::string &seqData =
+      sequences.empty() ? "" : sequences.begin()->second.sequence;
+      
+  auto windows = GCAnalyzer::gcContentWindowed(seqData, windowSize, windowSize / 2);
+  gcResults[resultId] = windows;
+  
+  if (debugMode) {
+    std::cout << "  Computed GC profile with " << windows.size() << " windows for \"" << resultId << "\"" << std::endl;
+  }
+}
+
+void Interpreter::executeAnalyzeCpG(const IRInstruction &instr) {
+  std::string resultId = instr.arg2;
+  
+  std::string chrId = "";
+  if (!sequences.empty()) {
+    chrId = sequences.begin()->second.sequenceId;
+  }
+  const std::string &seqData =
+      sequences.empty() ? "" : sequences.begin()->second.sequence;
+      
+  auto islands = GCAnalyzer::findCpGIslands(seqData, chrId);
+  resultSets[resultId] = islands;
+  
+  if (debugMode) {
+    std::cout << "  Found " << islands.size() << " CpG islands for \"" << resultId << "\"" << std::endl;
+  }
+}
+
 
 void Interpreter::dumpResultsJSON() const {
   std::ofstream out(".cisql_results.json");
@@ -643,7 +686,28 @@ void Interpreter::dumpResultsJSON() const {
     }
     out << "\n    ]";
   }
-  out << "\n  }\n}";
+  out << "\n  }";
+
+  if (!gcResults.empty()) {
+    out << ",\n  \"gcProfiles\": {\n";
+    bool firstProfile = true;
+    for (const auto &pair : gcResults) {
+      if (!firstProfile) out << ",\n";
+      firstProfile = false;
+      out << "    \"" << pair.first << "\": [\n";
+      
+      bool firstWindow = true;
+      for (const auto &w : pair.second) {
+        if (!firstWindow) out << ",\n";
+        firstWindow = false;
+        out << "      {\"pos\": " << w.position << ", \"gc\": " << w.gcPercent << "}";
+      }
+      out << "\n    ]";
+    }
+    out << "\n  }";
+  }
+  
+  out << "\n}\n";
 }
 
 void Interpreter::execute(const std::vector<IRInstruction> &program,
@@ -717,6 +781,12 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
       break;
     case IROpCode::SCAN_ALIAS:
       executeScanAlias(instr);
+      break;
+    case IROpCode::ANALYZE_GC:
+      executeAnalyzeGC(instr);
+      break;
+    case IROpCode::ANALYZE_CPG:
+      executeAnalyzeCpG(instr);
       break;
     }
   }

@@ -12,6 +12,7 @@ interface GenomicRegion {
 
 interface TrackViewerProps {
   results: Record<string, GenomicRegion[]>;
+  gcProfiles?: Record<string, any[]>;
   onSelectRegion?: (region: GenomicRegion) => void;
 }
 
@@ -26,6 +27,8 @@ const TYPE_COLORS: Record<string, string> = {
   mRNA: '#28a745',
   region: '#f9c513',
   motif: '#ea4aaa',
+  cpg_island: '#00fa9a',
+  gc_content: '#a2ee31',
 };
 
 function getTypeColor(type: string): string {
@@ -44,7 +47,7 @@ function formatBp(bp: number): string {
   return bp.toLocaleString() + ' bp';
 }
 
-export const TrackViewer: React.FC<TrackViewerProps> = ({ results, onSelectRegion }) => {
+export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = {}, onSelectRegion }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoveredRegion, setHoveredRegion] = useState<GenomicRegion | null>(null);
@@ -58,6 +61,7 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, onSelectRegio
   const panStartVal = useRef(0);
 
   const trackNames = React.useMemo(() => Object.keys(results), [results]);
+  const gcProfileNames = React.useMemo(() => Object.keys(gcProfiles), [gcProfiles]);
   let globalMin = Infinity, globalMax = 0;
   trackNames.forEach(name => {
     results[name].forEach(r => {
@@ -65,12 +69,20 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, onSelectRegio
       if (r.end > globalMax) globalMax = r.end;
     });
   });
+  gcProfileNames.forEach(name => {
+    if (gcProfiles[name].length > 0) {
+      if (gcProfiles[name][0].pos < globalMin) globalMin = gcProfiles[name][0].pos;
+      if (gcProfiles[name][gcProfiles[name].length - 1].pos > globalMax) globalMax = gcProfiles[name][gcProfiles[name].length - 1].pos;
+    }
+  });
+
   if (globalMin === Infinity) { globalMin = 0; globalMax = 1000; }
   const totalRange = globalMax - globalMin || 1000;
   const pad = totalRange * 0.05;
 
   const usedTypes = new Set<string>();
   trackNames.forEach(name => results[name].forEach(r => usedTypes.add(r.type)));
+  if (gcProfileNames.length > 0) usedTypes.add("gc_content");
 
   const totalResults = trackNames.reduce((sum, n) => sum + results[n].length, 0);
 
@@ -100,7 +112,7 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, onSelectRegio
     ctx.fillStyle = dark ? '#0d1117' : '#fff';
     ctx.fillRect(0, 0, w, h);
 
-    if (trackNames.length === 0) return;
+    if (trackNames.length === 0 && gcProfileNames.length === 0) return;
 
     const viewRange = totalRange / zoom;
     const viewMin = globalMin - pad + panOffset;
@@ -169,9 +181,70 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, onSelectRegio
     ctx.lineTo(LABEL_W - 0.5, h);
     ctx.stroke();
 
+    // Draw GC Profiles first
+    let currentY = RULER_H;
+    const GC_TRACK_H = 60;
+
+    gcProfileNames.forEach((profileName, idx) => {
+      const yTop = currentY;
+      const yMid = yTop + GC_TRACK_H / 2;
+
+      if (idx > 0 || trackNames.length > 0) {
+        ctx.strokeStyle = dark ? '#21262d' : '#eaeef2';
+        ctx.beginPath();
+        ctx.moveTo(0, yTop);
+        ctx.lineTo(w, yTop);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = dark ? 'rgba(22,27,34,0.3)' : 'rgba(246,248,250,0.3)';
+      ctx.fillRect(LABEL_W, yTop, w - LABEL_W, GC_TRACK_H);
+
+      ctx.fillStyle = dark ? '#e6edf3' : '#1f2328';
+      ctx.font = 'bold 11px Inter, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(profileName.length > 10 ? profileName.substring(0, 10) + '..' : profileName, 8, yTop + 15);
+      ctx.fillStyle = dark ? '#8b949e' : '#57606a';
+      ctx.font = '9px Inter, sans-serif';
+      ctx.fillText('GC %', 8, yTop + 30);
+
+      const profile = gcProfiles[profileName];
+      if (profile.length > 0) {
+        ctx.strokeStyle = getTypeColor('gc_content');
+        ctx.fillStyle = dark ? 'rgba(162, 238, 49, 0.2)' : 'rgba(162, 238, 49, 0.3)';
+        ctx.lineWidth = 1.5;
+
+        ctx.beginPath();
+        let started = false;
+
+        for (let i = 0; i < profile.length; i++) {
+          const w = profile[i];
+          const x = toX(w.pos);
+          if (x < LABEL_W) continue;
+          if (!started) {
+            ctx.moveTo(x, yTop + GC_TRACK_H - (w.gc / 100) * GC_TRACK_H);
+            started = true;
+          } else {
+            ctx.lineTo(x, yTop + GC_TRACK_H - (w.gc / 100) * GC_TRACK_H);
+          }
+          if (x > w + 50) break;
+        }
+        ctx.stroke();
+
+        if (started) {
+          ctx.lineTo(toX(profile[profile.length - 1].pos), yTop + GC_TRACK_H);
+          ctx.lineTo(toX(profile[0].pos), yTop + GC_TRACK_H);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+      currentY += GC_TRACK_H;
+    });
+
     // Tracks
     trackNames.forEach((trackName, idx) => {
-      const yTop = RULER_H + idx * TRACK_H;
+      const yTop = currentY;
       const yMid = yTop + TRACK_H / 2;
 
       // Track separator
@@ -189,12 +262,22 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, onSelectRegio
         ctx.fillRect(LABEL_W, yTop, w - LABEL_W, TRACK_H);
       }
 
-      // Track label
+      // Track header stats
+      const trackFeats = results[trackName];
+      let sumLen = 0;
+      trackFeats.forEach(f => sumLen += (f.end - f.start));
+      const avgLen = trackFeats.length ? Math.round(sumLen / trackFeats.length) : 0;
+
+      // Track label & stats
       ctx.fillStyle = dark ? '#e6edf3' : '#1f2328';
-      ctx.font = '11px Inter, sans-serif';
+      ctx.font = 'bold 11px Inter, sans-serif';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(trackName.length > 10 ? trackName.substring(0, 10) + '..' : trackName, 8, yMid);
+      ctx.fillText(trackName.length > 10 ? trackName.substring(0, 10) + '..' : trackName, 8, yTop + 12);
+      ctx.fillStyle = dark ? '#8b949e' : '#57606a';
+      ctx.font = '9px Inter, sans-serif';
+      ctx.fillText(`${trackFeats.length} features`, 8, yTop + 26);
+      ctx.fillText(`~${formatBp(avgLen)} avg`, 8, yTop + 38);
 
       // Center line
       ctx.strokeStyle = dark ? '#21262d' : '#e1e4e8';
@@ -247,6 +330,10 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, onSelectRegio
             ctx.stroke();
             ctx.lineWidth = 1;
           }
+        } else if (fW < 1) {
+          // Density indicator for very zoomed out
+          ctx.globalAlpha = isSelected ? 1.0 : isHovered ? 0.9 : 0.4;
+          ctx.fillRect(clampX1, yOff, 1, featureH);
         } else {
           ctx.fillRect(clampX1, yOff, fW, featureH);
           if (isSelected) {
@@ -259,8 +346,26 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, onSelectRegio
 
         ctx.globalAlpha = 1.0;
 
-        // Label inside feature if wide enough
-        if (fW > 50) {
+        // Label or Sequence inside feature
+        const pxPerBp = fW / (r.end - r.start);
+        if (pxPerBp > 8 && r.sequence) {
+          // Nucleotide level rendering
+          ctx.font = 'bold 10px "JetBrains Mono", monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          for (let i = 0; i < r.sequence.length; i++) {
+            const base = r.sequence[i].toUpperCase();
+            const baseX = toX(r.start + i) + pxPerBp / 2;
+            if (baseX < LABEL_W || baseX > w) continue;
+
+            ctx.fillStyle = base === 'A' ? '#3fb950' :
+              base === 'T' ? '#f85149' :
+                base === 'G' ? '#d29922' :
+                  base === 'C' ? '#58a6ff' : '#8b949e';
+            ctx.fillText(base, baseX, yOff + featureH / 2);
+          }
+        } else if (fW > 50) {
           ctx.fillStyle = '#fff';
           ctx.font = '9px Inter, sans-serif';
           ctx.textAlign = 'center';
@@ -269,6 +374,7 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, onSelectRegio
           ctx.fillText(label, clampX1 + fW / 2, yOff + featureH / 2);
         }
       });
+      currentY += TRACK_H;
     });
 
     // Cursor crosshair

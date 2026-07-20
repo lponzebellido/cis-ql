@@ -60,6 +60,11 @@ void Lexer::initKeywords() {
     keywords["MATRIX"] = TokenType::MATRIX;
     keywords["SCAN"] = TokenType::SCAN;
     keywords["THRESHOLD"] = TokenType::THRESHOLD;
+
+    keywords["ANALYZE"] = TokenType::ANALYZE;
+    keywords["GC_CONTENT"] = TokenType::GC_CONTENT;
+    keywords["CPG_ISLANDS"] = TokenType::CPG_ISLANDS;
+    keywords["WINDOW"] = TokenType::WINDOW;
 }
 
 char Lexer::getChar() {

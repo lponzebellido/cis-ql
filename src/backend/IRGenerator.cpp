@@ -23,6 +23,8 @@ std::string irOpcodeToString(IROpCode op) {
     case IROpCode::SCAN_OPT_STRAND:  return "SCAN_OPT_STRAND";
     case IROpCode::SCAN_OPT_THRESHOLD:return "SCAN_OPT_THRESHOLD";
     case IROpCode::SCAN_ALIAS:       return "SCAN_ALIAS";
+    case IROpCode::ANALYZE_GC:       return "ANALYZE_GC";
+    case IROpCode::ANALYZE_CPG:      return "ANALYZE_CPG";
     default: return "UNKNOWN";
   }
 }
@@ -229,5 +231,38 @@ void IRGenerator::visit(ScanStmtNode* node) {
   printInstr.opcode = IROpCode::PRINT_RESULTS;
   printInstr.arg1 = node->alias.empty() ? currentTemp : node->alias;
   printInstr.arg2 = "SCAN";
+  instructions.push_back(printInstr);
+}
+
+void IRGenerator::visit(AnalyzeStmtNode *node) {
+  currentTemp = newTemp("Analyze_" + node->analysisType);
+
+  IRInstruction analyzeInstr;
+  if (node->analysisType == "GC_CONTENT") {
+    analyzeInstr.opcode = IROpCode::ANALYZE_GC;
+  } else {
+    analyzeInstr.opcode = IROpCode::ANALYZE_CPG;
+  }
+  
+  analyzeInstr.arg1 = node->windowSize;
+  analyzeInstr.arg2 = currentTemp;
+  instructions.push_back(analyzeInstr);
+
+  if (!node->alias.empty()) {
+    IRInstruction aliasInstr;
+    aliasInstr.opcode = IROpCode::SCAN_ALIAS; // We can reuse SCAN_ALIAS or FIND_ALIAS as they just assign names
+    aliasInstr.arg1 = currentTemp;
+    aliasInstr.arg2 = node->alias;
+    instructions.push_back(aliasInstr);
+  }
+
+  if (node->whereClause) {
+    node->whereClause->accept(*this);
+  }
+
+  IRInstruction printInstr;
+  printInstr.opcode = IROpCode::PRINT_RESULTS;
+  printInstr.arg1 = node->alias.empty() ? currentTemp : node->alias;
+  printInstr.arg2 = "ANALYZE";
   instructions.push_back(printInstr);
 }

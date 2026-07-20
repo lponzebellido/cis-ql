@@ -8,6 +8,7 @@
 #include "../bioinfo/SetOperations.h"
 #include "../bioinfo/SmithWaterman.h"
 #include "../bioinfo/PWMScanner.h"
+#include "../bioinfo/GCAnalyzer.h"
 #include "IRGenerator.h"
 #include <string>
 #include <unordered_map>
@@ -39,6 +40,7 @@ private:
   std::unordered_map<std::string, std::vector<GenomicRegion>> namedRegions;
   std::unordered_map<std::string, PWMatrix> loadedMatrices;
   std::unordered_map<std::string, PSSM> loadedPSSMs;
+  std::unordered_map<std::string, std::vector<GCWindow>> gcResults;
 
   FindContext currentFind;
   ScanContext currentScan;
@@ -73,6 +75,8 @@ private:
   void executeScanOptThreshold(const IRInstruction &instr);
   void executeScanExec(const IRInstruction &instr);
   void executeScanAlias(const IRInstruction &instr);
+  void executeAnalyzeGC(const IRInstruction &instr);
+  void executeAnalyzeCpG(const IRInstruction &instr);
   
   void dumpResultsJSON() const;
 

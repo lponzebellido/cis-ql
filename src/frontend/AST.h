@@ -16,6 +16,7 @@ class FindStmtNode;
 class ExtractStmtNode;
 class SetOpStmtNode;
 class ScanStmtNode;
+class AnalyzeStmtNode;
 class ProgramNode;
 
 class ASTVisitor {
@@ -30,6 +31,7 @@ public:
   virtual void visit(ExtractStmtNode* node) = 0;
   virtual void visit(SetOpStmtNode* node) = 0;
   virtual void visit(ScanStmtNode* node) = 0;
+  virtual void visit(AnalyzeStmtNode* node) = 0;
   virtual void visit(ProgramNode* node) = 0;
 };
 
@@ -145,6 +147,20 @@ public:
                std::string a, std::unique_ptr<ConditionNode> w)
       : matrixAlias(ma), strandFilter(sf), threshold(th),
         alias(a), whereClause(std::move(w)) {}
+  void print(std::string prefix = "", bool isLast = true) const override;
+  void accept(ASTVisitor& visitor) override;
+};
+
+class AnalyzeStmtNode : public StatementNode {
+public:
+  std::string analysisType;
+  std::string windowSize;
+  std::string alias;
+  std::unique_ptr<ConditionNode> whereClause;
+  AnalyzeStmtNode(std::string at, std::string ws, std::string a,
+                  std::unique_ptr<ConditionNode> w)
+      : analysisType(at), windowSize(ws), alias(a),
+        whereClause(std::move(w)) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;
 };

@@ -78,6 +78,18 @@ void ScanStmtNode::print(std::string prefix, bool isLast) const {
     }
 }
 
+void AnalyzeStmtNode::print(std::string prefix, bool isLast) const {
+    std::cout << prefix << (isLast ? "\u2514\u2500\u2500 " : "\u251c\u2500\u2500 ") << "AnalyzeStmt(" << analysisType;
+    if (!windowSize.empty()) std::cout << ", Window: " << windowSize;
+    if (!alias.empty()) std::cout << ", AS: " << alias;
+    std::cout << ")" << std::endl;
+    std::string childPrefix = prefix + (isLast ? "    " : "\u2502   ");
+    if (whereClause) {
+        std::cout << childPrefix << "\u2514\u2500\u2500 Where:" << std::endl;
+        whereClause->print(childPrefix + "    ", true);
+    }
+}
+
 void ProgramNode::print(std::string prefix, bool isLast) const {
     if (prefix.empty()) {
         std::cout << "Program" << std::endl;
@@ -99,4 +111,5 @@ void FindStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ExtractStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void SetOpStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ScanStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
+void AnalyzeStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ProgramNode::accept(ASTVisitor& visitor) { visitor.visit(this); }

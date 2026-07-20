@@ -30,6 +30,7 @@ private:
   std::unique_ptr<ExtractStmtNode> parseExtract();
   std::unique_ptr<SetOpStmtNode> parseSetOperation();
   std::unique_ptr<ScanStmtNode> parseScan();
+  std::unique_ptr<AnalyzeStmtNode> parseAnalyze();
 
   std::unique_ptr<ConditionNode> parseWhereClause();
   std::unique_ptr<ConditionNode> parseCondition();

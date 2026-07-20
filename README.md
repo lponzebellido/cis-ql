@@ -112,7 +112,19 @@ EXTRACT GENE WHERE LENGTH > 1.5 KB;
 EXTRACT tata_sites WHERE LENGTH >= 8 BP;
 ```
 
-### 5. Set Operations
+### 5. Biological Analysis (GC & CpG)
+
+Perform genome-wide analysis to find structural properties like GC content and CpG islands.
+
+```sql
+// Profiling GC content with sliding windows
+ANALYZE GC_CONTENT WINDOW 100 BP AS ecoli_gc_profile;
+
+// Identifying CpG islands (promoter hallmarks)
+ANALYZE CPG_ISLANDS AS cpg_islands;
+```
+
+### 6. Set Operations
 
 Perform logical intersections, unions, or subtractions between feature sets.
 

@@ -189,3 +189,17 @@ void SemanticAnalyzer::visit(ScanStmtNode *node) {
     node->whereClause->accept(*this);
   }
 }
+
+void SemanticAnalyzer::visit(AnalyzeStmtNode *node) {
+  if (!node->alias.empty()) {
+    if (symbolTable.lookup(node->alias)) {
+      reportError("Alias '" + node->alias + "' is already defined.");
+    } else {
+      symbolTable.insert(node->alias, "RESULT_SET");
+    }
+  }
+
+  if (node->whereClause) {
+    node->whereClause->accept(*this);
+  }
+}

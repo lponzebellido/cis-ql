@@ -13,9 +13,11 @@ Grammar:
 Program         -> StatementList
 StatementList   -> Statement StatementList | λ
 
-Statement       -> LoadStmt | FindStmt | ExtractStmt | SetOperationStmt | ScanStmt
+Statement       -> LoadStmt | FindStmt | ExtractStmt | SetOperationStmt | ScanStmt | AnalyzeStmt
 
 LoadStmt        -> LOAD (SEQUENCE | ANNOTATION | MATRIX) STRING AS ID SEMICOLON
+
+AnalyzeStmt     -> ANALYZE (GC_CONTENT | CPG_ISLANDS) (WINDOW NUM Unit)? AliasOpt WhereClause SEMICOLON
 
 FindStmt        -> FIND MOTIF STRING FindOpts AliasOpt WhereClause SEMICOLON
 FindOpts        -> FindOpt FindOpts | λ

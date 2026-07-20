@@ -1,14 +1,12 @@
-// 05_pwm_tata_scan.cql
-// Probabilistic TATA-box discovery using the TBP Position Weight Matrix (JASPAR MA0108.1).
-// Expect: high-confidence TATA-box binding sites scoring >= 80% of the max PWM score.
+/*
+ * 05_pwm_tata_scan.cql
+ * 
+ * Purpose: Scans the genome using a Position Weight Matrix (PWM) for the TATA-binding protein (TBP).
+ * Expectation: Binding sites that match the TBP probability model with at least 85% confidence.
+ * Why: Transcription factor binding sites degenerate over evolutionary time and rarely match an exact string. PWMs are the standard way to score and identify these fuzzy binding sites.
+ */
 
 LOAD SEQUENCE "data_examples/ecoli.fasta" AS genome;
+LOAD MATRIX "matrices/MA0108.1_TBP.pwm" AS tbp_matrix;
 
-// Load the TBP (TATA-Binding Protein) matrix from the JASPAR database
-LOAD MATRIX "matrices/MA0108.1_TBP.pwm" AS tata_pwm;
-
-// Scan positive strand only; keep only sites above 80% of theoretical max score
-SCAN tata_pwm STRAND POSITIVE THRESHOLD 80% AS tata_sites;
-
-// Extract the results for visualization
-EXTRACT tata_sites;
+SCAN tbp_matrix THRESHOLD 85 % AS tbp_sites;

@@ -1,9 +1,12 @@
-// 11_strand_specific_search.cql
-// Demonstrates strand-specific motif searches across both strands independently.
-// Expect: separate tracks for the motif on the plus and minus strands.
+/*
+ * 11_strand_specific_search.cql
+ * 
+ * Purpose: Demonstrates how to restrict searches to specific DNA strands.
+ * Expectation: Two distinct tracks for the TATAAT motif, one for the positive (forward) strand and one for the negative (reverse) strand.
+ * Why: DNA is double-stranded and transcription is directional. Knowing which strand a motif is on is critical for predicting the direction of transcription for a gene.
+ */
 
 LOAD SEQUENCE "data_examples/ecoli.fasta" AS genome;
 
-// SOS response LexA binding box (SOS box): CTGT(N8)ACAG
-FIND MOTIF "CTGTN{8}ACAG" STRAND POSITIVE AS lexA_fwd;
-FIND MOTIF "CTGTN{8}ACAG" STRAND NEGATIVE AS lexA_rev;
+FIND MOTIF "TATAAT" STRAND POSITIVE AS pos_strand_promoters;
+FIND MOTIF "TATAAT" STRAND NEGATIVE AS neg_strand_promoters;

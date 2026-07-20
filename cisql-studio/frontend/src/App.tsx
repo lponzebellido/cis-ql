@@ -29,6 +29,7 @@ function App() {
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [stdout, setStdout] = useState('Welcome to Cis-QL Studio.');
   const [results, setResults] = useState<Record<string, any[]>>({});
+  const [gcProfiles, setGcProfiles] = useState<Record<string, any>>({});
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [activeVisTab, setActiveVisTab] = useState<'track' | 'sequence'>('track');
@@ -137,6 +138,11 @@ function App() {
       setStdout(data.stdout + (data.stderr ? '\n' + data.stderr : ''));
       if (data.results && data.results.resultSets) {
         setResults(data.results.resultSets);
+      }
+      if (data.results && data.results.gcProfiles) {
+        setGcProfiles(data.results.gcProfiles);
+      } else {
+        setGcProfiles({});
       }
     } catch (err) {
       setStdout('Error connecting to the backend server.');
@@ -314,7 +320,7 @@ function App() {
               </div>
               <div className="pane-content">
                 {activeVisTab === 'track' ? (
-                  <TrackViewer results={results} onSelectRegion={(region) => {
+                  <TrackViewer results={results} gcProfiles={gcProfiles} onSelectRegion={(region) => {
                     setHighlightedRegion(region);
                     setActiveVisTab('sequence');
                     setTimeout(() => {
