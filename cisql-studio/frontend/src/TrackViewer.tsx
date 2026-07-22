@@ -120,7 +120,6 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
     const effRange = viewMax - viewMin;
     const toX = (bp: number) => LABEL_W + ((bp - viewMin) / effRange) * (w - LABEL_W);
 
-    // Ruler background
     ctx.fillStyle = dark ? '#161b22' : '#f6f8fa';
     ctx.fillRect(0, 0, w, RULER_H);
     ctx.strokeStyle = dark ? '#30363d' : '#d0d7de';
@@ -130,7 +129,6 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
     ctx.lineTo(w, RULER_H - 0.5);
     ctx.stroke();
 
-    // Ruler ticks
     const idealTicks = 8;
     const rawStep = effRange / idealTicks;
     const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
@@ -160,7 +158,6 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
       ctx.fillText(formatBp(bp), x, 4);
     }
 
-    // Minor ticks
     const minorStep = step / 5;
     for (let bp = Math.ceil(viewMin / minorStep) * minorStep; bp <= viewMax; bp += minorStep) {
       const x = toX(bp);
@@ -172,7 +169,6 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
       ctx.stroke();
     }
 
-    // Label column background
     ctx.fillStyle = dark ? '#161b22' : '#f6f8fa';
     ctx.fillRect(0, RULER_H, LABEL_W, h - RULER_H);
     ctx.strokeStyle = dark ? '#30363d' : '#d0d7de';
@@ -181,7 +177,6 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
     ctx.lineTo(LABEL_W - 0.5, h);
     ctx.stroke();
 
-    // Draw GC Profiles first
     let currentY = RULER_H;
     const GC_TRACK_H = 60;
 
@@ -242,12 +237,10 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
       currentY += GC_TRACK_H;
     });
 
-    // Tracks
     trackNames.forEach((trackName, idx) => {
       const yTop = currentY;
       const yMid = yTop + TRACK_H / 2;
 
-      // Track separator
       if (idx > 0) {
         ctx.strokeStyle = dark ? '#21262d' : '#eaeef2';
         ctx.beginPath();
@@ -256,19 +249,15 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
         ctx.stroke();
       }
 
-      // Alternating track bg
       if (idx % 2 === 1) {
         ctx.fillStyle = dark ? 'rgba(22,27,34,0.5)' : 'rgba(246,248,250,0.5)';
         ctx.fillRect(LABEL_W, yTop, w - LABEL_W, TRACK_H);
       }
 
-      // Track header stats
       const trackFeats = results[trackName];
       let sumLen = 0;
       trackFeats.forEach(f => sumLen += (f.end - f.start));
       const avgLen = trackFeats.length ? Math.round(sumLen / trackFeats.length) : 0;
-
-      // Track label & stats
       ctx.fillStyle = dark ? '#e6edf3' : '#1f2328';
       ctx.font = 'bold 11px Inter, sans-serif';
       ctx.textAlign = 'left';
@@ -279,7 +268,6 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
       ctx.fillText(`${trackFeats.length} features`, 8, yTop + 26);
       ctx.fillText(`~${formatBp(avgLen)} avg`, 8, yTop + 38);
 
-      // Center line
       ctx.strokeStyle = dark ? '#21262d' : '#e1e4e8';
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
@@ -288,7 +276,6 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Features
       const featureH = TRACK_H * 0.32;
       results[trackName].forEach(r => {
         const x1 = toX(r.start);
@@ -331,7 +318,6 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
             ctx.lineWidth = 1;
           }
         } else if (fW < 1) {
-          // Density indicator for very zoomed out
           ctx.globalAlpha = isSelected ? 1.0 : isHovered ? 0.9 : 0.4;
           ctx.fillRect(clampX1, yOff, 1, featureH);
         } else {
@@ -346,10 +332,8 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
 
         ctx.globalAlpha = 1.0;
 
-        // Label or Sequence inside feature
         const pxPerBp = fW / (r.end - r.start);
         if (pxPerBp > 8 && r.sequence) {
-          // Nucleotide level rendering
           ctx.font = 'bold 10px "JetBrains Mono", monospace';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
@@ -377,7 +361,6 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
       currentY += TRACK_H;
     });
 
-    // Cursor crosshair
     if (cursorBp !== null) {
       const cx = toX(cursorBp);
       if (cx > LABEL_W && cx < w) {

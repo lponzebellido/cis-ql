@@ -1,12 +1,20 @@
 /*
  * 02_literal_motif_search.cql
- * 
- * Purpose: Searches for exact literal motifs (the classic sigma-70 -10 and -35 promoter boxes) in the genome.
- * Expectation: Exact-match genomic coordinates for 'TATAAT' and 'TTGACA' on the positive strand.
- * Why: Literal motif searching is the simplest way to find known, highly conserved regulatory sequences without using probabilistic models.
+ *
+ * What it does: Searches for the two core elements of a bacterial sigma-70 promoter:
+ *               the -10 box (Pribnow box, consensus TATAAT) and the -35 box (consensus TTGACA),
+ *               both on the positive strand.
+ *
+ * Expected output: Hundreds of exact TATAAT hits and TTGACA hits across the whole genome,
+ *                  returned as separate named tracks.
+ *
+ * Why it matters: The sigma-70 factor controls transcription of most housekeeping genes in E. coli.
+ *                 Scanning the genome for its binding motifs is the first step in building a
+ *                 map of all active promoters.
  */
 
 LOAD SEQUENCE "data_examples/ecoli.fasta" AS genome;
 
 FIND MOTIF "TATAAT" STRAND POSITIVE AS minus10_box;
+
 FIND MOTIF "TTGACA" STRAND POSITIVE AS minus35_box;

@@ -1,14 +1,23 @@
 /*
  * 08_set_union.cql
- * 
- * Purpose: Merges two separate result sets into a single track using the UNION operator.
- * Expectation: A unified set of all TATAAT and TTGACA exact motif hits across the genome.
- * Why: Union allows you to group different regulatory elements or motifs into a single logical "regulatory regions" track for simplified downstream analysis.
+ *
+ * What it does: Merges the -10 box (TATAAT) and -35 box (TTGACA) hits found upstream of
+ *               all CDS regions into a single unified track of sigma-70 promoter elements.
+ *
+ * Expected output: A combined track containing all -10 and -35 hits upstream of CDS,
+ *                  with each region labeled by its source (minus35_all or pribnow_all).
+ *
+ * Why it matters: The two elements of a sigma-70 promoter are separated by ~17 bp and
+ *                 are always searched independently. Merging them into one track lets
+ *                 you visualize the complete promoter picture in one view without
+ *                 switching between result sets.
  */
 
 LOAD SEQUENCE "data_examples/ecoli.fasta" AS genome;
+LOAD ANNOTATION "data_examples/genomic.gff" AS annot;
 
-FIND MOTIF "TATAAT" STRAND POSITIVE AS minus10;
-FIND MOTIF "TTGACA" STRAND POSITIVE AS minus35;
+FIND MOTIF "TTGACA" WITHIN 200 BP UPSTREAM FROM CDS AS minus35_all;
 
-UNION minus10 AND minus35;
+FIND MOTIF "TATAAT" WITHIN 50 BP UPSTREAM FROM CDS AS pribnow_all;
+
+UNION minus35_all AND pribnow_all;

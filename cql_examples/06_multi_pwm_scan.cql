@@ -1,14 +1,23 @@
 /*
  * 06_multi_pwm_scan.cql
- * 
- * Purpose: Scans for multiple transcription factors simultaneously using different PWMs.
- * Expectation: Distinct tracks for CTCF (insulator) and SP1 (activator) binding sites across the genome.
- * Why: Complex gene expression is often controlled by multiple transcription factors. Scanning for several factors at once is the first step in identifying co-regulatory modules.
+ *
+ * What it does: Scans the genome simultaneously for two transcription factors with
+ *               different roles: SP1 (GC-box binding activator) and CTCF (genome
+ *               organizer / insulator). Both are scanned at 85% confidence.
+ *
+ * Expected output: Two separate tracks — one for SP1 candidate sites, one for CTCF
+ *                  candidate sites — covering thousands of positions across the genome.
+ *
+ * Why it matters: Profiling multiple transcription factors in parallel is the foundation
+ *                 of ChIP-seq analysis and regulatory element annotation. Seeing both
+ *                 tracks at once reveals whether they share genomic locations or occupy
+ *                 distinct regions.
  */
 
 LOAD SEQUENCE "data_examples/ecoli.fasta" AS genome;
-LOAD MATRIX "matrices/MA0139.1_CTCF.pwm" AS ctcf_matrix;
-LOAD MATRIX "matrices/MA0079.5_SP1.pwm" AS sp1_matrix;
+LOAD MATRIX "matrices/MA0079.5_SP1.pwm" AS sp1;
+LOAD MATRIX "matrices/MA0139.1_CTCF.pwm" AS ctcf;
 
-SCAN ctcf_matrix THRESHOLD 85 % AS ctcf_sites;
-SCAN sp1_matrix THRESHOLD 80 % AS sp1_sites;
+SCAN sp1 THRESHOLD 85 % AS sp1_sites;
+
+SCAN ctcf THRESHOLD 85 % AS ctcf_sites;

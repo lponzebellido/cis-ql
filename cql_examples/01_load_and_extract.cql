@@ -1,14 +1,22 @@
 /*
  * 01_load_and_extract.cql
- * 
- * Purpose: Demonstrates how to load a genome and extract specific features by size.
- * Expectation: Lists of genes, coding sequences (CDS), and promoters that meet the length criteria.
- * Why: This is a fundamental operation in bioinformatics to filter out small, likely false-positive features or to isolate features of a specific length for downstream analysis.
+ *
+ * What it does: Loads the E. coli genome and annotation, then filters annotated features
+ *               by size. Each EXTRACT statement targets a different feature type.
+ *
+ * Expected output: ~586 genes > 1500 bp, ~4000 CDS between 150 and 600 bp,
+ *                  and all annotated promoter regions longer than 200 bp.
+ *
+ * Why it matters: A length filter is one of the most basic operations in genomics.
+ *                 Short ORFs are often noise or artifacts; applying a minimum length
+ *                 threshold quickly narrows a search to biologically relevant features.
  */
 
 LOAD SEQUENCE "data_examples/ecoli.fasta" AS genome;
 LOAD ANNOTATION "data_examples/genomic.gff" AS annot;
 
-EXTRACT GENE WHERE LENGTH > 1000 BP;
-EXTRACT CDS WHERE LENGTH > 300 BP AND LENGTH < 1000 BP;
-EXTRACT PROMOTER WHERE LENGTH > 100 BP;
+EXTRACT GENE WHERE LENGTH > 1500 BP;
+
+EXTRACT CDS WHERE LENGTH > 150 BP AND LENGTH < 600 BP;
+
+EXTRACT PROMOTER WHERE LENGTH > 200 BP;

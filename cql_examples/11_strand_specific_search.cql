@@ -1,12 +1,21 @@
 /*
  * 11_strand_specific_search.cql
- * 
- * Purpose: Demonstrates how to restrict searches to specific DNA strands.
- * Expectation: Two distinct tracks for the TATAAT motif, one for the positive (forward) strand and one for the negative (reverse) strand.
- * Why: DNA is double-stranded and transcription is directional. Knowing which strand a motif is on is critical for predicting the direction of transcription for a gene.
+ *
+ * What it does: Searches for the -10 box consensus (TATAAT) separately on the positive
+ *               and negative strands, producing two independent result tracks.
+ *
+ * Expected output: One track of TATAAT hits on the forward strand and another on the
+ *                  reverse strand. The reverse-strand hits mark promoters for genes
+ *                  transcribed in the opposite direction.
+ *
+ * Why it matters: E. coli genes are encoded on both strands. A promoter for a forward-
+ *                 strand gene points right; one for a reverse-strand gene points left.
+ *                 Separating them by strand is essential for correctly assigning a
+ *                 promoter motif to the gene it controls.
  */
 
 LOAD SEQUENCE "data_examples/ecoli.fasta" AS genome;
 
-FIND MOTIF "TATAAT" STRAND POSITIVE AS pos_strand_promoters;
-FIND MOTIF "TATAAT" STRAND NEGATIVE AS neg_strand_promoters;
+FIND MOTIF "TATAAT" STRAND POSITIVE AS fwd_minus10;
+
+FIND MOTIF "TATAAT" STRAND NEGATIVE AS rev_minus10;
