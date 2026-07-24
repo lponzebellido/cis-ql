@@ -6,7 +6,7 @@
  * sequence (TTGACA) to the 200 base pair window preceding each Coding Sequence (CDS).
  */
 
-LOAD SEQUENCE "data_examples/ecoli.fasta" AS genome;
+LOAD SEQUENCE "data_examples/ecoli2.fna" AS genome;
 LOAD ANNOTATION "data_examples/genomic.gff" AS annot;
 
 FIND MOTIF "TTGACA" WITHIN 200 BP UPSTREAM FROM CDS AS minus35_promoters;

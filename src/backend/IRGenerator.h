@@ -2,8 +2,20 @@
 #define IR_GENERATOR_H
 
 #include "../frontend/AST.h"
+#include <memory>
 #include <string>
 #include <vector>
+
+struct IRCondition {
+  enum class Kind { SIMPLE, AND, OR, NOT };
+
+  Kind kind = Kind::SIMPLE;
+  std::string property;
+  std::string op;
+  std::string value;
+  std::shared_ptr<IRCondition> left;
+  std::shared_ptr<IRCondition> right;
+};
 
 enum class IROpCode {
   LOAD_SEQ,
@@ -17,6 +29,7 @@ enum class IROpCode {
   EXTRACT,
   FILTER_LENGTH,
   FILTER_SIMILARITY,
+  FILTER_CONDITION,
   SET_INTERSECT,
   SET_UNION,
   SET_EXCEPT,
@@ -26,6 +39,7 @@ enum class IROpCode {
   SCAN_OPT_STRAND,
   SCAN_OPT_THRESHOLD,
   SCAN_ALIAS,
+  RESULT_ALIAS,
   ANALYZE_GC,
   ANALYZE_CPG,
   IF_BEGIN,
@@ -40,6 +54,7 @@ struct IRInstruction {
   std::string arg3;
   std::string arg4;
   std::string arg5;
+  std::shared_ptr<IRCondition> condition;
 };
 
 std::string irOpcodeToString(IROpCode op);
@@ -51,6 +66,8 @@ private:
   std::string currentTemp;
 
   std::string newTemp(const std::string& prefix = "t");
+  std::shared_ptr<IRCondition> lowerCondition(const ConditionNode *node) const;
+  void emitFilter(const ConditionNode *node, const std::string &resultId);
 
 public:
   IRGenerator();

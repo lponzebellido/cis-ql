@@ -14,6 +14,7 @@ std::string irOpcodeToString(IROpCode op) {
     case IROpCode::EXTRACT:          return "EXTRACT";
     case IROpCode::FILTER_LENGTH:    return "FILTER_LENGTH";
     case IROpCode::FILTER_SIMILARITY:return "FILTER_SIMILARITY";
+    case IROpCode::FILTER_CONDITION: return "FILTER_CONDITION";
     case IROpCode::SET_INTERSECT:    return "SET_INTERSECT";
     case IROpCode::SET_UNION:        return "SET_UNION";
     case IROpCode::SET_EXCEPT:       return "SET_EXCEPT";
@@ -23,6 +24,7 @@ std::string irOpcodeToString(IROpCode op) {
     case IROpCode::SCAN_OPT_STRAND:  return "SCAN_OPT_STRAND";
     case IROpCode::SCAN_OPT_THRESHOLD:return "SCAN_OPT_THRESHOLD";
     case IROpCode::SCAN_ALIAS:       return "SCAN_ALIAS";
+    case IROpCode::RESULT_ALIAS:     return "RESULT_ALIAS";
     case IROpCode::ANALYZE_GC:       return "ANALYZE_GC";
     case IROpCode::ANALYZE_CPG:      return "ANALYZE_CPG";
     case IROpCode::IF_BEGIN:         return "IF_BEGIN";
@@ -33,6 +35,42 @@ std::string irOpcodeToString(IROpCode op) {
 }
 
 IRGenerator::IRGenerator() : tempCounter(0) {}
+
+std::shared_ptr<IRCondition>
+IRGenerator::lowerCondition(const ConditionNode *node) const {
+  if (!node)
+    return nullptr;
+
+  auto lowered = std::make_shared<IRCondition>();
+  if (const auto *simple = dynamic_cast<const SimpleConditionNode *>(node)) {
+    lowered->kind = IRCondition::Kind::SIMPLE;
+    lowered->property = simple->property;
+    lowered->op = simple->op;
+    lowered->value = simple->value;
+  } else if (const auto *binary =
+                 dynamic_cast<const BinaryConditionNode *>(node)) {
+    lowered->kind = binary->op == "OR" ? IRCondition::Kind::OR
+                                       : IRCondition::Kind::AND;
+    lowered->left = lowerCondition(binary->left.get());
+    lowered->right = lowerCondition(binary->right.get());
+  } else if (const auto *negated =
+                 dynamic_cast<const NotConditionNode *>(node)) {
+    lowered->kind = IRCondition::Kind::NOT;
+    lowered->left = lowerCondition(negated->condition.get());
+  }
+  return lowered;
+}
+
+void IRGenerator::emitFilter(const ConditionNode *node,
+                             const std::string &resultId) {
+  if (!node)
+    return;
+  IRInstruction filter;
+  filter.opcode = IROpCode::FILTER_CONDITION;
+  filter.arg1 = resultId;
+  filter.condition = lowerCondition(node);
+  instructions.push_back(filter);
+}
 
 std::string IRGenerator::newTemp(const std::string& prefix) {
   std::string sanitized = prefix;
@@ -85,17 +123,13 @@ void IRGenerator::visit(FindStmtNode* node) {
   execInstr.arg1 = currentTemp;
   instructions.push_back(execInstr);
 
-  if (!node->alias.empty()) {
-    IRInstruction aliasInstr;
-    aliasInstr.opcode = IROpCode::FIND_ALIAS;
-    aliasInstr.arg1 = currentTemp;
-    aliasInstr.arg2 = node->alias;
-    instructions.push_back(aliasInstr);
-  }
+  emitFilter(node->whereClause.get(), currentTemp);
 
-  if (node->whereClause) {
-    node->whereClause->accept(*this);
-  }
+  IRInstruction aliasInstr;
+  aliasInstr.opcode = IROpCode::RESULT_ALIAS;
+  aliasInstr.arg1 = currentTemp;
+  aliasInstr.arg2 = node->alias.empty() ? currentTemp : node->alias;
+  instructions.push_back(aliasInstr);
 
   IRInstruction printInstr;
   printInstr.opcode = IROpCode::PRINT_RESULTS;
@@ -132,9 +166,7 @@ void IRGenerator::visit(ExtractStmtNode* node) {
   extractInstr.arg2 = currentTemp;
   instructions.push_back(extractInstr);
 
-  if (node->whereClause) {
-    node->whereClause->accept(*this);
-  }
+  emitFilter(node->whereClause.get(), currentTemp);
 
   IRInstruction printInstr;
   printInstr.opcode = IROpCode::PRINT_RESULTS;
@@ -156,9 +188,7 @@ void IRGenerator::visit(SetOpStmtNode* node) {
   setInstr.arg3 = currentTemp;
   instructions.push_back(setInstr);
 
-  if (node->whereClause) {
-    node->whereClause->accept(*this);
-  }
+  emitFilter(node->whereClause.get(), currentTemp);
 
   IRInstruction printInstr;
   printInstr.opcode = IROpCode::PRINT_RESULTS;
@@ -168,25 +198,15 @@ void IRGenerator::visit(SetOpStmtNode* node) {
 }
 
 void IRGenerator::visit(SimpleConditionNode* node) {
-  IRInstruction filterInstr;
-  if (node->property == "LENGTH") {
-    filterInstr.opcode = IROpCode::FILTER_LENGTH;
-  } else {
-    filterInstr.opcode = IROpCode::FILTER_SIMILARITY;
-  }
-  filterInstr.arg1 = node->op;
-  filterInstr.arg2 = node->value;
-  filterInstr.arg3 = currentTemp;
-  instructions.push_back(filterInstr);
+  emitFilter(node, currentTemp);
 }
 
 void IRGenerator::visit(BinaryConditionNode* node) {
-  if (node->left) node->left->accept(*this);
-  if (node->right) node->right->accept(*this);
+  emitFilter(node, currentTemp);
 }
 
 void IRGenerator::visit(NotConditionNode* node) {
-  if (node->condition) node->condition->accept(*this);
+  emitFilter(node, currentTemp);
 }
 
 void IRGenerator::visit(ScanStmtNode* node) {
@@ -216,18 +236,13 @@ void IRGenerator::visit(ScanStmtNode* node) {
   instructions.push_back(scanInstr);
 
   
-  if (!node->alias.empty()) {
-    IRInstruction aliasInstr;
-    aliasInstr.opcode = IROpCode::SCAN_ALIAS;
-    aliasInstr.arg1 = currentTemp;
-    aliasInstr.arg2 = node->alias;
-    instructions.push_back(aliasInstr);
-  }
+  emitFilter(node->whereClause.get(), currentTemp);
 
-  
-  if (node->whereClause) {
-    node->whereClause->accept(*this);
-  }
+  IRInstruction aliasInstr;
+  aliasInstr.opcode = IROpCode::RESULT_ALIAS;
+  aliasInstr.arg1 = currentTemp;
+  aliasInstr.arg2 = node->alias.empty() ? currentTemp : node->alias;
+  instructions.push_back(aliasInstr);
 
   
   IRInstruction printInstr;
@@ -251,17 +266,13 @@ void IRGenerator::visit(AnalyzeStmtNode *node) {
   analyzeInstr.arg2 = currentTemp;
   instructions.push_back(analyzeInstr);
 
-  if (!node->alias.empty()) {
-    IRInstruction aliasInstr;
-    aliasInstr.opcode = IROpCode::SCAN_ALIAS; // We can reuse SCAN_ALIAS or FIND_ALIAS as they just assign names
-    aliasInstr.arg1 = currentTemp;
-    aliasInstr.arg2 = node->alias;
-    instructions.push_back(aliasInstr);
-  }
+  emitFilter(node->whereClause.get(), currentTemp);
 
-  if (node->whereClause) {
-    node->whereClause->accept(*this);
-  }
+  IRInstruction aliasInstr;
+  aliasInstr.opcode = IROpCode::RESULT_ALIAS;
+  aliasInstr.arg1 = currentTemp;
+  aliasInstr.arg2 = node->alias.empty() ? currentTemp : node->alias;
+  instructions.push_back(aliasInstr);
 
   IRInstruction printInstr;
   printInstr.opcode = IROpCode::PRINT_RESULTS;
@@ -271,17 +282,9 @@ void IRGenerator::visit(AnalyzeStmtNode *node) {
 }
 
 void IRGenerator::visit(IfStmtNode *node) {
-  std::string prop, op, val;
-  if (auto simple = dynamic_cast<SimpleConditionNode*>(node->condition.get())) {
-    prop = simple->property;
-    op = simple->op;
-    val = simple->value;
-  }
   IRInstruction ifBegin;
   ifBegin.opcode = IROpCode::IF_BEGIN;
-  ifBegin.arg1 = prop;
-  ifBegin.arg2 = op;
-  ifBegin.arg3 = val;
+  ifBegin.condition = lowerCondition(node->condition.get());
   instructions.push_back(ifBegin);
 
   for (auto &stmt : node->thenStatements) {
@@ -308,12 +311,24 @@ void IRGenerator::visit(ForeachStmtNode *node) {
     for (auto &stmt : node->bodyStatements) {
       if (stmt) stmt->accept(*this);
     }
+    std::string repeatedAlias;
+    std::string iterationAlias;
     for (size_t i = startIdx; i < instructions.size(); ++i) {
       if (instructions[i].arg1 == node->iteratorVar) instructions[i].arg1 = val;
       if (instructions[i].arg2 == node->iteratorVar) instructions[i].arg2 = val;
       if (instructions[i].arg3 == node->iteratorVar) instructions[i].arg3 = val;
       if (instructions[i].arg4 == node->iteratorVar) instructions[i].arg4 = val;
       if (instructions[i].arg5 == node->iteratorVar) instructions[i].arg5 = val;
+      if (instructions[i].opcode == IROpCode::RESULT_ALIAS &&
+          !instructions[i].arg2.empty()) {
+        repeatedAlias = instructions[i].arg2;
+        iterationAlias = repeatedAlias + "_" + val;
+        instructions[i].arg2 = iterationAlias;
+      } else if (!repeatedAlias.empty() &&
+                 instructions[i].opcode == IROpCode::PRINT_RESULTS &&
+                 instructions[i].arg1 == repeatedAlias) {
+        instructions[i].arg1 = iterationAlias;
+      }
     }
   }
 }

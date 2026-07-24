@@ -114,6 +114,12 @@ PWMatrix PWMScanner::loadJASPAR(const std::string& filename) {
 
     std::vector<double> values = parseLine(line);
     if (!values.empty()) {
+      if (idx < 0 || idx >= 4 || !pwm.counts[idx].empty()) {
+        std::cerr << "  Error: Invalid or duplicate PWM row in " << filename
+                  << std::endl;
+        pwm.length = 0;
+        return pwm;
+      }
       pwm.counts[idx] = values;
       if ((int)values.size() > pwm.length) {
         pwm.length = (int)values.size();
@@ -151,21 +157,38 @@ PSSM PWMScanner::computePSSM(const PWMatrix& pwm,
   PSSM pssm;
   pssm.name = pwm.name;
   pssm.length = pwm.length;
+  if (pwm.length <= 0 || pwm.counts.size() != 4 || bgA <= 0.0 ||
+      bgC <= 0.0 || bgG <= 0.0 || bgT <= 0.0) {
+    pssm.length = 0;
+    return pssm;
+  }
   pssm.scores.resize(4);
   pssm.maxScore = 0.0;
   pssm.minScore = 0.0;
 
   double bg[4] = {bgA, bgC, bgG, bgT};
-  double pseudocount = 0.8; 
+  const double pseudocount = 0.1;
 
   for (int i = 0; i < 4; i++) {
     pssm.scores[i].resize(pwm.length, 0.0);
   }
 
   for (int j = 0; j < pwm.length; j++) {
+    for (int i = 0; i < 4; ++i) {
+      if (pwm.counts[i].size() != static_cast<size_t>(pwm.length)) {
+        pssm.length = 0;
+        pssm.scores.clear();
+        return pssm;
+      }
+    }
     
     double colTotal = 0.0;
     for (int i = 0; i < 4; i++) {
+      if (pwm.counts[i][j] < 0.0) {
+        pssm.length = 0;
+        pssm.scores.clear();
+        return pssm;
+      }
       colTotal += pwm.counts[i][j];
     }
 
@@ -286,6 +309,9 @@ std::vector<MotifMatch> PWMScanner::scan(
             [](const MotifMatch& a, const MotifMatch& b) {
               return a.position < b.position;
             });
+
+  for (auto &match : allMatches)
+    match.chr = chrId;
 
   return allMatches;
 }

@@ -6,9 +6,9 @@
 
 ## Overview & Purpose
 
-Identifying cis-regulatory elements (such as promoters, enhancers, and transcription factor binding sites) within large genomic datasets traditionally requires stringing together multiple command-line utilities (e.g., `bedtools`, `grep`, `awk`) or writing custom scripts in Python or Perl. These imperative approaches often result in complex, hard-to-maintain pipelines that are difficult to reproduce.
+Identifying cis-regulatory elements (such as promoters, enhancers, and transcription factor binding sites) often involves coordinating command-line utilities or custom scripts. Cis-QL explores whether a single declarative syntax can make a subset of these workflows shorter and easier to reproduce.
 
-**Cis-QL provides a unified, declarative interface.** Instead of writing imperative code to parse files, perform string matching, compute spatial distances, and calculate set intersections, researchers declare the desired biological criteria. The underlying C++ execution engine handles parsing, spatial indexing, multi-threaded alignment, and interval arithmetic automatically.
+**Cis-QL provides a unified, declarative interface.** The C++ execution engine currently handles FASTA and GFF3 parsing, motif and matrix scanning, bounded spatial searches, local alignment, and interval arithmetic.
 
 ---
 
@@ -27,16 +27,16 @@ Cis-QL operates across three primary modes:
 
 1. **Annotation-Driven Analysis:** Queries established `GFF3` annotation files to analyze known genes, exons, CDS, and regulatory features.
 2. **De Novo Discovery Mode:** Constructs a virtual annotation layer in memory directly from raw `.fasta` sequence data using literal strings, IUPAC ambiguity codes, or Regular Expressions.
-3. **Probabilistic PWM Scanning:** Scans sequences using Position Weight Matrices with log-odds PSSM scoring, evaluating hit thresholds as percentages of maximum theoretical scores.
+3. **Probabilistic PWM Scanning:** Scans sequences using Position Weight Matrices with log-odds PSSM scoring, normalizing thresholds across each matrix's attainable score range.
 
 ---
 
 ## Key Technical Features
 
 - **Native IUPAC Degeneration Engine:** Translates IUPAC nucleotide ambiguity codes (`R`, `Y`, `S`, `W`, `K`, `M`, `B`, `D`, `H`, `V`, `N`) automatically into regular expression search patterns (e.g., `TATAWAW` translates to `TATA[AT]A[AT]`).
-- **High-Performance Multi-Chromosome Parallelism:** Leverages `std::async` to execute sequence scanning across multiple contigs and chromosomes in parallel.
-- **Sweep-Line Interval Algebra:** Evaluates set operations (`INTERSECT`, `UNION`, `EXCEPT`) on genomic intervals using an $O(N \log N)$ two-pointer sweep-line algorithm.
-- **Pairwise Smith-Waterman Local Alignment:** Performs dynamic programming local sequence alignment in native C++ to filter candidate features by sequence similarity (`WHERE SIMILARITY > 70 %`).
+- **Multi-Chromosome Scanning:** Uses `std::async` to scan loaded contigs independently. Performance depends on contig count, input size, and the host implementation.
+- **Sweep-Line Interval Algebra:** Sorts interval inputs and then evaluates geometric `INTERSECT`, `UNION`, and `EXCEPT` operations with a two-pointer sweep. Sorting dominates at $O((N+M)\log(N+M))$; the sweep is linear.
+- **Pairwise Smith-Waterman Local Alignment:** Computes a normalized local-alignment score in C++. In the current syntax, `WHERE SIMILARITY` uses the first non-empty candidate sequence as the implicit reference; this behavior should be considered experimental.
 - **Control Flow & Scripting (v2.0):** Supports conditional execution (`IF / ELSE`) based on sequence metrics and batch iteration (`FOREACH`) over matrix collections.
 - **Cis-QL Studio (GUI):** Desktop environment built with Electron and React 18 for interactive query authoring, multi-track genomic visualization, and live result inspection.
 
@@ -85,7 +85,7 @@ npm start
 Load sequence files (FASTA), annotation files (GFF3), and matrix files (JASPAR format):
 
 ```sql
-LOAD SEQUENCE "data_examples/ecoli.fasta" AS genome;
+LOAD SEQUENCE "data_examples/ecoli2.fna" AS genome;
 LOAD ANNOTATION "data_examples/genomic.gff" AS annot;
 LOAD MATRIX "matrices/MA0108.1_TBP.pwm" AS tbp_matrix;
 ```
@@ -95,15 +95,15 @@ LOAD MATRIX "matrices/MA0108.1_TBP.pwm" AS tbp_matrix;
 Locate exact motifs, regular expressions, or IUPAC degenerate strings, with optional spatial constraints relative to other features:
 
 ```sql
--- IUPAC degenerate motif search on the positive strand
+// IUPAC degenerate motif search on the positive strand
 FIND MOTIF "TATAWAW" STRAND POSITIVE AS tata_boxes;
 
--- Spatial constraint: motif within 200 BP upstream of coding sequences
+// Spatial constraint: motif within 200 BP upstream of coding sequences
 FIND MOTIF "TTGACA" WITHIN 200 BP UPSTREAM FROM CDS AS minus35_promoters;
 
--- De novo ORF search downstream of putative promoters
+// De novo ORF search downstream of putative promoters
 FIND MOTIF "ATG(...)*?(TAA|TAG|TGA)"
-    WITHIN 300 BP DOWNSTREAM FROM tata_boxes
+    WITHIN 2500 BP DOWNSTREAM FROM tata_boxes
     AS candidate_orfs
     WHERE LENGTH > 600 BP;
 ```
@@ -118,7 +118,8 @@ SCAN tbp_matrix STRAND POSITIVE THRESHOLD 80 % AS tbp_sites;
 
 ### 4. Biological & Structural Analysis (`ANALYZE`)
 
-Calculate sliding-window GC content profiles or identify CpG islands:
+Calculate non-overlapping GC-content windows or identify candidate CpG islands
+using 200-bp seed windows with GC and observed/expected CpG thresholds:
 
 ```sql
 ANALYZE GC_CONTENT WINDOW 1 KB AS gc_profile;
@@ -144,19 +145,24 @@ EXTRACT GENE WHERE LENGTH >= 500 BP AND LENGTH <= 3 KB;
 EXTRACT GENE WHERE LENGTH > 1 KB AND SIMILARITY > 70 %;
 ```
 
+Condition properties are result-specific: region sets support `LENGTH`,
+`SIMILARITY`, `GC_CONTENT`, and `ID`; motif results support `LENGTH` and
+`GC_CONTENT`; GC profiles support `GC_CONTENT`. `IF` currently evaluates the
+GC content of the active sequence dataset.
+
 ### 7. Control Flow (`IF`, `FOREACH`)
 
-Control query execution paths and iterate over collections:
+Control query execution paths and iterate over collections of loaded matrices:
 
 ```sql
--- Conditional execution based on sequence properties
+// Conditional execution based on sequence properties
 IF GC_CONTENT > 50 % THEN
     SCAN sp1 THRESHOLD 80 % AS gc_sites;
 ELSE
     SCAN tbp THRESHOLD 80 % AS at_sites;
 ENDIF;
 
--- Batch processing over matrix lists
+// Batch processing over matrix lists
 FOREACH m IN [tbp, sp1, ctcf] DO
     SCAN m THRESHOLD 80 % AS tf_sites;
 ENDFOR;
@@ -177,21 +183,21 @@ Statement          ::= LoadStmt | FindStmt | ExtractStmt | SetOperationStmt
 
 LoadStmt           ::= LOAD (SEQUENCE | ANNOTATION | MATRIX) STRING AS ID SEMICOLON
 
-AnalyzeStmt        ::= ANALYZE (GC_CONTENT | CPG_ISLANDS) (WINDOW NUM Unit)? AliasOpt WhereClause SEMICOLON
+AnalyzeStmt        ::= ANALYZE (GC_CONTENT | CPG_ISLANDS) (WINDOW (NUM | FLOAT) Unit)? AliasOpt WhereClause SEMICOLON
 
 FindStmt           ::= FIND MOTIF STRING FindOpts AliasOpt WhereClause SEMICOLON
 FindOpts           ::= FindOpt FindOpts | λ
-FindOpt            ::= WITHIN NUM Unit Direction FROM EntityRef EntityName
+FindOpt            ::= WITHIN (NUM | FLOAT) Unit Direction FROM EntityRef EntityName
                      | STRAND StrandType
                      | CHR STRING
 
 ScanStmt           ::= SCAN ID ScanOpts AliasOpt WhereClause SEMICOLON
 ScanOpts           ::= ScanOpt ScanOpts | λ
 ScanOpt            ::= STRAND StrandType
-                     | THRESHOLD NUM PERCENT
+                     | THRESHOLD (NUM | FLOAT) PERCENT
 
-SetOperationStmt   ::= SetOp EntityRef AND EntityRef WhereClause SEMICOLON
-SetOp              ::= INTERSECT | UNION | EXCEPT
+SetOperationStmt   ::= (INTERSECT | UNION) EntityRef AND EntityRef WhereClause SEMICOLON
+                     | EXCEPT EntityRef FROM EntityRef WhereClause SEMICOLON
 
 ExtractStmt        ::= EXTRACT EntityRef WhereClause SEMICOLON
 
@@ -199,7 +205,7 @@ IfStmt             ::= IF Condition THEN StatementList (ELSE StatementList)? END
 
 ForeachStmt        ::= FOREACH ID IN "[" CollectionList "]" DO StatementList ENDFOR (SEMICOLON)?
 CollectionList     ::= CollectionItem ("," CollectionItem)* | λ
-CollectionItem     ::= ID | STRING | NUM
+CollectionItem     ::= ID
 
 WhereClause        ::= WHERE Condition | λ
 
@@ -212,15 +218,36 @@ Factor             ::= NOT Factor | SimpleCondition | "(" Condition ")"
 SimpleCondition    ::= Property RelOp Value
 Property           ::= LENGTH | SIMILARITY | GC_CONTENT | ID
 RelOp              ::= ">" | "<" | ">=" | "<=" | "="
-Value              ::= NUM Unit | FLOAT PERCENT | NUM | STRING
+Value              ::= (NUM | FLOAT) Unit | (NUM | FLOAT) PERCENT | NUM | FLOAT | STRING
 
 Unit               ::= BP | KB | MB | λ
 Direction          ::= UPSTREAM | DOWNSTREAM
 Entity             ::= GENE | PROMOTER | ENHANCER | EXON | INTRON | UTR | TSS | CDS | REGION
 EntityRef          ::= Entity | ID
 EntityName         ::= STRING | λ
+AliasOpt           ::= AS ID | λ
 StrandType         ::= POSITIVE | NEGATIVE
 ```
+
+## Correctness Tests and Engineering Benchmarks
+
+Run the automated language and algorithm tests with:
+
+```bash
+make test
+```
+
+Deterministic scaling measurements and complete-query timings are available
+with:
+
+```bash
+make benchmark-core
+make benchmark
+```
+
+These are engineering measurements of the current implementation, not evidence
+of superiority over other tools. See `benchmarks/README.md` for the comparison
+requirements needed before reporting external benchmark results.
 
 ---
 

@@ -2,8 +2,9 @@
 #include <cctype>
 #include <iostream>
 
-Lexer::Lexer(std::istream& inputStream, SymbolTable* st) 
-    : in(inputStream), colIndex(0), line(1), bufferLen(0), eofReached(false), symbolTable(st) {
+Lexer::Lexer(std::istream& inputStream)
+    : in(inputStream), colIndex(0), line(1), bufferLen(0), eofReached(false),
+      hasError(false) {
     initKeywords();
 }
 
@@ -207,7 +208,13 @@ Token Lexer::stringLiteral(int startLine, int startCol) {
     std::string lexeme = "";
     while (true) {
         char c = getChar();
-        if (c == EOF || c == '"') {
+        if (c == EOF) {
+            hasError = true;
+            std::cerr << "Lexical Error at L" << startLine << ":C" << startCol
+                      << " - Unterminated string literal" << std::endl;
+            break;
+        }
+        if (c == '"') {
             break;
         }
         lexeme += c;
@@ -273,6 +280,7 @@ std::vector<Token> Lexer::tokenize() {
                     break;
                 }
                 default:
+                    hasError = true;
                     std::cerr << "Lexical Error at L" << startLine << ":C" << startCol 
                               << " - Invalid character '" << c << "'" << std::endl;
                     tokens.push_back(createToken(TokenType::ERROR_TOKEN, lexeme, startLine, startCol));

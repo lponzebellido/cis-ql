@@ -6,7 +6,7 @@
  * subtracts any sites that overlap annotated Coding Sequences (CDS), isolating candidates in intergenic regions.
  */
 
-LOAD SEQUENCE "data_examples/ecoli.fasta" AS genome;
+LOAD SEQUENCE "data_examples/ecoli2.fna" AS genome;
 LOAD ANNOTATION "data_examples/genomic.gff" AS annot;
 LOAD MATRIX "matrices/MA0139.1_CTCF.pwm" AS ctcf_matrix;
 

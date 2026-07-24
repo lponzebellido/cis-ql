@@ -6,7 +6,7 @@
  * The INTERSECT statement then identifies SP1 binding sites that co-occur within these CpG islands.
  */
 
-LOAD SEQUENCE "data_examples/ecoli.fasta" AS genome;
+LOAD SEQUENCE "data_examples/ecoli2.fna" AS genome;
 LOAD ANNOTATION "data_examples/genomic.gff" AS annot;
 LOAD MATRIX "matrices/MA0079.5_SP1.pwm" AS sp1;
 

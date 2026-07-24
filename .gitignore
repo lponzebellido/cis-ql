@@ -1,8 +1,12 @@
 *.out
 *.exe
 *.o
+*.d
+*.dSYM/
 *.a
 cisql
+/tests/test_core
+/benchmarks/benchmark_core
 cmake-build-debug/
 pdf/
 tools/
@@ -32,3 +36,5 @@ Thumbs.db
 
 .cisql_results.json
 temp_script.cql
+
+*.tex

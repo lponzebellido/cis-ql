@@ -57,6 +57,21 @@ bool MotifFinder::isRegexPattern(const std::string& pattern) {
   return translateIUPAC(pattern) != pattern;
 }
 
+bool MotifFinder::isValidPattern(const std::string &pattern) {
+  if (pattern.empty())
+    return false;
+  if (!isRegexPattern(pattern))
+    return true;
+  try {
+    const std::regex expression("(?=(" + translateIUPAC(pattern) + "))",
+                                std::regex::icase);
+    (void)expression;
+    return true;
+  } catch (const std::regex_error &) {
+    return false;
+  }
+}
+
 std::vector<int> MotifFinder::computeKMPTable(const std::string& pattern) {
   int m = (int)pattern.size();
   std::vector<int> table(m, 0);
@@ -116,14 +131,19 @@ std::vector<MotifMatch> MotifFinder::regexSearch(
   std::string pattern = translateIUPAC(rawPattern);
 
   try {
-    std::regex re(pattern, std::regex::icase | std::regex::optimize);
+    // A look-ahead reports a match at every valid start coordinate, including
+    // overlapping motifs (for example, NN at positions 0 and 1 in AAA).
+    std::regex re("(?=(" + pattern + "))",
+                  std::regex::icase | std::regex::optimize);
     auto it = std::sregex_iterator(text.begin(), text.end(), re);
     auto end = std::sregex_iterator();
 
     for (; it != end; ++it) {
+      if ((*it)[1].length() == 0)
+        continue;
       MotifMatch m;
       m.position = (size_t)it->position();
-      m.matchLength = (size_t)it->length();
+      m.matchLength = (size_t)(*it)[1].length();
       m.strand = strand;
       size_t ctxStart = (m.position > contextSize) ? m.position - contextSize : 0;
       size_t ctxEnd = std::min(m.position + m.matchLength + contextSize, text.size());

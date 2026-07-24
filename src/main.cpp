@@ -3,6 +3,7 @@
 #include "backend/SemanticAnalyzer.h"
 #include "frontend/Lexer.h"
 #include "frontend/Parser.h"
+#include <cstdio>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -101,18 +102,23 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  std::remove(".cisql_results.json");
+
   
   SymbolTable symbolTable;
-  Lexer lexer(file, &symbolTable);
+  Lexer lexer(file);
   std::vector<Token> tokens = lexer.tokenize();
 
   if (debugMode)
     printLexicalAnalysis(tokens);
+  if (lexer.hadError())
+    return 2;
 
   
   Parser parser(tokens);
   auto ast = parser.parse();
 
+  int exitCode = 0;
   if (!parser.hadError()) {
     if (debugMode)
       printSyntaxAnalysis(parser, ast);
@@ -134,14 +140,19 @@ int main(int argc, char *argv[]) {
       
       Interpreter interpreter;
       interpreter.execute(ir, debugMode);
+      if (interpreter.hadError())
+        exitCode = 4;
+    } else {
+      exitCode = 3;
     }
   } else {
     if (debugMode)
       printSyntaxAnalysis(parser, ast);
+    exitCode = 2;
   }
 
   if (debugMode)
     symbolTable.print();
 
-  return 0;
+  return exitCode;
 }

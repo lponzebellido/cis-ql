@@ -24,6 +24,7 @@ public:
 
   static std::string reverseComplement(const std::string& seq);
   static bool isRegexPattern(const std::string& pattern);
+  static bool isValidPattern(const std::string& pattern);
   static std::string translateIUPAC(const std::string& pattern);
 
 private:

@@ -10,6 +10,7 @@ private:
   SymbolTable &symbolTable;
   bool hasError;
   bool annotationLoaded;
+  bool sequenceLoaded;
 
   void reportError(const std::string &message);
   double parseValue(const std::string &val);

@@ -18,21 +18,21 @@ Statement          -> LoadStmt | FindStmt | ExtractStmt | SetOperationStmt | Sca
 
 LoadStmt           -> LOAD (SEQUENCE | ANNOTATION | MATRIX) STRING AS ID SEMICOLON
 
-AnalyzeStmt        -> ANALYZE (GC_CONTENT | CPG_ISLANDS) (WINDOW NUM Unit)? AliasOpt WhereClause SEMICOLON
+AnalyzeStmt        -> ANALYZE (GC_CONTENT | CPG_ISLANDS) (WINDOW (NUM | FLOAT) Unit)? AliasOpt WhereClause SEMICOLON
 
 FindStmt           -> FIND MOTIF STRING FindOpts AliasOpt WhereClause SEMICOLON
 FindOpts           -> FindOpt FindOpts | λ
-FindOpt            -> WITHIN NUM Unit Direction FROM EntityRef EntityName
+FindOpt            -> WITHIN (NUM | FLOAT) Unit Direction FROM EntityRef EntityName
                     | STRAND StrandType
                     | CHR STRING
 
 ScanStmt           -> SCAN ID ScanOpts AliasOpt WhereClause SEMICOLON
 ScanOpts           -> ScanOpt ScanOpts | λ
 ScanOpt            -> STRAND StrandType
-                    | THRESHOLD NUM PERCENT
+                    | THRESHOLD (NUM | FLOAT) PERCENT
 
-SetOperationStmt   -> SetOp EntityRef AND EntityRef WhereClause SEMICOLON
-SetOp              -> INTERSECT | UNION | EXCEPT
+SetOperationStmt   -> (INTERSECT | UNION) EntityRef AND EntityRef WhereClause SEMICOLON
+                    | EXCEPT EntityRef FROM EntityRef WhereClause SEMICOLON
 
 ExtractStmt        -> EXTRACT EntityRef WhereClause SEMICOLON
 
@@ -40,7 +40,7 @@ IfStmt             -> IF Condition THEN StatementList (ELSE StatementList)? ENDI
 
 ForeachStmt        -> FOREACH ID IN LBRACKET CollectionList RBRACKET DO StatementList ENDFOR (SEMICOLON)?
 CollectionList     -> CollectionItem (COMMA CollectionItem)* | λ
-CollectionItem     -> ID | STRING | NUM
+CollectionItem     -> ID
 
 WhereClause        -> WHERE Condition | λ
 
@@ -53,13 +53,14 @@ Factor             -> NOT Factor | SimpleCondition | LPAREN Condition RPAREN
 SimpleCondition    -> Property RelOp Value
 Property           -> LENGTH | SIMILARITY | GC_CONTENT | ID
 RelOp              -> GREATER | LESS | GREATER_EQ | LESS_EQ | ASSIGN
-Value              -> NUM Unit | FLOAT PERCENT | NUM | STRING
+Value              -> (NUM | FLOAT) Unit | (NUM | FLOAT) PERCENT | NUM | FLOAT | STRING
 
 Unit               -> BP | KB | MB | λ
 Direction          -> UPSTREAM | DOWNSTREAM
 Entity             -> GENE | PROMOTER | ENHANCER | EXON | INTRON | UTR | TSS | CDS | REGION
 EntityRef          -> Entity | ID
 EntityName         -> STRING | λ
+AliasOpt           -> AS ID | λ
 StrandType         -> POSITIVE | NEGATIVE
 
 Note on Execution Engine & Studio Integration:

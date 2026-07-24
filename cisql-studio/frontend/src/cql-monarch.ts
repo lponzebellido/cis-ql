@@ -7,11 +7,13 @@ export const cqlLanguageDef = {
     'WITHIN', 'FROM', 'GENE', 'PROMOTER', 'ENHANCER', 'EXON', 'INTRON',
     'UTR', 'TSS', 'CDS', 'REGION', 'STRAND', 'POSITIVE', 'NEGATIVE',
     'CHR', 'EXTRACT', 'WHERE', 'INTERSECT', 'UNION', 'EXCEPT', 'AND', 'OR', 'NOT',
-    'LENGTH', 'SIMILARITY', 'BP', 'KB', 'MB', 'UPSTREAM', 'DOWNSTREAM', 'SCAN', 'THRESHOLD'
+    'LENGTH', 'SIMILARITY', 'GC_CONTENT', 'CPG_ISLANDS', 'BP', 'KB', 'MB',
+    'UPSTREAM', 'DOWNSTREAM', 'SCAN', 'THRESHOLD', 'ANALYZE', 'WINDOW',
+    'IF', 'THEN', 'ELSE', 'ENDIF', 'FOREACH', 'IN', 'DO', 'ENDFOR'
   ],
 
   operators: [
-    '<=', '>=', '==', '!=', '>', '<', '=', '%'
+    '<=', '>=', '>', '<', '=', '%'
   ],
 
   // we include these common regular expressions

@@ -19,8 +19,8 @@ struct FindContext {
   std::string pattern;
   std::string strandFilter;
   std::string chrFilter;
-  bool hasWithin;
-  size_t withinDistance;
+  bool hasWithin = false;
+  double withinDistance = 0.0;
   std::string withinUnit;
   std::string withinDirection;
   std::string withinEntity;
@@ -28,8 +28,8 @@ struct FindContext {
 };
 
 struct ScanContext {
-  std::string strandFilter;   
-  double threshold;           
+  std::string strandFilter;
+  double threshold = -1.0;
 };
 
 class Interpreter {
@@ -48,16 +48,19 @@ private:
   ScanContext currentScan;
   std::string activeSequenceAlias;
   bool debugMode;
+  bool runtimeError;
   int lastPrintIndex;
   int currentPrintIndex;
 
-  std::string stripQuotes(const std::string &s);
-  size_t toBasePairs(size_t value, const std::string &unit);
+  std::string stripQuotes(const std::string &s) const;
+  std::string jsonEscape(const std::string &s) const;
+  void reportRuntimeError(const std::string &message);
+  size_t toBasePairs(double value, const std::string &unit);
   std::vector<GenomicRegion> resolveEntity(const std::string &entity);
   void printRegions(const std::vector<GenomicRegion> &regions,
                     int maxShow = 20);
   void printMotifMatches(const std::vector<MotifMatch> &matches,
-                         const std::string &pattern, int maxShow = 20);
+                         int maxShow = 20);
 
   void executeLoadSeq(const IRInstruction &instr);
   void executeLoadAnnot(const IRInstruction &instr);
@@ -70,6 +73,7 @@ private:
   void executeExtract(const IRInstruction &instr);
   void executeFilterLength(const IRInstruction &instr);
   void executeFilterSimilarity(const IRInstruction &instr);
+  void executeFilterCondition(const IRInstruction &instr);
   void executeSetOp(const IRInstruction &instr);
   void executePrint(const IRInstruction &instr);
   void executeLoadMatrix(const IRInstruction &instr);
@@ -77,14 +81,30 @@ private:
   void executeScanOptThreshold(const IRInstruction &instr);
   void executeScanExec(const IRInstruction &instr);
   void executeScanAlias(const IRInstruction &instr);
+  void executeResultAlias(const IRInstruction &instr);
   void executeAnalyzeGC(const IRInstruction &instr);
   void executeAnalyzeCpG(const IRInstruction &instr);
-  bool evaluateCondition(const std::string &prop, const std::string &op, const std::string &val);
+  bool compareValues(double left, const std::string &op,
+                     const std::string &right) const;
+  bool evaluateRegionCondition(const std::shared_ptr<IRCondition> &condition,
+                               const GenomicRegion &region,
+                               const std::string &referenceSequence) const;
+  bool conditionContainsSimilarity(
+      const std::shared_ptr<IRCondition> &condition) const;
+  bool evaluateReferenceEligibility(
+      const std::shared_ptr<IRCondition> &condition,
+      const GenomicRegion &region) const;
+  bool evaluateMotifCondition(const std::shared_ptr<IRCondition> &condition,
+                              const MotifMatch &match) const;
+  bool evaluateGCCondition(const std::shared_ptr<IRCondition> &condition,
+                           const GCWindow &window) const;
+  bool evaluateGlobalCondition(const std::shared_ptr<IRCondition> &condition);
   
   void dumpResultsJSON() const;
 
 public:
   void execute(const std::vector<IRInstruction> &program, bool debug = false);
+  bool hadError() const { return runtimeError; }
 };
 
 #endif

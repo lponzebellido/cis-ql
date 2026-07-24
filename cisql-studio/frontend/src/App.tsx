@@ -104,6 +104,9 @@ function App() {
     editor.addCommand(monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS, () => {
       handleSave();
     });
+    editor.addCommand(monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.Enter, () => {
+      handleExecute();
+    });
   };
 
   const handleSave = async () => {
@@ -128,6 +131,7 @@ function App() {
     setIsRunning(true);
     setStdout('Executing...\n');
     setResults({});
+    setGcProfiles({});
     try {
       const response = await fetch('http://localhost:3001/api/execute', {
         method: 'POST',
@@ -135,14 +139,19 @@ function App() {
         body: JSON.stringify({ code })
       });
       const data = await response.json();
-      setStdout(data.stdout + (data.stderr ? '\n' + data.stderr : ''));
+      if (!response.ok) {
+        setStdout(data.error || `Execution request failed (${response.status}).`);
+        return;
+      }
+      const output = [data.stdout, data.stderr, data.error]
+        .filter((value) => value)
+        .join('\n');
+      setStdout(output || 'Execution completed.');
       if (data.results && data.results.resultSets) {
         setResults(data.results.resultSets);
       }
       if (data.results && data.results.gcProfiles) {
         setGcProfiles(data.results.gcProfiles);
-      } else {
-        setGcProfiles({});
       }
     } catch (err) {
       setStdout('Error connecting to the backend server.');

@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -13,6 +13,30 @@ const PORT = 3001;
 
 const CISQL_BIN = path.resolve(__dirname, '../../cisql');
 let WORKING_DIR = null;
+let executionInProgress = false;
+
+function isInside(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative === '' ||
+    (!relative.startsWith(`..${path.sep}`) && relative !== '..' &&
+     !path.isAbsolute(relative));
+}
+
+function workspacePath(relativePath = '.') {
+  if (!WORKING_DIR) return null;
+  const root = fs.realpathSync(WORKING_DIR);
+  const candidate = path.resolve(root, relativePath);
+  if (!isInside(root, candidate)) return null;
+
+  let existingAncestor = candidate;
+  while (!fs.existsSync(existingAncestor) && existingAncestor !== root) {
+    existingAncestor = path.dirname(existingAncestor);
+  }
+  if (!isInside(root, fs.realpathSync(existingAncestor))) return null;
+  if (fs.existsSync(candidate) &&
+      !isInside(root, fs.realpathSync(candidate))) return null;
+  return candidate;
+}
 
 app.get('/api/fs/workspace', (req, res) => {
   res.json({ workspace: WORKING_DIR });
@@ -20,15 +44,16 @@ app.get('/api/fs/workspace', (req, res) => {
 
 app.post('/api/fs/workspace', (req, res) => {
   const { path: newPath } = req.body;
-  if (!newPath || !fs.existsSync(newPath)) {
+  if (!newPath || !fs.existsSync(newPath) ||
+      !fs.statSync(newPath).isDirectory()) {
     return res.status(400).json({ error: 'Invalid path' });
   }
-  WORKING_DIR = newPath;
+  WORKING_DIR = fs.realpathSync(newPath);
   res.json({ success: true, workspace: WORKING_DIR });
 });
 
 app.post('/api/execute', (req, res) => {
-  const { code, targetFile } = req.body;
+  const { code } = req.body;
   
   if (!WORKING_DIR) {
     return res.status(400).json({ error: 'No workspace opened' });
@@ -37,20 +62,30 @@ app.post('/api/execute', (req, res) => {
   if (!code) {
     return res.status(400).json({ error: 'No code provided' });
   }
+  if (executionInProgress) {
+    return res.status(409).json({ error: 'A query is already running' });
+  }
 
-  
-  const tempFile = path.join(WORKING_DIR, 'temp_script.cql');
+  executionInProgress = true;
+  const tempFile = path.join(
+    WORKING_DIR, `.cisql-studio-${process.pid}-${Date.now()}.cql`
+  );
   const resultsFile = path.join(WORKING_DIR, '.cisql_results.json');
   
   
-  if (fs.existsSync(resultsFile)) {
-    fs.unlinkSync(resultsFile);
+  try {
+    if (fs.existsSync(resultsFile)) {
+      fs.unlinkSync(resultsFile);
+    }
+    fs.writeFileSync(tempFile, code);
+  } catch (error) {
+    executionInProgress = false;
+    return res.status(500).json({ error: error.message });
   }
 
-  fs.writeFileSync(tempFile, code);
-
   
-  exec(`"${CISQL_BIN}" temp_script.cql`, { cwd: WORKING_DIR }, (error, stdout, stderr) => {
+  execFile(CISQL_BIN, [path.basename(tempFile)], { cwd: WORKING_DIR },
+    (error, stdout, stderr) => {
     
     let parsedResults = null;
     if (fs.existsSync(resultsFile)) {
@@ -66,11 +101,13 @@ app.post('/api/execute', (req, res) => {
     if (fs.existsSync(tempFile)) {
       fs.unlinkSync(tempFile);
     }
+    executionInProgress = false;
 
     res.json({
       stdout: stdout,
       stderr: stderr,
       error: error ? error.message : null,
+      exitCode: error && typeof error.code === 'number' ? error.code : 0,
       results: parsedResults
     });
   });
@@ -78,10 +115,8 @@ app.post('/api/execute', (req, res) => {
 
 app.get('/api/fs/list', (req, res) => {
   if (!WORKING_DIR) return res.status(400).json({ error: 'No workspace opened' });
-  const dirPath = req.query.path ? path.join(WORKING_DIR, req.query.path) : WORKING_DIR;
-  
-  
-  if (!dirPath.startsWith(WORKING_DIR)) {
+  const dirPath = workspacePath(req.query.path || '.');
+  if (!dirPath) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -110,8 +145,8 @@ app.get('/api/fs/read', (req, res) => {
   if (!WORKING_DIR) return res.status(400).json({ error: 'No workspace opened' });
   if (!req.query.path) return res.status(400).json({ error: 'No path provided' });
   
-  const targetPath = path.join(WORKING_DIR, req.query.path);
-  if (!targetPath.startsWith(WORKING_DIR)) {
+  const targetPath = workspacePath(req.query.path);
+  if (!targetPath) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -128,8 +163,8 @@ app.post('/api/fs/write', (req, res) => {
   const { path: relPath, content } = req.body;
   if (!relPath) return res.status(400).json({ error: 'No path provided' });
   
-  const targetPath = path.join(WORKING_DIR, relPath);
-  if (!targetPath.startsWith(WORKING_DIR)) {
+  const targetPath = workspacePath(relPath);
+  if (!targetPath) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -146,8 +181,8 @@ app.post('/api/fs/create-file', (req, res) => {
   const { path: relPath } = req.body;
   if (!relPath) return res.status(400).json({ error: 'No path provided' });
   
-  const targetPath = path.join(WORKING_DIR, relPath);
-  if (!targetPath.startsWith(WORKING_DIR)) return res.status(403).json({ error: 'Forbidden' });
+  const targetPath = workspacePath(relPath);
+  if (!targetPath) return res.status(403).json({ error: 'Forbidden' });
 
   try {
     if (fs.existsSync(targetPath)) {
@@ -165,8 +200,8 @@ app.post('/api/fs/create-dir', (req, res) => {
   const { path: relPath } = req.body;
   if (!relPath) return res.status(400).json({ error: 'No path provided' });
   
-  const targetPath = path.join(WORKING_DIR, relPath);
-  if (!targetPath.startsWith(WORKING_DIR)) return res.status(403).json({ error: 'Forbidden' });
+  const targetPath = workspacePath(relPath);
+  if (!targetPath) return res.status(403).json({ error: 'Forbidden' });
 
   try {
     if (fs.existsSync(targetPath)) {
@@ -184,10 +219,11 @@ app.post('/api/fs/rename', (req, res) => {
   const { oldPath, newPath } = req.body;
   if (!oldPath || !newPath) return res.status(400).json({ error: 'Paths not provided' });
 
-  const targetOldPath = path.join(WORKING_DIR, oldPath);
-  const targetNewPath = path.join(WORKING_DIR, newPath);
+  const targetOldPath = workspacePath(oldPath);
+  const targetNewPath = workspacePath(newPath);
 
-  if (!targetOldPath.startsWith(WORKING_DIR) || !targetNewPath.startsWith(WORKING_DIR)) {
+  if (!targetOldPath || !targetNewPath ||
+      targetOldPath === WORKING_DIR || targetNewPath === WORKING_DIR) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -210,8 +246,10 @@ app.post('/api/fs/delete', (req, res) => {
   const { path: relPath } = req.body;
   if (!relPath) return res.status(400).json({ error: 'No path provided' });
 
-  const targetPath = path.join(WORKING_DIR, relPath);
-  if (!targetPath.startsWith(WORKING_DIR)) return res.status(403).json({ error: 'Forbidden' });
+  const targetPath = workspacePath(relPath);
+  if (!targetPath || targetPath === WORKING_DIR) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
 
   try {
     if (!fs.existsSync(targetPath)) {

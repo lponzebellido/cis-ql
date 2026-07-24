@@ -186,8 +186,6 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
 
     gcProfileNames.forEach((profileName, idx) => {
       const yTop = currentY;
-      const yMid = yTop + GC_TRACK_H / 2;
-
       if (idx > 0 || trackNames.length > 0) {
         ctx.strokeStyle = dark ? '#21262d' : '#eaeef2';
         ctx.beginPath();

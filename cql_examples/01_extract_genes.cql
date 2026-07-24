@@ -6,7 +6,7 @@
  * clause retains only genes longer than 1500 base pairs. Supported units include BP, KB, and MB.
  */
 
-LOAD SEQUENCE "data_examples/ecoli.fasta" AS genome;
+LOAD SEQUENCE "data_examples/ecoli2.fna" AS genome;
 LOAD ANNOTATION "data_examples/genomic.gff" AS annot;
 
 EXTRACT GENE WHERE LENGTH > 1.5 KB;

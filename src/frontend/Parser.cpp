@@ -144,8 +144,12 @@ std::unique_ptr<FindStmtNode> Parser::parseFind() {
     auto opt = std::unique_ptr<FindOptNode>(new FindOptNode());
     if (match(TokenType::WITHIN)) {
       opt->type = "WITHIN";
-      consume(TokenType::NUM, "Expected a number for WITHIN.");
-      opt->value1 = previous().lexeme;
+      if (match(TokenType::NUM) || match(TokenType::FLOAT)) {
+        opt->value1 = previous().lexeme;
+      } else {
+        reportError(peek(), "Expected a number for WITHIN.");
+        throw std::runtime_error("Parse error");
+      }
 
       if (match(TokenType::BP) || match(TokenType::KB) ||
           match(TokenType::MB)) {
@@ -413,7 +417,7 @@ std::unique_ptr<AnalyzeStmtNode> Parser::parseAnalyze() {
 
   std::string windowSize;
   if (match(TokenType::WINDOW)) {
-    if (match(TokenType::NUM)) {
+    if (match(TokenType::NUM) || match(TokenType::FLOAT)) {
       windowSize = previous().lexeme;
       if (match(TokenType::BP) || match(TokenType::KB) || match(TokenType::MB)) {
         windowSize += " " + previous().lexeme;
@@ -466,10 +470,11 @@ std::unique_ptr<ForeachStmtNode> Parser::parseForeach() {
   std::vector<std::string> coll;
   if (!check(TokenType::RBRACKET)) {
     do {
-      if (match(TokenType::ID) || match(TokenType::STRING) || match(TokenType::NUM)) {
+      if (match(TokenType::ID)) {
         coll.push_back(previous().lexeme);
       } else {
-        reportError(peek(), "Expected item identifier in FOREACH collection.");
+        reportError(peek(),
+                    "Expected a matrix alias in the FOREACH collection.");
         throw std::runtime_error("Parse error");
       }
     } while (match(TokenType::COMMA));

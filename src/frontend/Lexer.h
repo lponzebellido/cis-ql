@@ -1,7 +1,6 @@
 #ifndef LEXER_H
 #define LEXER_H
 
-#include "../backend/SymbolTable.h"
 #include "Token.h"
 #include <iostream>
 #include <string>
@@ -18,9 +17,8 @@ private:
   int line;
   int bufferLen;
   bool eofReached;
+  bool hasError;
   std::unordered_map<std::string, TokenType> keywords;
-  SymbolTable *symbolTable;
-
   void initKeywords();
   char getChar();
   void ungetChar();
@@ -33,8 +31,9 @@ private:
   Token stringLiteral(int startLine, int startCol);
 
 public:
-  Lexer(std::istream &inputStream, SymbolTable *st);
+  explicit Lexer(std::istream &inputStream);
   std::vector<Token> tokenize();
+  bool hadError() const { return hasError; }
 };
 
 #endif

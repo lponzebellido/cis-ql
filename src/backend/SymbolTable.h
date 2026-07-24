@@ -20,8 +20,13 @@ public:
     }
   }
 
-  bool lookup(const std::string &name) {
+  bool lookup(const std::string &name) const {
     return table.find(name) != table.end();
+  }
+
+  std::string typeOf(const std::string &name) const {
+    const auto found = table.find(name);
+    return found == table.end() ? "" : found->second.type;
   }
 
   void print() const {

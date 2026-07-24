@@ -4,25 +4,37 @@
 std::vector<GCWindow> GCAnalyzer::gcContentWindowed(
     const std::string& sequence, size_t windowSize, size_t stepSize) {
   std::vector<GCWindow> results;
-  if (sequence.size() < windowSize) return results;
+  if (windowSize == 0 || stepSize == 0 || sequence.size() < windowSize)
+    return results;
 
   size_t gcCount = 0;
-  for (size_t i = 0; i < windowSize; ++i) {
-    char c = std::toupper(sequence[i]);
-    if (c == 'G' || c == 'C') gcCount++;
-  }
-  results.push_back({0, (double)gcCount / windowSize * 100.0});
-
-  for (size_t pos = stepSize; pos + windowSize <= sequence.size(); pos += stepSize) {
-    for (size_t i = pos - stepSize; i < pos; ++i) {
-      char c = std::toupper(sequence[i]);
-      if (c == 'G' || c == 'C') gcCount--;
+  size_t previousPos = 0;
+  for (size_t pos = 0; pos + windowSize <= sequence.size(); pos += stepSize) {
+    if (pos == 0 || stepSize >= windowSize) {
+      gcCount = 0;
+      for (size_t i = pos; i < pos + windowSize; ++i) {
+        const char c = static_cast<char>(
+            std::toupper(static_cast<unsigned char>(sequence[i])));
+        if (c == 'G' || c == 'C')
+          ++gcCount;
+      }
+    } else {
+      for (size_t i = previousPos; i < pos; ++i) {
+        const char c = static_cast<char>(
+            std::toupper(static_cast<unsigned char>(sequence[i])));
+        if (c == 'G' || c == 'C')
+          --gcCount;
+      }
+      for (size_t i = previousPos + windowSize; i < pos + windowSize; ++i) {
+        const char c = static_cast<char>(
+            std::toupper(static_cast<unsigned char>(sequence[i])));
+        if (c == 'G' || c == 'C')
+          ++gcCount;
+      }
     }
-    for (size_t i = pos + windowSize - stepSize; i < pos + windowSize; ++i) {
-      char c = std::toupper(sequence[i]);
-      if (c == 'G' || c == 'C') gcCount++;
-    }
-    results.push_back({pos, (double)gcCount / windowSize * 100.0});
+    results.push_back(
+        {pos, static_cast<double>(gcCount) / windowSize * 100.0});
+    previousPos = pos;
   }
   return results;
 }
@@ -36,67 +48,73 @@ std::vector<GenomicRegion> GCAnalyzer::findCpGIslands(
 
   if (sequence.size() < scanWindow) return islands;
 
-  bool inIsland = false;
-  size_t islandStart = 0;
-
-  for (size_t pos = 0; pos + scanWindow <= sequence.size(); pos += scanStep) {
-    size_t cCount = 0, gCount = 0, cpgCount = 0;
-    for (size_t i = pos; i < pos + scanWindow; ++i) {
-      char c = std::toupper(sequence[i]);
-      if (c == 'C') {
-        cCount++;
-        if (i + 1 < pos + scanWindow && std::toupper(sequence[i + 1]) == 'G') {
-          cpgCount++;
-        }
-      } else if (c == 'G') {
-        gCount++;
-      }
+  size_t cCount = 0;
+  size_t gCount = 0;
+  size_t cpgCount = 0;
+  for (size_t i = 0; i < scanWindow; ++i) {
+    const char c = std::toupper(sequence[i]);
+    if (c == 'C')
+      ++cCount;
+    else if (c == 'G')
+      ++gCount;
+    if (i + 1 < scanWindow && c == 'C' &&
+        std::toupper(sequence[i + 1]) == 'G') {
+      ++cpgCount;
     }
+  }
 
+  for (size_t pos = 0; pos + scanWindow <= sequence.size();
+       pos += scanStep) {
     double gc = (double)(cCount + gCount) / scanWindow;
     double expectedCpG = (double)(cCount * gCount) / scanWindow;
     double obsExp = expectedCpG > 0 ? (double)cpgCount / expectedCpG : 0;
 
     bool passes = gc >= minGC && obsExp >= minObsExpCpG;
 
-    if (passes && !inIsland) {
-      inIsland = true;
-      islandStart = pos;
-    } else if (!passes && inIsland) {
-      inIsland = false;
-      size_t islandEnd = pos + scanWindow - 1;
-      if (islandEnd - islandStart >= minLength) {
+    if (passes) {
+      const size_t candidateEnd = pos + scanWindow;
+      if (islands.empty() || pos > islands.back().end) {
         GenomicRegion r;
         r.chr = chrId;
-        r.start = islandStart;
-        r.end = islandEnd;
+        r.start = pos;
+        r.end = candidateEnd;
         r.strand = "+";
         r.type = "CpG_island";
-        r.name = "CpG_" + std::to_string(islandStart);
-        if (islandEnd <= sequence.size()) {
-          r.sequence = sequence.substr(islandStart, islandEnd - islandStart);
-        }
-        islands.push_back(r);
+        r.name = "CpG_" + std::to_string(pos);
+        islands.push_back(std::move(r));
+      } else {
+        islands.back().end = std::max(islands.back().end, candidateEnd);
       }
     }
+
+    if (pos + scanWindow >= sequence.size())
+      break;
+
+    const char outgoing = std::toupper(sequence[pos]);
+    if (outgoing == 'C')
+      --cCount;
+    else if (outgoing == 'G')
+      --gCount;
+    if (outgoing == 'C' && std::toupper(sequence[pos + 1]) == 'G')
+      --cpgCount;
+
+    const size_t incomingPos = pos + scanWindow;
+    const char incoming = std::toupper(sequence[incomingPos]);
+    if (incoming == 'C')
+      ++cCount;
+    else if (incoming == 'G')
+      ++gCount;
+    if (std::toupper(sequence[incomingPos - 1]) == 'C' && incoming == 'G')
+      ++cpgCount;
   }
 
-  if (inIsland) {
-    size_t islandEnd = sequence.size();
-    if (islandEnd - islandStart >= minLength) {
-      GenomicRegion r;
-      r.chr = chrId;
-      r.start = islandStart;
-      r.end = islandEnd;
-      r.strand = "+";
-      r.type = "CpG_island";
-      r.name = "CpG_" + std::to_string(islandStart);
-      if (islandEnd <= sequence.size()) {
-        r.sequence = sequence.substr(islandStart, islandEnd - islandStart);
-      }
-      islands.push_back(r);
-    }
+  std::vector<GenomicRegion> filtered;
+  for (auto &island : islands) {
+    if (island.length() < minLength)
+      continue;
+    island.sequence =
+        sequence.substr(island.start, island.end - island.start);
+    filtered.push_back(std::move(island));
   }
-
-  return islands;
+  return filtered;
 }

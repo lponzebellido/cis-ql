@@ -1,35 +1,71 @@
 #include "Interpreter.h"
 #include <algorithm>
+#include <atomic>
+#include <cctype>
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <set>
+#include <thread>
 #include <fstream>
 
-static const std::set<std::string> BUILTIN_ENTITIES = {
-    "GENE", "PROMOTER", "ENHANCER", "EXON",  "INTRON",
-    "UTR",  "TSS",      "CDS",      "REGION"};
+namespace {
 
-static bool isBuiltinEntity(const std::string &name) {
-  return BUILTIN_ENTITIES.count(name) > 0;
+bool conditionUsesOnly(const std::shared_ptr<IRCondition> &condition,
+                       const std::set<std::string> &properties) {
+  if (!condition)
+    return true;
+  if (condition->kind == IRCondition::Kind::SIMPLE)
+    return properties.count(condition->property) > 0;
+  return conditionUsesOnly(condition->left, properties) &&
+         conditionUsesOnly(condition->right, properties);
 }
 
-std::string Interpreter::stripQuotes(const std::string &s) {
+} // namespace
+
+std::string Interpreter::stripQuotes(const std::string &s) const {
   if (s.size() >= 2 && s.front() == '"' && s.back() == '"') {
     return s.substr(1, s.size() - 2);
   }
   return s;
 }
 
-size_t Interpreter::toBasePairs(size_t value, const std::string &unit) {
+std::string Interpreter::jsonEscape(const std::string &s) const {
+  std::string escaped;
+  escaped.reserve(s.size());
+  for (const unsigned char c : s) {
+    switch (c) {
+    case '"': escaped += "\\\""; break;
+    case '\\': escaped += "\\\\"; break;
+    case '\b': escaped += "\\b"; break;
+    case '\f': escaped += "\\f"; break;
+    case '\n': escaped += "\\n"; break;
+    case '\r': escaped += "\\r"; break;
+    case '\t': escaped += "\\t"; break;
+    default:
+      if (c >= 0x20)
+        escaped += static_cast<char>(c);
+      break;
+    }
+  }
+  return escaped;
+}
+
+void Interpreter::reportRuntimeError(const std::string &message) {
+  runtimeError = true;
+  std::cerr << "Runtime Error: " << message << std::endl;
+}
+
+size_t Interpreter::toBasePairs(double value, const std::string &unit) {
   if (unit == "KB")
-    return value * 1000;
+    return static_cast<size_t>(value * 1000.0);
   if (unit == "MB")
-    return value * 1000000;
-  return value;
+    return static_cast<size_t>(value * 1000000.0);
+  return static_cast<size_t>(value);
 }
 
 void Interpreter::printMotifMatches(const std::vector<MotifMatch> &matches,
-                                    const std::string &pattern, int maxShow) {
+                                    int maxShow) {
   if (matches.empty()) {
     std::cout << "  No matches found." << std::endl;
     return;
@@ -98,7 +134,7 @@ void Interpreter::executeLoadSeq(const IRInstruction &instr) {
 
   auto records = FastaReader::read(filename);
   if (records.empty()) {
-    std::cerr << "  Error: No sequences found in " << filename << std::endl;
+    reportRuntimeError("No sequences found in " + filename + ".");
     return;
   }
 
@@ -142,11 +178,15 @@ void Interpreter::executeFindMotif(const IRInstruction &instr) {
   currentFind = FindContext();
   currentFind.pattern = stripQuotes(instr.arg1);
   currentFind.hasWithin = false;
+  if (!MotifFinder::isValidPattern(currentFind.pattern)) {
+    reportRuntimeError("Invalid or empty motif pattern '" +
+                       currentFind.pattern + "'.");
+  }
 }
 
 void Interpreter::executeFindOptWithin(const IRInstruction &instr) {
   currentFind.hasWithin = true;
-  currentFind.withinDistance = std::atol(instr.arg1.c_str());
+  currentFind.withinDistance = std::atof(instr.arg1.c_str());
   currentFind.withinUnit = instr.arg2;
   currentFind.withinDirection = instr.arg3;
   currentFind.withinEntity = instr.arg4;
@@ -183,7 +223,7 @@ void Interpreter::executeFindExec(const IRInstruction &instr) {
   }
 
   if (sequenceDatasets.empty()) {
-    std::cerr << "  Error: No sequence loaded." << std::endl;
+    reportRuntimeError("No sequence loaded.");
     return;
   }
 
@@ -226,8 +266,10 @@ void Interpreter::executeFindExec(const IRInstruction &instr) {
       std::string seqData = "";
       if (sequenceChrMaps[activeSequenceAlias].count(target.chr)) {
         seqData = sequenceChrMaps[activeSequenceAlias][target.chr].sequence;
-      } else if (!targetDataset.empty()) {
-        seqData = targetDataset[0].sequence;
+      } else {
+        reportRuntimeError("Annotation sequence identifier '" + target.chr +
+                           "' is not present in the active FASTA dataset.");
+        continue;
       }
       if (seqData.empty()) continue;
 
@@ -261,12 +303,12 @@ void Interpreter::executeFindExec(const IRInstruction &instr) {
       if (!currentFind.chrFilter.empty() && seqRec.sequenceId != currentFind.chrFilter)
         continue;
 
-      std::string seqStr = seqRec.sequence;
+      const FastaRecord *record = &seqRec;
       std::string chrId = seqRec.sequenceId;
       std::string pat = currentFind.pattern;
 
-      futures.push_back(std::async(std::launch::async, [seqStr, pat, chrId, searchNeg]() {
-        return MotifFinder::findAll(seqStr, pat, chrId, searchNeg);
+      futures.push_back(std::async(std::launch::async, [record, pat, chrId, searchNeg]() {
+        return MotifFinder::findAll(record->sequence, pat, chrId, searchNeg);
       }));
     }
 
@@ -289,6 +331,26 @@ void Interpreter::executeFindExec(const IRInstruction &instr) {
     }
     matches = filtered;
   }
+
+  std::sort(matches.begin(), matches.end(),
+            [](const MotifMatch &left, const MotifMatch &right) {
+              if (left.chr != right.chr)
+                return left.chr < right.chr;
+              if (left.position != right.position)
+                return left.position < right.position;
+              if (left.matchLength != right.matchLength)
+                return left.matchLength < right.matchLength;
+              return left.strand < right.strand;
+            });
+  matches.erase(
+      std::unique(matches.begin(), matches.end(),
+                  [](const MotifMatch &left, const MotifMatch &right) {
+                    return left.chr == right.chr &&
+                           left.position == right.position &&
+                           left.matchLength == right.matchLength &&
+                           left.strand == right.strand;
+                  }),
+      matches.end());
 
   motifResults[resultId] = matches;
 }
@@ -365,7 +427,7 @@ void Interpreter::executeFilterLength(const IRInstruction &instr) {
   } else {
     threshold = std::atof(valueStr.c_str());
   }
-  size_t thresholdBP = toBasePairs((size_t)threshold, unit);
+  size_t thresholdBP = toBasePairs(threshold, unit);
 
   if (resultSets.count(resultId)) {
     auto &regions = resultSets[resultId];
@@ -392,10 +454,14 @@ void Interpreter::executeFilterLength(const IRInstruction &instr) {
     }
     regions = filtered;
   } else if (motifResults.count(resultId)) {
-    if (debugMode) {
-      std::cout << "  WHERE LENGTH " << op << " " << valueStr
-                << ": filtering motif matches by pattern length." << std::endl;
+    auto &matches = motifResults[resultId];
+    std::vector<MotifMatch> filtered;
+    for (const auto &match : matches) {
+      const double length = static_cast<double>(match.matchLength);
+      if (compareValues(length, op, std::to_string(thresholdBP)))
+        filtered.push_back(match);
     }
+    matches = std::move(filtered);
   }
 }
 
@@ -448,6 +514,262 @@ void Interpreter::executeFilterSimilarity(const IRInstruction &instr) {
               << std::endl;
   }
   regions = filtered;
+}
+
+bool Interpreter::compareValues(double left, const std::string &op,
+                                const std::string &right) const {
+  double rightValue = std::atof(right.c_str());
+  const size_t spacePos = right.find(' ');
+  if (spacePos != std::string::npos) {
+    rightValue = std::atof(right.substr(0, spacePos).c_str());
+    const std::string unit = right.substr(spacePos + 1);
+    if (unit == "KB")
+      rightValue *= 1000.0;
+    else if (unit == "MB")
+      rightValue *= 1000000.0;
+  }
+
+  if (op == ">") return left > rightValue;
+  if (op == ">=") return left >= rightValue;
+  if (op == "<") return left < rightValue;
+  if (op == "<=") return left <= rightValue;
+  if (op == "=" || op == "==") return std::abs(left - rightValue) < 1e-9;
+  if (op == "!=") return std::abs(left - rightValue) >= 1e-9;
+  return false;
+}
+
+bool Interpreter::evaluateRegionCondition(
+    const std::shared_ptr<IRCondition> &condition,
+    const GenomicRegion &region,
+    const std::string &referenceSequence) const {
+  if (!condition)
+    return true;
+  if (condition->kind == IRCondition::Kind::AND)
+    return evaluateRegionCondition(condition->left, region, referenceSequence) &&
+           evaluateRegionCondition(condition->right, region, referenceSequence);
+  if (condition->kind == IRCondition::Kind::OR)
+    return evaluateRegionCondition(condition->left, region, referenceSequence) ||
+           evaluateRegionCondition(condition->right, region, referenceSequence);
+  if (condition->kind == IRCondition::Kind::NOT)
+    return !evaluateRegionCondition(condition->left, region, referenceSequence);
+
+  if (condition->property == "LENGTH")
+    return compareValues(static_cast<double>(region.length()), condition->op,
+                         condition->value);
+  if (condition->property == "SIMILARITY") {
+    if (referenceSequence.empty() || region.sequence.empty())
+      return false;
+    const double similarity =
+        SmithWaterman::computeSimilarity(referenceSequence, region.sequence);
+    return compareValues(similarity, condition->op, condition->value);
+  }
+  if (condition->property == "GC_CONTENT") {
+    if (region.sequence.empty())
+      return false;
+    size_t gc = 0;
+    for (char c : region.sequence) {
+      c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+      if (c == 'G' || c == 'C')
+        ++gc;
+    }
+    const double percent =
+        100.0 * static_cast<double>(gc) / region.sequence.size();
+    return compareValues(percent, condition->op, condition->value);
+  }
+  if (condition->property == "ID" || condition->property == "NAME") {
+    const std::string expected = stripQuotes(condition->value);
+    if (condition->op == "=" || condition->op == "==")
+      return region.name == expected;
+    if (condition->op == "!=")
+      return region.name != expected;
+  }
+  return false;
+}
+
+bool Interpreter::conditionContainsSimilarity(
+    const std::shared_ptr<IRCondition> &condition) const {
+  if (!condition)
+    return false;
+  if (condition->kind == IRCondition::Kind::SIMPLE)
+    return condition->property == "SIMILARITY";
+  return conditionContainsSimilarity(condition->left) ||
+         conditionContainsSimilarity(condition->right);
+}
+
+bool Interpreter::evaluateReferenceEligibility(
+    const std::shared_ptr<IRCondition> &condition,
+    const GenomicRegion &region) const {
+  if (!condition)
+    return true;
+  if (condition->kind == IRCondition::Kind::SIMPLE) {
+    if (condition->property == "SIMILARITY")
+      return true;
+    return evaluateRegionCondition(condition, region, "");
+  }
+  if (condition->kind == IRCondition::Kind::AND) {
+    return evaluateReferenceEligibility(condition->left, region) &&
+           evaluateReferenceEligibility(condition->right, region);
+  }
+  // OR and NOT expressions involving similarity do not define a unique
+  // pre-filter. They therefore use the first sequence-bearing candidate.
+  if (conditionContainsSimilarity(condition))
+    return true;
+  return evaluateRegionCondition(condition, region, "");
+}
+
+bool Interpreter::evaluateMotifCondition(
+    const std::shared_ptr<IRCondition> &condition,
+    const MotifMatch &match) const {
+  if (!condition)
+    return true;
+  if (condition->kind == IRCondition::Kind::AND)
+    return evaluateMotifCondition(condition->left, match) &&
+           evaluateMotifCondition(condition->right, match);
+  if (condition->kind == IRCondition::Kind::OR)
+    return evaluateMotifCondition(condition->left, match) ||
+           evaluateMotifCondition(condition->right, match);
+  if (condition->kind == IRCondition::Kind::NOT)
+    return !evaluateMotifCondition(condition->left, match);
+  if (condition->property == "LENGTH")
+    return compareValues(static_cast<double>(match.matchLength), condition->op,
+                         condition->value);
+  if (condition->property == "GC_CONTENT") {
+    const auto dataset = sequenceChrMaps.find(activeSequenceAlias);
+    if (dataset == sequenceChrMaps.end())
+      return false;
+    const auto sequence = dataset->second.find(match.chr);
+    if (sequence == dataset->second.end() || match.matchLength == 0 ||
+        match.position + match.matchLength >
+            sequence->second.sequence.size()) {
+      return false;
+    }
+    size_t gc = 0;
+    for (size_t i = match.position;
+         i < match.position + match.matchLength; ++i) {
+      const char c = static_cast<char>(std::toupper(
+          static_cast<unsigned char>(sequence->second.sequence[i])));
+      if (c == 'G' || c == 'C')
+        ++gc;
+    }
+    return compareValues(100.0 * static_cast<double>(gc) / match.matchLength,
+                         condition->op, condition->value);
+  }
+  return false;
+}
+
+bool Interpreter::evaluateGCCondition(
+    const std::shared_ptr<IRCondition> &condition,
+    const GCWindow &window) const {
+  if (!condition)
+    return true;
+  if (condition->kind == IRCondition::Kind::AND)
+    return evaluateGCCondition(condition->left, window) &&
+           evaluateGCCondition(condition->right, window);
+  if (condition->kind == IRCondition::Kind::OR)
+    return evaluateGCCondition(condition->left, window) ||
+           evaluateGCCondition(condition->right, window);
+  if (condition->kind == IRCondition::Kind::NOT)
+    return !evaluateGCCondition(condition->left, window);
+  return condition->property == "GC_CONTENT" &&
+         compareValues(window.gcPercent, condition->op, condition->value);
+}
+
+void Interpreter::executeFilterCondition(const IRInstruction &instr) {
+  const std::string &resultId = instr.arg1;
+  if (gcResults.count(resultId)) {
+    if (!conditionUsesOnly(instr.condition, {"GC_CONTENT"})) {
+      reportRuntimeError(
+          "GC profiles can only be filtered by GC_CONTENT.");
+      return;
+    }
+    auto &windows = gcResults[resultId];
+    std::vector<GCWindow> filtered;
+    for (const auto &window : windows) {
+      if (evaluateGCCondition(instr.condition, window))
+        filtered.push_back(window);
+    }
+    windows = std::move(filtered);
+  } else if (resultSets.count(resultId)) {
+    if (!conditionUsesOnly(
+            instr.condition,
+            {"LENGTH", "SIMILARITY", "GC_CONTENT", "ID", "NAME"})) {
+      reportRuntimeError("Unsupported condition for a genomic region set.");
+      return;
+    }
+    auto &regions = resultSets[resultId];
+    std::string referenceSequence;
+    if (conditionContainsSimilarity(instr.condition)) {
+      for (const auto &region : regions) {
+        if (!region.sequence.empty() &&
+            evaluateReferenceEligibility(instr.condition, region)) {
+          referenceSequence = region.sequence;
+          break;
+        }
+      }
+    }
+    if (referenceSequence.empty()) {
+      for (const auto &region : regions) {
+        if (!region.sequence.empty()) {
+          referenceSequence = region.sequence;
+          break;
+        }
+      }
+    }
+    std::vector<GenomicRegion> filtered;
+    std::vector<unsigned char> keep(regions.size(), 0);
+    const bool parallel =
+        conditionContainsSimilarity(instr.condition) && regions.size() > 1;
+    if (parallel) {
+      const size_t workerCount = std::min(
+          regions.size(),
+          std::max<size_t>(1, std::thread::hardware_concurrency()));
+      std::atomic<size_t> next(0);
+      std::vector<std::thread> workers;
+      workers.reserve(workerCount);
+      for (size_t worker = 0; worker < workerCount; ++worker) {
+        workers.emplace_back([&, referenceSequence] {
+          while (true) {
+            const size_t index = next.fetch_add(1);
+            if (index >= regions.size())
+              break;
+            keep[index] = evaluateRegionCondition(
+                              instr.condition, regions[index],
+                              referenceSequence)
+                              ? 1
+                              : 0;
+          }
+        });
+      }
+      for (auto &worker : workers)
+        worker.join();
+    } else {
+      for (size_t index = 0; index < regions.size(); ++index) {
+        keep[index] =
+            evaluateRegionCondition(instr.condition, regions[index],
+                                    referenceSequence)
+                ? 1
+                : 0;
+      }
+    }
+    for (size_t index = 0; index < regions.size(); ++index) {
+      if (keep[index])
+        filtered.push_back(regions[index]);
+    }
+    regions = std::move(filtered);
+  } else if (motifResults.count(resultId)) {
+    if (!conditionUsesOnly(instr.condition, {"LENGTH", "GC_CONTENT"})) {
+      reportRuntimeError(
+          "Motif matches can only be filtered by LENGTH or GC_CONTENT.");
+      return;
+    }
+    auto &matches = motifResults[resultId];
+    std::vector<MotifMatch> filtered;
+    for (const auto &match : matches) {
+      if (evaluateMotifCondition(instr.condition, match))
+        filtered.push_back(match);
+    }
+    matches = std::move(filtered);
+  }
 }
 
 void Interpreter::executeSetOp(const IRInstruction &instr) {
@@ -511,7 +833,7 @@ void Interpreter::executePrint(const IRInstruction &instr) {
     if (resultSets.count(resultId) && !resultSets[resultId].empty()) {
       printRegions(resultSets[resultId]);
     } else if (motifResults.count(resultId)) {
-      printMotifMatches(motifResults[resultId], currentFind.pattern);
+      printMotifMatches(motifResults[resultId]);
     }
   } else {
     if (resultSets.count(resultId)) {
@@ -531,11 +853,16 @@ void Interpreter::executeLoadMatrix(const IRInstruction &instr) {
 
   PWMatrix pwm = PWMScanner::loadJASPAR(filename);
   if (pwm.length == 0) {
-    std::cerr << "  Error: Failed to load PWM from " << filename << std::endl;
+    reportRuntimeError("Failed to load PWM from " + filename + ".");
     return;
   }
 
   PSSM pssm = PWMScanner::computePSSM(pwm);
+  if (pssm.length == 0) {
+    reportRuntimeError("Invalid matrix values or unequal row lengths in " +
+                       filename + ".");
+    return;
+  }
   loadedMatrices[alias] = pwm;
   loadedPSSMs[alias] = pssm;
 
@@ -565,7 +892,7 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
   std::string matrixAlias = instr.arg1;
   std::string resultId = instr.arg2;
 
-  if (currentScan.threshold <= 0.0) {
+  if (currentScan.threshold < 0.0) {
     currentScan.threshold = 75.0;
   }
 
@@ -579,13 +906,12 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
   }
 
   if (sequenceDatasets.empty()) {
-    std::cerr << "  Error: No sequence loaded." << std::endl;
+    reportRuntimeError("No sequence loaded.");
     return;
   }
 
   if (!loadedPSSMs.count(matrixAlias)) {
-    std::cerr << "  Error: Matrix '" << matrixAlias << "' not loaded."
-              << std::endl;
+    reportRuntimeError("Matrix '" + matrixAlias + "' not loaded.");
     return;
   }
 
@@ -599,12 +925,14 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
 
   std::vector<std::future<std::vector<MotifMatch>>> futures;
   for (const auto &seqRec : targetDataset) {
-    std::string seqStr = seqRec.sequence;
+    const FastaRecord *record = &seqRec;
     std::string chrId = seqRec.sequenceId;
     double thresh = currentScan.threshold;
+    const PSSM *matrix = &pssm;
 
-    futures.push_back(std::async(std::launch::async, [seqStr, pssm, thresh, chrId, searchPos, searchNeg]() {
-      return PWMScanner::scan(seqStr, pssm, thresh, chrId, searchPos, searchNeg);
+    futures.push_back(std::async(std::launch::async, [record, matrix, thresh, chrId, searchPos, searchNeg]() {
+      return PWMScanner::scan(record->sequence, *matrix, thresh, chrId,
+                              searchPos, searchNeg);
     }));
   }
 
@@ -659,6 +987,54 @@ void Interpreter::executeScanAlias(const IRInstruction &instr) {
   }
 }
 
+void Interpreter::executeResultAlias(const IRInstruction &instr) {
+  const std::string &resultId = instr.arg1;
+  const std::string &alias = instr.arg2;
+
+  if (gcResults.count(resultId)) {
+    if (alias != resultId) {
+      gcResults[alias] = std::move(gcResults[resultId]);
+      gcResults.erase(resultId);
+    }
+    return;
+  }
+  if (resultSets.count(resultId)) {
+    if (alias != resultId) {
+      resultSets[alias] = std::move(resultSets[resultId]);
+      resultSets.erase(resultId);
+    }
+    namedRegions[alias] = resultSets[alias];
+    return;
+  }
+
+  if (!motifResults.count(resultId))
+    return;
+
+  std::vector<GenomicRegion> regions;
+  for (const auto &match : motifResults[resultId]) {
+    GenomicRegion region;
+    region.chr = match.chr;
+    region.start = match.position;
+    region.end = match.position + match.matchLength;
+    region.strand = match.strand;
+    region.type = alias;
+    region.name = alias + "_" + region.chr + "_" +
+                  std::to_string(match.position);
+    const auto chrMapIt = sequenceChrMaps.find(activeSequenceAlias);
+    if (chrMapIt != sequenceChrMaps.end()) {
+      const auto sequenceIt = chrMapIt->second.find(region.chr);
+      if (sequenceIt != chrMapIt->second.end() &&
+          region.end <= sequenceIt->second.sequence.size()) {
+        region.sequence = sequenceIt->second.sequence.substr(
+            region.start, region.end - region.start);
+      }
+    }
+    regions.push_back(std::move(region));
+  }
+  resultSets[alias] = regions;
+  namedRegions[alias] = std::move(regions);
+}
+
 void Interpreter::executeAnalyzeGC(const IRInstruction &instr) {
   std::string windowSizeStr = instr.arg1;
   std::string resultId = instr.arg2;
@@ -667,9 +1043,11 @@ void Interpreter::executeAnalyzeGC(const IRInstruction &instr) {
   if (!windowSizeStr.empty()) {
     size_t spacePos = windowSizeStr.find(' ');
     if (spacePos != std::string::npos) {
-      windowSize = toBasePairs(std::stoull(windowSizeStr.substr(0, spacePos)), windowSizeStr.substr(spacePos + 1));
+      windowSize = toBasePairs(
+          std::stod(windowSizeStr.substr(0, spacePos)),
+          windowSizeStr.substr(spacePos + 1));
     } else {
-      windowSize = std::stoull(windowSizeStr);
+      windowSize = toBasePairs(std::stod(windowSizeStr), "BP");
     }
   }
 
@@ -679,7 +1057,8 @@ void Interpreter::executeAnalyzeGC(const IRInstruction &instr) {
       
   std::vector<GCWindow> allWindows;
   for (const auto &seqRec : targetDataset) {
-    auto windows = GCAnalyzer::gcContentWindowed(seqRec.sequence, windowSize, windowSize / 2);
+    auto windows =
+        GCAnalyzer::gcContentWindowed(seqRec.sequence, windowSize, windowSize);
     allWindows.insert(allWindows.end(), windows.begin(), windows.end());
   }
 
@@ -720,20 +1099,20 @@ void Interpreter::dumpResultsJSON() const {
   for (const auto &pair : resultSets) {
     if (!firstSet) out << ",\n";
     firstSet = false;
-    out << "    \"" << pair.first << "\": [\n";
+    out << "    \"" << jsonEscape(pair.first) << "\": [\n";
     
     bool firstRegion = true;
     for (const auto &r : pair.second) {
       if (!firstRegion) out << ",\n";
       firstRegion = false;
       out << "      {\n"
-          << "        \"chr\": \"" << r.chr << "\",\n"
+          << "        \"chr\": \"" << jsonEscape(r.chr) << "\",\n"
           << "        \"start\": " << r.start << ",\n"
           << "        \"end\": " << r.end << ",\n"
-          << "        \"strand\": \"" << r.strand << "\",\n"
-          << "        \"type\": \"" << r.type << "\",\n"
-          << "        \"name\": \"" << r.name << "\",\n"
-          << "        \"sequence\": \"" << r.sequence << "\"\n"
+          << "        \"strand\": \"" << jsonEscape(r.strand) << "\",\n"
+          << "        \"type\": \"" << jsonEscape(r.type) << "\",\n"
+          << "        \"name\": \"" << jsonEscape(r.name) << "\",\n"
+          << "        \"sequence\": \"" << jsonEscape(r.sequence) << "\"\n"
           << "      }";
     }
     out << "\n    ]";
@@ -746,7 +1125,7 @@ void Interpreter::dumpResultsJSON() const {
     for (const auto &pair : gcResults) {
       if (!firstProfile) out << ",\n";
       firstProfile = false;
-      out << "    \"" << pair.first << "\": [\n";
+      out << "    \"" << jsonEscape(pair.first) << "\": [\n";
       
       bool firstWindow = true;
       for (const auto &w : pair.second) {
@@ -762,13 +1141,27 @@ void Interpreter::dumpResultsJSON() const {
   out << "\n}\n";
 }
 
-bool Interpreter::evaluateCondition(const std::string &prop, const std::string &op, const std::string &val) {
+bool Interpreter::evaluateGlobalCondition(
+    const std::shared_ptr<IRCondition> &condition) {
+  if (!condition)
+    return false;
+  if (condition->kind == IRCondition::Kind::AND)
+    return evaluateGlobalCondition(condition->left) &&
+           evaluateGlobalCondition(condition->right);
+  if (condition->kind == IRCondition::Kind::OR)
+    return evaluateGlobalCondition(condition->left) ||
+           evaluateGlobalCondition(condition->right);
+  if (condition->kind == IRCondition::Kind::NOT)
+    return !evaluateGlobalCondition(condition->left);
+
+  const std::string &prop = condition->property;
   double leftVal = 0.0;
   if (prop == "GC_CONTENT") {
     size_t totalBases = 0;
     size_t gcBases = 0;
-    for (const auto &pair : sequenceDatasets) {
-      for (const auto &rec : pair.second) {
+    const auto active = sequenceDatasets.find(activeSequenceAlias);
+    if (active != sequenceDatasets.end()) {
+      for (const auto &rec : active->second) {
         totalBases += rec.sequence.length();
         for (char c : rec.sequence) {
           if (c == 'G' || c == 'C' || c == 'g' || c == 'c') gcBases++;
@@ -784,25 +1177,16 @@ bool Interpreter::evaluateCondition(const std::string &prop, const std::string &
     leftVal = std::atof(prop.c_str());
   }
 
-  double rightVal = std::atof(val.c_str());
-  size_t spacePos = val.find(' ');
-  if (spacePos != std::string::npos) {
-    rightVal = std::atof(val.substr(0, spacePos).c_str());
-  }
-
-  if (op == ">") return leftVal > rightVal;
-  if (op == ">=") return leftVal >= rightVal;
-  if (op == "<") return leftVal < rightVal;
-  if (op == "<=") return leftVal <= rightVal;
-  if (op == "=" || op == "==") return std::abs(leftVal - rightVal) < 1e-6;
-  if (op == "!=") return std::abs(leftVal - rightVal) >= 1e-6;
-  return false;
+  return compareValues(leftVal, condition->op, condition->value);
 }
 
 void Interpreter::execute(const std::vector<IRInstruction> &program,
                           bool debug) {
   debugMode = debug;
+  runtimeError = false;
   currentPrintIndex = 0;
+  currentFind = FindContext();
+  currentScan = ScanContext();
 
   lastPrintIndex = -1;
   int printIdx = 0;
@@ -817,9 +1201,14 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
     const auto &instr = program[i];
 
     if (instr.opcode == IROpCode::IF_BEGIN) {
-      bool cond = evaluateCondition(instr.arg1, instr.arg2, instr.arg3);
+      if (!conditionUsesOnly(instr.condition, {"GC_CONTENT"})) {
+        reportRuntimeError(
+            "IF conditions currently support GC_CONTENT only.");
+      }
+      bool cond = evaluateGlobalCondition(instr.condition);
       if (debugMode) {
-        std::cout << "> IF (" << instr.arg1 << " " << instr.arg2 << " " << instr.arg3 << ") -> " << (cond ? "TRUE" : "FALSE") << std::endl;
+        std::cout << "> IF condition -> " << (cond ? "TRUE" : "FALSE")
+                  << std::endl;
       }
       if (!cond) {
         int depth = 1;
@@ -888,6 +1277,9 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
     case IROpCode::FILTER_SIMILARITY:
       executeFilterSimilarity(instr);
       break;
+    case IROpCode::FILTER_CONDITION:
+      executeFilterCondition(instr);
+      break;
     case IROpCode::SET_INTERSECT:
     case IROpCode::SET_UNION:
     case IROpCode::SET_EXCEPT:
@@ -911,6 +1303,9 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
     case IROpCode::SCAN_ALIAS:
       executeScanAlias(instr);
       break;
+    case IROpCode::RESULT_ALIAS:
+      executeResultAlias(instr);
+      break;
     case IROpCode::ANALYZE_GC:
       executeAnalyzeGC(instr);
       break;
@@ -923,5 +1318,6 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
   }
 
   
-  dumpResultsJSON();
+  if (!runtimeError)
+    dumpResultsJSON();
 }
