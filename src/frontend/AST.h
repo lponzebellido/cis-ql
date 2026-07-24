@@ -11,6 +11,8 @@ class SimpleConditionNode;
 class BinaryConditionNode;
 class NotConditionNode;
 class LoadStmtNode;
+class UseStmtNode;
+class ExportStmtNode;
 class FindOptNode;
 class FindStmtNode;
 class ExtractStmtNode;
@@ -28,6 +30,8 @@ public:
   virtual void visit(BinaryConditionNode* node) = 0;
   virtual void visit(NotConditionNode* node) = 0;
   virtual void visit(LoadStmtNode* node) = 0;
+  virtual void visit(UseStmtNode* node) = 0;
+  virtual void visit(ExportStmtNode* node) = 0;
   virtual void visit(FindOptNode* node) = 0;
   virtual void visit(FindStmtNode* node) = 0;
   virtual void visit(ExtractStmtNode* node) = 0;
@@ -51,10 +55,12 @@ class ConditionNode : public ASTNode {};
 class SimpleConditionNode : public ConditionNode {
 public:
   std::string property;
+  std::string reference;
   std::string op;
   std::string value;
-  SimpleConditionNode(std::string prop, std::string o, std::string val)
-      : property(prop), op(o), value(val) {}
+  SimpleConditionNode(std::string prop, std::string o, std::string val,
+                      std::string ref = "")
+      : property(prop), reference(ref), op(o), value(val) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;
 };
@@ -93,6 +99,27 @@ public:
   void accept(ASTVisitor& visitor) override;
 };
 
+class UseStmtNode : public StatementNode {
+public:
+  std::string datasetType;
+  std::string alias;
+  UseStmtNode(std::string type, std::string a)
+      : datasetType(type), alias(a) {}
+  void print(std::string prefix = "", bool isLast = true) const override;
+  void accept(ASTVisitor& visitor) override;
+};
+
+class ExportStmtNode : public StatementNode {
+public:
+  std::string alias;
+  std::string filename;
+  std::string format;
+  ExportStmtNode(std::string a, std::string f, std::string fmt)
+      : alias(a), filename(f), format(fmt) {}
+  void print(std::string prefix = "", bool isLast = true) const override;
+  void accept(ASTVisitor& visitor) override;
+};
+
 class FindOptNode : public ASTNode {
 public:
   std::string type;
@@ -120,9 +147,11 @@ public:
 class ExtractStmtNode : public StatementNode {
 public:
   std::string entity;
+  std::string alias;
   std::unique_ptr<ConditionNode> whereClause;
-  ExtractStmtNode(std::string e, std::unique_ptr<ConditionNode> w)
-      : entity(e), whereClause(std::move(w)) {}
+  ExtractStmtNode(std::string e, std::string a,
+                  std::unique_ptr<ConditionNode> w)
+      : entity(e), alias(a), whereClause(std::move(w)) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;
 };
@@ -132,10 +161,12 @@ public:
   std::string op;
   std::string entity1;
   std::string entity2;
+  std::string alias;
   std::unique_ptr<ConditionNode> whereClause;
   SetOpStmtNode(std::string o, std::string e1, std::string e2,
-                std::unique_ptr<ConditionNode> w)
-      : op(o), entity1(e1), entity2(e2), whereClause(std::move(w)) {}
+                std::string a, std::unique_ptr<ConditionNode> w)
+      : op(o), entity1(e1), entity2(e2), alias(a),
+        whereClause(std::move(w)) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;
 };

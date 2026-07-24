@@ -4,6 +4,7 @@ CXXFLAGS = -std=c++11 -Wall -O2 -MMD -MP -I src/frontend -I src/backend -I src/b
 TARGET = cisql
 CORE_TEST_TARGET = tests/test_core
 CORE_BENCHMARK_TARGET = benchmarks/benchmark_core
+SANITIZER_TARGET = tests/cisql_sanitize
 
 SRCS = src/main.cpp \
        src/frontend/Lexer.cpp src/frontend/Parser.cpp src/frontend/AST.cpp \
@@ -27,7 +28,7 @@ run: $(TARGET)
 	./$(TARGET)
 
 clean:
-	rm -f $(OBJS) $(DEPS) $(TARGET) $(CORE_TEST_TARGET) $(CORE_BENCHMARK_TARGET)
+	rm -f $(OBJS) $(DEPS) $(TARGET) $(CORE_TEST_TARGET) $(CORE_BENCHMARK_TARGET) $(SANITIZER_TARGET)
 
 $(CORE_TEST_TARGET): tests/test_core.cpp \
        src/bioinfo/MotifFinder.cpp src/bioinfo/SmithWaterman.cpp \
@@ -38,6 +39,18 @@ $(CORE_TEST_TARGET): tests/test_core.cpp \
 test: $(TARGET) $(CORE_TEST_TARGET)
 	./$(CORE_TEST_TARGET)
 	python3 tests/test_language.py
+
+validate: $(TARGET)
+	python3 tests/reference_validation.py
+
+$(SANITIZER_TARGET): $(SRCS)
+	$(CXX) -std=c++11 -Wall -O1 -g -fno-omit-frame-pointer \
+		-fsanitize=address,undefined \
+		-I src/frontend -I src/backend -I src/bioinfo -o $@ $^
+
+test-sanitize: $(SANITIZER_TARGET)
+	CISQL_BINARY=$(CURDIR)/$(SANITIZER_TARGET) python3 tests/test_language.py
+	CISQL_BINARY=$(CURDIR)/$(SANITIZER_TARGET) python3 tests/reference_validation.py
 
 benchmark: $(TARGET)
 	python3 benchmarks/run_examples.py
@@ -51,6 +64,6 @@ $(CORE_BENCHMARK_TARGET): benchmarks/benchmark_core.cpp \
 benchmark-core: $(CORE_BENCHMARK_TARGET)
 	./$(CORE_BENCHMARK_TARGET)
 
-.PHONY: all run clean test benchmark benchmark-core
+.PHONY: all run clean test validate test-sanitize benchmark benchmark-core
 
 -include $(DEPS)

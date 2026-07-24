@@ -5,6 +5,9 @@ std::string irOpcodeToString(IROpCode op) {
   switch (op) {
     case IROpCode::LOAD_SEQ:         return "LOAD_SEQ";
     case IROpCode::LOAD_ANNOT:       return "LOAD_ANNOT";
+    case IROpCode::USE_SEQUENCE:     return "USE_SEQUENCE";
+    case IROpCode::USE_ANNOTATION:   return "USE_ANNOTATION";
+    case IROpCode::EXPORT_RESULTS:   return "EXPORT_RESULTS";
     case IROpCode::FIND_MOTIF:       return "FIND_MOTIF";
     case IROpCode::FIND_OPT_WITHIN:  return "FIND_OPT_WITHIN";
     case IROpCode::FIND_OPT_STRAND:  return "FIND_OPT_STRAND";
@@ -45,6 +48,7 @@ IRGenerator::lowerCondition(const ConditionNode *node) const {
   if (const auto *simple = dynamic_cast<const SimpleConditionNode *>(node)) {
     lowered->kind = IRCondition::Kind::SIMPLE;
     lowered->property = simple->property;
+    lowered->reference = simple->reference;
     lowered->op = simple->op;
     lowered->value = simple->value;
   } else if (const auto *binary =
@@ -102,6 +106,24 @@ void IRGenerator::visit(LoadStmtNode* node) {
   }
   instr.arg1 = node->filename;
   instr.arg2 = node->alias;
+  instructions.push_back(instr);
+}
+
+void IRGenerator::visit(UseStmtNode *node) {
+  IRInstruction instr;
+  instr.opcode = node->datasetType == "SEQUENCE"
+                     ? IROpCode::USE_SEQUENCE
+                     : IROpCode::USE_ANNOTATION;
+  instr.arg1 = node->alias;
+  instructions.push_back(instr);
+}
+
+void IRGenerator::visit(ExportStmtNode *node) {
+  IRInstruction instr;
+  instr.opcode = IROpCode::EXPORT_RESULTS;
+  instr.arg1 = node->alias;
+  instr.arg2 = node->filename;
+  instr.arg3 = node->format;
   instructions.push_back(instr);
 }
 
@@ -168,9 +190,15 @@ void IRGenerator::visit(ExtractStmtNode* node) {
 
   emitFilter(node->whereClause.get(), currentTemp);
 
+  IRInstruction aliasInstr;
+  aliasInstr.opcode = IROpCode::RESULT_ALIAS;
+  aliasInstr.arg1 = currentTemp;
+  aliasInstr.arg2 = node->alias.empty() ? currentTemp : node->alias;
+  instructions.push_back(aliasInstr);
+
   IRInstruction printInstr;
   printInstr.opcode = IROpCode::PRINT_RESULTS;
-  printInstr.arg1 = currentTemp;
+  printInstr.arg1 = node->alias.empty() ? currentTemp : node->alias;
   printInstr.arg2 = "EXTRACT";
   instructions.push_back(printInstr);
 }
@@ -190,9 +218,15 @@ void IRGenerator::visit(SetOpStmtNode* node) {
 
   emitFilter(node->whereClause.get(), currentTemp);
 
+  IRInstruction aliasInstr;
+  aliasInstr.opcode = IROpCode::RESULT_ALIAS;
+  aliasInstr.arg1 = currentTemp;
+  aliasInstr.arg2 = node->alias.empty() ? currentTemp : node->alias;
+  instructions.push_back(aliasInstr);
+
   IRInstruction printInstr;
   printInstr.opcode = IROpCode::PRINT_RESULTS;
-  printInstr.arg1 = currentTemp;
+  printInstr.arg1 = node->alias.empty() ? currentTemp : node->alias;
   printInstr.arg2 = "SET_OP";
   instructions.push_back(printInstr);
 }

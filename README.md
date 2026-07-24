@@ -36,7 +36,9 @@ Cis-QL operates across three primary modes:
 - **Native IUPAC Degeneration Engine:** Translates IUPAC nucleotide ambiguity codes (`R`, `Y`, `S`, `W`, `K`, `M`, `B`, `D`, `H`, `V`, `N`) automatically into regular expression search patterns (e.g., `TATAWAW` translates to `TATA[AT]A[AT]`).
 - **Multi-Chromosome Scanning:** Uses `std::async` to scan loaded contigs independently. Performance depends on contig count, input size, and the host implementation.
 - **Sweep-Line Interval Algebra:** Sorts interval inputs and then evaluates geometric `INTERSECT`, `UNION`, and `EXCEPT` operations with a two-pointer sweep. Sorting dominates at $O((N+M)\log(N+M))$; the sweep is linear.
-- **Pairwise Smith-Waterman Local Alignment:** Computes a normalized local-alignment score in C++. In the current syntax, `WHERE SIMILARITY` uses the first non-empty candidate sequence as the implicit reference; this behavior should be considered experimental.
+- **Pairwise Smith-Waterman Local Alignment:** Computes a normalized local-alignment score in C++. `SIMILARITY TO alias` requires an explicit one-region reference set. The older implicit-reference form remains available for compatibility.
+- **Explicit Dataset Context:** Multiple FASTA and GFF3 datasets can be loaded and selected deterministically with `USE SEQUENCE` and `USE ANNOTATION`.
+- **Standard Result Export:** Named region sets can be written as BED, GFF3, or TSV; GC profiles can be written as TSV.
 - **Control Flow & Scripting (v2.0):** Supports conditional execution (`IF / ELSE`) based on sequence metrics and batch iteration (`FOREACH`) over matrix collections.
 - **Cis-QL Studio (GUI):** Desktop environment built with Electron and React 18 for interactive query authoring, multi-track genomic visualization, and live result inspection.
 
@@ -90,6 +92,14 @@ LOAD ANNOTATION "data_examples/genomic.gff" AS annot;
 LOAD MATRIX "matrices/MA0108.1_TBP.pwm" AS tbp_matrix;
 ```
 
+When multiple sequence or annotation datasets are loaded, select the active
+context explicitly:
+
+```sql
+USE SEQUENCE genome;
+USE ANNOTATION annot;
+```
+
 ### 2. Motif Searching & Spatial Conditions (`FIND MOTIF`)
 
 Locate exact motifs, regular expressions, or IUPAC degenerate strings, with optional spatial constraints relative to other features:
@@ -131,9 +141,9 @@ ANALYZE CPG_ISLANDS AS cpg_islands;
 Combine or filter interval sets using high-speed interval algebra:
 
 ```sql
-INTERSECT sp1_sites AND cpg_islands;
-UNION minus35_box AND minus10_box;
-EXCEPT ctcf_sites FROM CDS;
+INTERSECT sp1_sites AND cpg_islands AS supported_sites;
+UNION minus35_box AND minus10_box AS promoter_boxes;
+EXCEPT ctcf_sites FROM CDS AS noncoding_ctcf_sites;
 ```
 
 ### 6. Feature Extraction & Filtering (`EXTRACT`, `WHERE`)
@@ -141,8 +151,10 @@ EXCEPT ctcf_sites FROM CDS;
 Filter genomic entities by physical length or alignment similarity:
 
 ```sql
-EXTRACT GENE WHERE LENGTH >= 500 BP AND LENGTH <= 3 KB;
-EXTRACT GENE WHERE LENGTH > 1 KB AND SIMILARITY > 70 %;
+EXTRACT GENE AS reference_gene WHERE ID = "geneA";
+EXTRACT GENE AS homologous_genes
+    WHERE LENGTH > 1 KB
+      AND SIMILARITY TO reference_gene > 70 %;
 ```
 
 Condition properties are result-specific: region sets support `LENGTH`,
@@ -150,7 +162,25 @@ Condition properties are result-specific: region sets support `LENGTH`,
 `GC_CONTENT`; GC profiles support `GC_CONTENT`. `IF` currently evaluates the
 GC content of the active sequence dataset.
 
-### 7. Control Flow (`IF`, `FOREACH`)
+An explicit similarity reference must be a named result set containing exactly
+one region. Similarity percentages are normalized local-alignment scores, not
+percent identity.
+
+### 7. Result Export (`EXPORT`)
+
+```sql
+EXPORT homologous_genes TO "homologous_genes.bed" FORMAT BED;
+EXPORT homologous_genes TO "homologous_genes.gff3" FORMAT GFF3;
+EXPORT homologous_genes TO "homologous_genes.tsv" FORMAT TSV;
+EXPORT gc_profile TO "gc_profile.tsv" FORMAT TSV;
+```
+
+Internal and BED coordinates are zero-based and half-open. GFF3 exports convert
+the start coordinate to the one-based inclusive convention. Export paths are
+relative to the query workspace; absolute paths and parent-directory traversal
+are rejected.
+
+### 8. Control Flow (`IF`, `FOREACH`)
 
 Control query execution paths and iterate over collections of loaded matrices:
 
@@ -178,10 +208,13 @@ Cis-QL is formally specified by an LL(1) Context-Free Grammar. Below is the comp
 Program            ::= StatementList
 StatementList      ::= Statement StatementList | λ
 
-Statement          ::= LoadStmt | FindStmt | ExtractStmt | SetOperationStmt 
-                     | ScanStmt | AnalyzeStmt | IfStmt | ForeachStmt
+Statement          ::= LoadStmt | UseStmt | ExportStmt | FindStmt | ExtractStmt
+                     | SetOperationStmt | ScanStmt | AnalyzeStmt | IfStmt
+                     | ForeachStmt
 
 LoadStmt           ::= LOAD (SEQUENCE | ANNOTATION | MATRIX) STRING AS ID SEMICOLON
+UseStmt            ::= USE (SEQUENCE | ANNOTATION) ID SEMICOLON
+ExportStmt         ::= EXPORT ID TO STRING FORMAT (BED | GFF3 | TSV) SEMICOLON
 
 AnalyzeStmt        ::= ANALYZE (GC_CONTENT | CPG_ISLANDS) (WINDOW (NUM | FLOAT) Unit)? AliasOpt WhereClause SEMICOLON
 
@@ -196,10 +229,10 @@ ScanOpts           ::= ScanOpt ScanOpts | λ
 ScanOpt            ::= STRAND StrandType
                      | THRESHOLD (NUM | FLOAT) PERCENT
 
-SetOperationStmt   ::= (INTERSECT | UNION) EntityRef AND EntityRef WhereClause SEMICOLON
-                     | EXCEPT EntityRef FROM EntityRef WhereClause SEMICOLON
+SetOperationStmt   ::= (INTERSECT | UNION) EntityRef AND EntityRef AliasOpt WhereClause SEMICOLON
+                     | EXCEPT EntityRef FROM EntityRef AliasOpt WhereClause SEMICOLON
 
-ExtractStmt        ::= EXTRACT EntityRef WhereClause SEMICOLON
+ExtractStmt        ::= EXTRACT EntityRef AliasOpt WhereClause SEMICOLON
 
 IfStmt             ::= IF Condition THEN StatementList (ELSE StatementList)? ENDIF (SEMICOLON)?
 
@@ -216,7 +249,9 @@ TermPrime          ::= AND Factor TermPrime | λ
 Factor             ::= NOT Factor | SimpleCondition | "(" Condition ")"
 
 SimpleCondition    ::= Property RelOp Value
-Property           ::= LENGTH | SIMILARITY | GC_CONTENT | ID
+                     | SIMILARITY SimilarityRefOpt RelOp Value
+Property           ::= LENGTH | GC_CONTENT | ID
+SimilarityRefOpt   ::= TO ID | λ
 RelOp              ::= ">" | "<" | ">=" | "<=" | "="
 Value              ::= (NUM | FLOAT) Unit | (NUM | FLOAT) PERCENT | NUM | FLOAT | STRING
 
@@ -235,7 +270,13 @@ Run the automated language and algorithm tests with:
 
 ```bash
 make test
+make validate
 ```
+
+`make validate` compares motif coordinates, PSSM thresholds, interval
+subtraction, and normalized local-alignment filtering with independent
+reference implementations. If BEDTools or Biopython are installed, compatible
+external checks run as additional optional comparisons.
 
 Deterministic scaling measurements and complete-query timings are available
 with:

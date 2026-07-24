@@ -26,6 +26,8 @@ private:
 
   std::unique_ptr<StatementNode> parseStatement();
   std::unique_ptr<LoadStmtNode> parseLoad();
+  std::unique_ptr<UseStmtNode> parseUse();
+  std::unique_ptr<ExportStmtNode> parseExport();
   std::unique_ptr<FindStmtNode> parseFind();
   std::unique_ptr<ExtractStmtNode> parseExtract();
   std::unique_ptr<SetOpStmtNode> parseSetOperation();

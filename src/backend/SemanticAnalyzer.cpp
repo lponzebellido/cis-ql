@@ -72,10 +72,45 @@ void SemanticAnalyzer::visit(LoadStmtNode *node) {
   }
 }
 
+void SemanticAnalyzer::visit(UseStmtNode *node) {
+  if (!symbolTable.lookup(node->alias)) {
+    reportError("Dataset alias '" + node->alias + "' is not defined.");
+    return;
+  }
+  const std::string expected =
+      node->datasetType == "SEQUENCE" ? "GENOME_DATA" : "ANNOTATION_DATA";
+  const std::string actual = symbolTable.typeOf(node->alias);
+  if (actual != expected) {
+    reportError("USE " + node->datasetType + " expects a " + expected +
+                " alias, but '" + node->alias + "' has type " + actual + ".");
+  }
+}
+
+void SemanticAnalyzer::visit(ExportStmtNode *node) {
+  if (!symbolTable.lookup(node->alias)) {
+    reportError("Cannot export undefined alias '" + node->alias + "'.");
+    return;
+  }
+  const std::string type = symbolTable.typeOf(node->alias);
+  if (type != "RESULT_SET" && type != "GC_PROFILE") {
+    reportError("EXPORT expects a result-set or GC-profile alias, but '" +
+                node->alias + "' has type " + type + ".");
+  }
+  if (type == "GC_PROFILE" && node->format != "TSV") {
+    reportError("GC profiles can currently be exported only as TSV.");
+  }
+}
+
 void SemanticAnalyzer::visit(FindStmtNode *node) {
   if (!sequenceLoaded) {
     reportError("FIND requires sequence data. Use: LOAD SEQUENCE "
                 "\"file.fasta\" AS alias;");
+  }
+  for (const auto &opt : node->opts) {
+    opt->accept(*this);
+  }
+  if (node->whereClause) {
+    node->whereClause->accept(*this);
   }
   if (!node->alias.empty()) {
     if (symbolTable.lookup(node->alias)) {
@@ -83,12 +118,6 @@ void SemanticAnalyzer::visit(FindStmtNode *node) {
     } else {
       symbolTable.insert(node->alias, "RESULT_SET");
     }
-  }
-  for (const auto &opt : node->opts) {
-    opt->accept(*this);
-  }
-  if (node->whereClause) {
-    node->whereClause->accept(*this);
   }
 }
 
@@ -131,6 +160,13 @@ void SemanticAnalyzer::visit(ExtractStmtNode *node) {
   if (node->whereClause) {
     node->whereClause->accept(*this);
   }
+  if (!node->alias.empty()) {
+    if (symbolTable.lookup(node->alias)) {
+      reportError("Alias '" + node->alias + "' is already defined.");
+    } else {
+      symbolTable.insert(node->alias, "RESULT_SET");
+    }
+  }
 }
 
 void SemanticAnalyzer::visit(SetOpStmtNode *node) {
@@ -162,6 +198,13 @@ void SemanticAnalyzer::visit(SetOpStmtNode *node) {
   }
   if (node->whereClause) {
     node->whereClause->accept(*this);
+  }
+  if (!node->alias.empty()) {
+    if (symbolTable.lookup(node->alias)) {
+      reportError("Alias '" + node->alias + "' is already defined.");
+    } else {
+      symbolTable.insert(node->alias, "RESULT_SET");
+    }
   }
 }
 
@@ -198,6 +241,16 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
     double similarity = parseValue(node->value);
     if (similarity < 0 || similarity > 100) {
       reportError("SIMILARITY must be between 0 and 100.");
+    }
+    if (!node->reference.empty()) {
+      if (!symbolTable.lookup(node->reference)) {
+        reportError("Similarity reference alias '" + node->reference +
+                    "' is not defined.");
+      } else if (!isResultAlias(symbolTable, node->reference)) {
+        reportError("SIMILARITY TO expects a result-set alias, but '" +
+                    node->reference + "' has type " +
+                    symbolTable.typeOf(node->reference) + ".");
+      }
     }
   } else if (node->property == "GC_CONTENT") {
     double gc = parseValue(node->value);
@@ -236,16 +289,15 @@ void SemanticAnalyzer::visit(ScanStmtNode *node) {
   }
 
   
+  if (node->whereClause) {
+    node->whereClause->accept(*this);
+  }
   if (!node->alias.empty()) {
     if (symbolTable.lookup(node->alias)) {
       reportError("Alias '" + node->alias + "' is already defined.");
     } else {
       symbolTable.insert(node->alias, "RESULT_SET");
     }
-  }
-
-  if (node->whereClause) {
-    node->whereClause->accept(*this);
   }
 }
 
@@ -256,6 +308,9 @@ void SemanticAnalyzer::visit(AnalyzeStmtNode *node) {
   if (!node->windowSize.empty() && parseValue(node->windowSize) <= 0.0) {
     reportError("ANALYZE WINDOW must be greater than zero.");
   }
+  if (node->whereClause) {
+    node->whereClause->accept(*this);
+  }
   if (!node->alias.empty()) {
     if (symbolTable.lookup(node->alias)) {
       reportError("Alias '" + node->alias + "' is already defined.");
@@ -264,10 +319,6 @@ void SemanticAnalyzer::visit(AnalyzeStmtNode *node) {
                                           ? "GC_PROFILE"
                                           : "RESULT_SET");
     }
-  }
-
-  if (node->whereClause) {
-    node->whereClause->accept(*this);
   }
 }
 

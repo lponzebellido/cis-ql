@@ -16,6 +16,8 @@ void Lexer::initKeywords() {
     keywords["COUNT"] = TokenType::COUNT;
     keywords["LOAD"] = TokenType::LOAD;
     keywords["SAVE"] = TokenType::SAVE;
+    keywords["USE"] = TokenType::USE;
+    keywords["EXPORT"] = TokenType::EXPORT;
     keywords["MOTIF"] = TokenType::MOTIF;
     keywords["GENE"] = TokenType::GENE;
     keywords["SEQUENCE"] = TokenType::SEQUENCE;
@@ -28,6 +30,11 @@ void Lexer::initKeywords() {
     keywords["WITHIN"] = TokenType::WITHIN;
     keywords["FROM"] = TokenType::FROM;
     keywords["AT"] = TokenType::AT;
+    keywords["TO"] = TokenType::TO;
+    keywords["FORMAT"] = TokenType::FORMAT;
+    keywords["BED"] = TokenType::BED;
+    keywords["GFF3"] = TokenType::GFF3;
+    keywords["TSV"] = TokenType::TSV;
     keywords["BP"] = TokenType::BP;
     keywords["KB"] = TokenType::KB;
     keywords["MB"] = TokenType::MB;
@@ -301,6 +308,8 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::COUNT: return "COUNT";
         case TokenType::LOAD: return "LOAD";
         case TokenType::SAVE: return "SAVE";
+        case TokenType::USE: return "USE";
+        case TokenType::EXPORT: return "EXPORT";
         case TokenType::MOTIF: return "MOTIF";
         case TokenType::GENE: return "GENE";
         case TokenType::SEQUENCE: return "SEQUENCE";
@@ -313,6 +322,11 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::WITHIN: return "WITHIN";
         case TokenType::FROM: return "FROM";
         case TokenType::AT: return "AT";
+        case TokenType::TO: return "TO";
+        case TokenType::FORMAT: return "FORMAT";
+        case TokenType::BED: return "BED";
+        case TokenType::GFF3: return "GFF3";
+        case TokenType::TSV: return "TSV";
         case TokenType::BP: return "BP";
         case TokenType::KB: return "KB";
         case TokenType::MB: return "MB";

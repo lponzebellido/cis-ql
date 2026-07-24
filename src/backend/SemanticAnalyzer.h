@@ -25,6 +25,8 @@ public:
   void visit(BinaryConditionNode *node) override;
   void visit(NotConditionNode *node) override;
   void visit(LoadStmtNode *node) override;
+  void visit(UseStmtNode *node) override;
+  void visit(ExportStmtNode *node) override;
   void visit(FindOptNode *node) override;
   void visit(FindStmtNode *node) override;
   void visit(ExtractStmtNode *node) override;

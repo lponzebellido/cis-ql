@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  core:
+    name: Core (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Cis-QL
+        run: make -j2
+
+      - name: Run unit and language tests
+        run: make test
+
+      - name: Run independent reference validations
+        run: make validate
+
+  studio:
+    name: Cis-QL Studio
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: cisql-studio/frontend/package-lock.json
+
+      - name: Check desktop and backend JavaScript
+        run: |
+          node --check cisql-studio/main.js
+          node --check cisql-studio/preload.js
+          node --check cisql-studio/backend/server.js
+
+      - name: Build Studio frontend
+        working-directory: cisql-studio/frontend
+        run: |
+          npm ci
+          npm run build

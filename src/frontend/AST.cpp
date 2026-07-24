@@ -2,7 +2,9 @@
 #include <iostream>
 
 void SimpleConditionNode::print(std::string prefix, bool isLast) const {
-    std::cout << prefix << (isLast ? "└── " : "├── ") << "SimpleCondition(" << property << " " << op << " " << value << ")" << std::endl;
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "SimpleCondition(" << property;
+    if (!reference.empty()) std::cout << " TO " << reference;
+    std::cout << " " << op << " " << value << ")" << std::endl;
 }
 
 void BinaryConditionNode::print(std::string prefix, bool isLast) const {
@@ -20,6 +22,18 @@ void NotConditionNode::print(std::string prefix, bool isLast) const {
 
 void LoadStmtNode::print(std::string prefix, bool isLast) const {
     std::cout << prefix << (isLast ? "└── " : "├── ") << "LoadStmt(" << loadType << " File: " << filename << ", Alias: " << alias << ")" << std::endl;
+}
+
+void UseStmtNode::print(std::string prefix, bool isLast) const {
+    std::cout << prefix << (isLast ? "└── " : "├── ")
+              << "UseStmt(" << datasetType << ": " << alias << ")"
+              << std::endl;
+}
+
+void ExportStmtNode::print(std::string prefix, bool isLast) const {
+    std::cout << prefix << (isLast ? "└── " : "├── ")
+              << "ExportStmt(" << alias << " TO " << filename
+              << " FORMAT " << format << ")" << std::endl;
 }
 
 void FindOptNode::print(std::string prefix, bool isLast) const {
@@ -48,7 +62,9 @@ void FindStmtNode::print(std::string prefix, bool isLast) const {
 }
 
 void ExtractStmtNode::print(std::string prefix, bool isLast) const {
-    std::cout << prefix << (isLast ? "└── " : "├── ") << "ExtractStmt(Entity: " << entity << ")" << std::endl;
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "ExtractStmt(Entity: " << entity;
+    if (!alias.empty()) std::cout << ", AS: " << alias;
+    std::cout << ")" << std::endl;
     std::string childPrefix = prefix + (isLast ? "    " : "│   ");
     if (whereClause) {
         std::cout << childPrefix << "└── Where:" << std::endl;
@@ -57,7 +73,9 @@ void ExtractStmtNode::print(std::string prefix, bool isLast) const {
 }
 
 void SetOpStmtNode::print(std::string prefix, bool isLast) const {
-    std::cout << prefix << (isLast ? "└── " : "├── ") << "SetOperationStmt(" << op << " " << entity1 << " AND " << entity2 << ")" << std::endl;
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "SetOperationStmt(" << op << " " << entity1 << " AND " << entity2;
+    if (!alias.empty()) std::cout << ", AS: " << alias;
+    std::cout << ")" << std::endl;
     std::string childPrefix = prefix + (isLast ? "    " : "│   ");
     if (whereClause) {
         std::cout << childPrefix << "└── Where:" << std::endl;
@@ -130,6 +148,8 @@ void SimpleConditionNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void BinaryConditionNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void NotConditionNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void LoadStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
+void UseStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
+void ExportStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void FindOptNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void FindStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ExtractStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }

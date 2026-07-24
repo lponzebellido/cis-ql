@@ -2,21 +2,23 @@ Context-Free Grammar (CFG) for Cis-QL (v2.0)
 
 Terminals (Tokens):
 
-LOAD, SEQUENCE, ANNOTATION, MATRIX, STRING, AS, ID, SEMICOLON, FIND, MOTIF, WITHIN, NUM,
+LOAD, USE, EXPORT, SEQUENCE, ANNOTATION, MATRIX, STRING, AS, ID, SEMICOLON, FIND, MOTIF, WITHIN, NUM,
 FROM, GENE, PROMOTER, ENHANCER, EXON, INTRON, UTR, TSS, CDS, REGION, STRAND, POSITIVE, NEGATIVE,
 CHR, EXTRACT, WHERE, INTERSECT, UNION, EXCEPT, AND, OR, NOT, LPAREN, RPAREN, LBRACKET, RBRACKET,
 LENGTH, SIMILARITY, GREATER, LESS, GREATER_EQ, LESS_EQ, ASSIGN, FLOAT, PERCENT, BP, KB, MB,
 UPSTREAM, DOWNSTREAM, SCAN, THRESHOLD, ANALYZE, GC_CONTENT, CPG_ISLANDS, WINDOW,
-IF, THEN, ELSE, ENDIF, FOREACH, IN, DO, ENDFOR, COMMA.
+IF, THEN, ELSE, ENDIF, FOREACH, IN, DO, ENDFOR, COMMA, TO, FORMAT, BED, GFF3, TSV.
 
 Grammar Rules:
 
 Program            -> StatementList
 StatementList      -> Statement StatementList | λ
 
-Statement          -> LoadStmt | FindStmt | ExtractStmt | SetOperationStmt | ScanStmt | AnalyzeStmt | IfStmt | ForeachStmt
+Statement          -> LoadStmt | UseStmt | ExportStmt | FindStmt | ExtractStmt | SetOperationStmt | ScanStmt | AnalyzeStmt | IfStmt | ForeachStmt
 
 LoadStmt           -> LOAD (SEQUENCE | ANNOTATION | MATRIX) STRING AS ID SEMICOLON
+UseStmt            -> USE (SEQUENCE | ANNOTATION) ID SEMICOLON
+ExportStmt         -> EXPORT ID TO STRING FORMAT (BED | GFF3 | TSV) SEMICOLON
 
 AnalyzeStmt        -> ANALYZE (GC_CONTENT | CPG_ISLANDS) (WINDOW (NUM | FLOAT) Unit)? AliasOpt WhereClause SEMICOLON
 
@@ -31,10 +33,10 @@ ScanOpts           -> ScanOpt ScanOpts | λ
 ScanOpt            -> STRAND StrandType
                     | THRESHOLD (NUM | FLOAT) PERCENT
 
-SetOperationStmt   -> (INTERSECT | UNION) EntityRef AND EntityRef WhereClause SEMICOLON
-                    | EXCEPT EntityRef FROM EntityRef WhereClause SEMICOLON
+SetOperationStmt   -> (INTERSECT | UNION) EntityRef AND EntityRef AliasOpt WhereClause SEMICOLON
+                    | EXCEPT EntityRef FROM EntityRef AliasOpt WhereClause SEMICOLON
 
-ExtractStmt        -> EXTRACT EntityRef WhereClause SEMICOLON
+ExtractStmt        -> EXTRACT EntityRef AliasOpt WhereClause SEMICOLON
 
 IfStmt             -> IF Condition THEN StatementList (ELSE StatementList)? ENDIF (SEMICOLON)?
 
@@ -50,8 +52,9 @@ Term               -> Factor TermPrime
 TermPrime          -> AND Factor TermPrime | λ
 Factor             -> NOT Factor | SimpleCondition | LPAREN Condition RPAREN
 
-SimpleCondition    -> Property RelOp Value
-Property           -> LENGTH | SIMILARITY | GC_CONTENT | ID
+SimpleCondition    -> Property RelOp Value | SIMILARITY SimilarityRefOpt RelOp Value
+Property           -> LENGTH | GC_CONTENT | ID
+SimilarityRefOpt   -> TO ID | λ
 RelOp              -> GREATER | LESS | GREATER_EQ | LESS_EQ | ASSIGN
 Value              -> (NUM | FLOAT) Unit | (NUM | FLOAT) PERCENT | NUM | FLOAT | STRING
 

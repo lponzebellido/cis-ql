@@ -21,6 +21,68 @@ bool conditionUsesOnly(const std::shared_ptr<IRCondition> &condition,
          conditionUsesOnly(condition->right, properties);
 }
 
+void collectSimilarityReferences(
+    const std::shared_ptr<IRCondition> &condition,
+    std::set<std::string> &references) {
+  if (!condition)
+    return;
+  if (condition->kind == IRCondition::Kind::SIMPLE) {
+    if (condition->property == "SIMILARITY" &&
+        !condition->reference.empty()) {
+      references.insert(condition->reference);
+    }
+    return;
+  }
+  collectSimilarityReferences(condition->left, references);
+  collectSimilarityReferences(condition->right, references);
+}
+
+std::string cleanTabularField(const std::string &value) {
+  std::string cleaned = value;
+  for (char &c : cleaned) {
+    if (c == '\t' || c == '\n' || c == '\r')
+      c = ' ';
+  }
+  return cleaned;
+}
+
+std::string gffAttributeEscape(const std::string &value) {
+  static const char HEX[] = "0123456789ABCDEF";
+  std::string escaped;
+  for (const unsigned char c : value) {
+    if (std::isalnum(c) || c == '_' || c == '-' || c == '.' || c == ':') {
+      escaped += static_cast<char>(c);
+    } else {
+      escaped += '%';
+      escaped += HEX[(c >> 4) & 0x0f];
+      escaped += HEX[c & 0x0f];
+    }
+  }
+  return escaped;
+}
+
+bool isSafeRelativeExportPath(const std::string &path) {
+  if (path.empty() || path.front() == '/' || path.front() == '\\' ||
+      (path.size() > 1 &&
+       std::isalpha(static_cast<unsigned char>(path[0])) &&
+       path[1] == ':')) {
+    return false;
+  }
+  std::string component;
+  for (size_t index = 0; index <= path.size(); ++index) {
+    const bool separator =
+        index == path.size() || path[index] == '/' || path[index] == '\\';
+    if (!separator) {
+      component += path[index];
+      continue;
+    }
+    if (component == "..")
+      return false;
+    component.clear();
+  }
+  return true;
+}
+
 } // namespace
 
 std::string Interpreter::stripQuotes(const std::string &s) const {
@@ -121,7 +183,10 @@ Interpreter::resolveEntity(const std::string &entity) {
   if (namedRegions.count(entity)) {
     return namedRegions[entity];
   }
-  return GFFReader::filterByType(annotations, entity);
+  const auto annotations = annotationDatasets.find(activeAnnotationAlias);
+  if (annotations == annotationDatasets.end())
+    return {};
+  return GFFReader::filterByType(annotations->second, entity);
 }
 
 void Interpreter::executeLoadSeq(const IRInstruction &instr) {
@@ -159,7 +224,13 @@ void Interpreter::executeLoadAnnot(const IRInstruction &instr) {
               << std::endl;
   }
 
-  annotations = GFFReader::read(filename);
+  auto annotations = GFFReader::read(filename);
+  if (annotations.empty()) {
+    reportRuntimeError("No annotation features found in " + filename + ".");
+    return;
+  }
+  annotationDatasets[alias] = annotations;
+  activeAnnotationAlias = alias;
   if (debugMode) {
     std::cout << "  Loaded " << annotations.size()
               << " annotation features from " << filename << std::endl;
@@ -171,6 +242,114 @@ void Interpreter::executeLoadAnnot(const IRInstruction &instr) {
     for (const auto &pair : typeCounts) {
       std::cout << "    " << pair.first << ": " << pair.second << std::endl;
     }
+  }
+}
+
+void Interpreter::executeUseDataset(const IRInstruction &instr) {
+  const std::string &alias = instr.arg1;
+  if (instr.opcode == IROpCode::USE_SEQUENCE) {
+    if (!sequenceDatasets.count(alias)) {
+      reportRuntimeError("Sequence dataset '" + alias + "' is not loaded.");
+      return;
+    }
+    activeSequenceAlias = alias;
+    if (debugMode)
+      std::cout << "> USE SEQUENCE " << alias << std::endl;
+    return;
+  }
+
+  if (!annotationDatasets.count(alias)) {
+    reportRuntimeError("Annotation dataset '" + alias + "' is not loaded.");
+    return;
+  }
+  activeAnnotationAlias = alias;
+  if (debugMode)
+    std::cout << "> USE ANNOTATION " << alias << std::endl;
+}
+
+void Interpreter::executeExport(const IRInstruction &instr) {
+  const std::string &alias = instr.arg1;
+  const std::string filename = stripQuotes(instr.arg2);
+  const std::string &format = instr.arg3;
+
+  if (!isSafeRelativeExportPath(filename)) {
+    reportRuntimeError(
+        "Export paths must be relative to the query workspace and cannot "
+        "contain '..'.");
+    return;
+  }
+
+  const auto regionsIt = resultSets.find(alias);
+  const auto gcIt = gcResults.find(alias);
+  if (regionsIt == resultSets.end() && gcIt == gcResults.end()) {
+    reportRuntimeError("Result alias '" + alias + "' is not available.");
+    return;
+  }
+  if (gcIt != gcResults.end() && format != "TSV") {
+    reportRuntimeError("GC profiles can currently be exported only as TSV.");
+    return;
+  }
+  if (regionsIt != resultSets.end() && format != "BED" &&
+      format != "GFF3" && format != "TSV") {
+    reportRuntimeError("Unsupported export format '" + format + "'.");
+    return;
+  }
+
+  std::ofstream out(filename);
+  if (!out.is_open()) {
+    reportRuntimeError("Could not open export file '" + filename + "'.");
+    return;
+  }
+
+  if (gcIt != gcResults.end()) {
+    out << "chromosome\tstart\tgc_percent\n";
+    for (const auto &window : gcIt->second) {
+      out << cleanTabularField(window.chr) << '\t' << window.position << '\t'
+          << window.gcPercent << '\n';
+    }
+  } else if (format == "BED") {
+    for (const auto &region : regionsIt->second) {
+      const std::string name =
+          region.name.empty() ? "." : cleanTabularField(region.name);
+      const std::string strand =
+          (region.strand == "+" || region.strand == "-") ? region.strand : ".";
+      out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
+          << region.end << '\t' << name << "\t0\t" << strand << '\n';
+    }
+  } else if (format == "GFF3") {
+    out << "##gff-version 3\n";
+    size_t generatedId = 0;
+    for (const auto &region : regionsIt->second) {
+      const std::string type = region.type.empty() ? "region" : region.type;
+      const std::string strand =
+          (region.strand == "+" || region.strand == "-") ? region.strand : ".";
+      const std::string name =
+          region.name.empty() ? alias + "_" + std::to_string(generatedId++)
+                              : region.name;
+      out << cleanTabularField(region.chr) << "\tCis-QL\t"
+          << cleanTabularField(type) << '\t' << (region.start + 1) << '\t'
+          << region.end << "\t.\t" << strand << "\t.\tID="
+          << gffAttributeEscape(name) << ";Name="
+          << gffAttributeEscape(name) << '\n';
+    }
+  } else if (format == "TSV") {
+    out << "chromosome\tstart\tend\tstrand\ttype\tname\tlength\n";
+    for (const auto &region : regionsIt->second) {
+      out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
+          << region.end << '\t' << cleanTabularField(region.strand) << '\t'
+          << cleanTabularField(region.type) << '\t'
+          << cleanTabularField(region.name) << '\t' << region.length()
+          << '\n';
+    }
+  }
+
+  if (!out.good()) {
+    reportRuntimeError("Failed while writing export file '" + filename + "'.");
+    return;
+  }
+  if (debugMode) {
+    std::cout << "> EXPORT " << alias << " TO \"" << filename
+              << "\" FORMAT " << format << std::endl;
   }
 }
 
@@ -698,7 +877,54 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
     }
     auto &regions = resultSets[resultId];
     std::string referenceSequence;
-    if (conditionContainsSimilarity(instr.condition)) {
+    std::set<std::string> explicitReferences;
+    collectSimilarityReferences(instr.condition, explicitReferences);
+    if (explicitReferences.size() > 1) {
+      reportRuntimeError(
+          "A filter cannot use more than one SIMILARITY reference alias.");
+      return;
+    }
+    if (!explicitReferences.empty()) {
+      const std::string &referenceAlias = *explicitReferences.begin();
+      const auto referenceSet = resultSets.find(referenceAlias);
+      if (referenceSet == resultSets.end()) {
+        reportRuntimeError("Similarity reference alias '" + referenceAlias +
+                           "' is not available.");
+        return;
+      }
+      if (referenceSet->second.size() != 1) {
+        reportRuntimeError(
+            "Similarity reference alias '" + referenceAlias +
+            "' must contain exactly one region; found " +
+            std::to_string(referenceSet->second.size()) + ".");
+        return;
+      }
+      GenomicRegion reference = referenceSet->second.front();
+      if (reference.sequence.empty()) {
+        const auto dataset = sequenceChrMaps.find(activeSequenceAlias);
+        if (dataset != sequenceChrMaps.end()) {
+          const auto chromosome = dataset->second.find(reference.chr);
+          if (chromosome != dataset->second.end() &&
+              reference.start < chromosome->second.sequence.size() &&
+              reference.end <= chromosome->second.sequence.size()) {
+            reference.sequence = chromosome->second.sequence.substr(
+                reference.start, reference.end - reference.start);
+          }
+        }
+      }
+      if (reference.sequence.empty()) {
+        reportRuntimeError("Similarity reference alias '" + referenceAlias +
+                           "' has no resolvable sequence.");
+        return;
+      }
+      referenceSequence = reference.sequence;
+    } else if (conditionContainsSimilarity(instr.condition)) {
+      if (debugMode) {
+        std::cout
+            << "  Note: implicit SIMILARITY reference uses the first eligible "
+               "sequence. Prefer 'SIMILARITY TO alias' for reproducibility."
+            << std::endl;
+      }
       for (const auto &region : regions) {
         if (!region.sequence.empty() &&
             evaluateReferenceEligibility(instr.condition, region)) {
@@ -707,7 +933,7 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
         }
       }
     }
-    if (referenceSequence.empty()) {
+    if (referenceSequence.empty() && explicitReferences.empty()) {
       for (const auto &region : regions) {
         if (!region.sequence.empty()) {
           referenceSequence = region.sequence;
@@ -1059,6 +1285,8 @@ void Interpreter::executeAnalyzeGC(const IRInstruction &instr) {
   for (const auto &seqRec : targetDataset) {
     auto windows =
         GCAnalyzer::gcContentWindowed(seqRec.sequence, windowSize, windowSize);
+    for (auto &window : windows)
+      window.chr = seqRec.sequenceId;
     allWindows.insert(allWindows.end(), windows.begin(), windows.end());
   }
 
@@ -1094,7 +1322,15 @@ void Interpreter::dumpResultsJSON() const {
   std::ofstream out(".cisql_results.json");
   if (!out.is_open()) return;
 
-  out << "{\n  \"resultSets\": {\n";
+  out << "{\n"
+      << "  \"metadata\": {\n"
+      << "    \"coordinateSystem\": \"zero-based-half-open\",\n"
+      << "    \"sequenceDataset\": \"" << jsonEscape(activeSequenceAlias)
+      << "\",\n"
+      << "    \"annotationDataset\": \"" << jsonEscape(activeAnnotationAlias)
+      << "\"\n"
+      << "  },\n"
+      << "  \"resultSets\": {\n";
   bool firstSet = true;
   for (const auto &pair : resultSets) {
     if (!firstSet) out << ",\n";
@@ -1131,7 +1367,9 @@ void Interpreter::dumpResultsJSON() const {
       for (const auto &w : pair.second) {
         if (!firstWindow) out << ",\n";
         firstWindow = false;
-        out << "      {\"pos\": " << w.position << ", \"gc\": " << w.gcPercent << "}";
+        out << "      {\"chr\": \"" << jsonEscape(w.chr)
+            << "\", \"pos\": " << w.position << ", \"gc\": "
+            << w.gcPercent << "}";
       }
       out << "\n    ]";
     }
@@ -1249,6 +1487,13 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
       break;
     case IROpCode::LOAD_ANNOT:
       executeLoadAnnot(instr);
+      break;
+    case IROpCode::USE_SEQUENCE:
+    case IROpCode::USE_ANNOTATION:
+      executeUseDataset(instr);
+      break;
+    case IROpCode::EXPORT_RESULTS:
+      executeExport(instr);
       break;
     case IROpCode::FIND_MOTIF:
       executeFindMotif(instr);

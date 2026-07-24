@@ -11,6 +11,7 @@ struct IRCondition {
 
   Kind kind = Kind::SIMPLE;
   std::string property;
+  std::string reference;
   std::string op;
   std::string value;
   std::shared_ptr<IRCondition> left;
@@ -20,6 +21,9 @@ struct IRCondition {
 enum class IROpCode {
   LOAD_SEQ,
   LOAD_ANNOT,
+  USE_SEQUENCE,
+  USE_ANNOTATION,
+  EXPORT_RESULTS,
   FIND_MOTIF,
   FIND_OPT_WITHIN,
   FIND_OPT_STRAND,
@@ -81,6 +85,8 @@ public:
   void visit(BinaryConditionNode *node) override;
   void visit(NotConditionNode *node) override;
   void visit(LoadStmtNode *node) override;
+  void visit(UseStmtNode *node) override;
+  void visit(ExportStmtNode *node) override;
   void visit(FindOptNode *node) override;
   void visit(FindStmtNode *node) override;
   void visit(ExtractStmtNode *node) override;

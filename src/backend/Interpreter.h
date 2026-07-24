@@ -36,7 +36,8 @@ class Interpreter {
 private:
   std::unordered_map<std::string, std::vector<FastaRecord>> sequenceDatasets;
   std::unordered_map<std::string, std::unordered_map<std::string, FastaRecord>> sequenceChrMaps;
-  std::vector<GenomicRegion> annotations;
+  std::unordered_map<std::string, std::vector<GenomicRegion>>
+      annotationDatasets;
   std::unordered_map<std::string, std::vector<GenomicRegion>> resultSets;
   std::unordered_map<std::string, std::vector<MotifMatch>> motifResults;
   std::unordered_map<std::string, std::vector<GenomicRegion>> namedRegions;
@@ -47,6 +48,7 @@ private:
   FindContext currentFind;
   ScanContext currentScan;
   std::string activeSequenceAlias;
+  std::string activeAnnotationAlias;
   bool debugMode;
   bool runtimeError;
   int lastPrintIndex;
@@ -64,6 +66,8 @@ private:
 
   void executeLoadSeq(const IRInstruction &instr);
   void executeLoadAnnot(const IRInstruction &instr);
+  void executeUseDataset(const IRInstruction &instr);
+  void executeExport(const IRInstruction &instr);
   void executeFindMotif(const IRInstruction &instr);
   void executeFindOptWithin(const IRInstruction &instr);
   void executeFindOptStrand(const IRInstruction &instr);

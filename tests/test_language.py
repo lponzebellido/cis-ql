@@ -88,6 +88,14 @@ def main() -> int:
             "T [ 0 0 ]\n",
             encoding="utf-8",
         )
+        (workspace / "alternate.fasta").write_text(
+            ">chr1\n" + ("T" * len(sequence)) + "\n", encoding="utf-8"
+        )
+        (workspace / "alternate.gff3").write_text(
+            "##gff-version 3\n"
+            "chr1\ttest\tgene\t101\t200\t.\t-\t.\tID=alternate\n",
+            encoding="utf-8",
+        )
 
         data, _ = run_query(
             workspace,
@@ -134,6 +142,109 @@ def main() -> int:
         )
         require(len(extracted) == 1 and extracted[0]["name"] == "long",
                 "similarity reference follows non-similarity predicates")
+
+        data, _ = run_query(
+            workspace,
+            "explicit_similarity_reference",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            'EXTRACT GENE AS reference WHERE ID = "short";\n'
+            "EXTRACT GENE AS matches "
+            "WHERE SIMILARITY TO reference >= 99 %;\n",
+        )
+        require(
+            [item["name"] for item in data["resultSets"]["reference"]]
+            == ["short"]
+            and [item["name"] for item in data["resultSets"]["matches"]]
+            == ["short"],
+            "explicit similarity reference",
+        )
+
+        runtime_error = run_invalid_query(
+            workspace,
+            "ambiguous_similarity_reference",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            "EXTRACT GENE AS references WHERE LENGTH > 500 BP;\n"
+            "EXTRACT GENE AS matches "
+            "WHERE SIMILARITY TO references > 50 %;\n",
+            4,
+        )
+        require("must contain exactly one region" in runtime_error,
+                "ambiguous explicit similarity references are rejected")
+
+        data, _ = run_query(
+            workspace,
+            "dataset_selection",
+            'LOAD SEQUENCE "fixture.fasta" AS primary_genome;\n'
+            'LOAD SEQUENCE "alternate.fasta" AS alternate_genome;\n'
+            "USE SEQUENCE primary_genome;\n"
+            'FIND MOTIF "AAAA" STRAND POSITIVE AS primary_hits;\n'
+            "USE SEQUENCE alternate_genome;\n"
+            'FIND MOTIF "AAAA" STRAND POSITIVE AS alternate_hits;\n'
+            'LOAD ANNOTATION "fixture.gff3" AS primary_annot;\n'
+            'LOAD ANNOTATION "alternate.gff3" AS alternate_annot;\n'
+            "USE ANNOTATION primary_annot;\n"
+            "EXTRACT GENE AS primary_genes;\n"
+            "USE ANNOTATION alternate_annot;\n"
+            "EXTRACT GENE AS alternate_genes;\n",
+        )
+        require(len(data["resultSets"]["primary_hits"]) > 0 and
+                len(data["resultSets"]["alternate_hits"]) == 0,
+                "explicit sequence dataset selection")
+        require(len(data["resultSets"]["primary_genes"]) == 3 and
+                [item["name"] for item
+                 in data["resultSets"]["alternate_genes"]] == ["alternate"],
+                "explicit annotation dataset selection")
+        require(data["metadata"]["sequenceDataset"] == "alternate_genome" and
+                data["metadata"]["annotationDataset"] == "alternate_annot" and
+                data["metadata"]["coordinateSystem"]
+                == "zero-based-half-open",
+                "result provenance metadata")
+
+        data, _ = run_query(
+            workspace,
+            "exports",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            'EXTRACT GENE AS genes WHERE ID = "short";\n'
+            'EXPORT genes TO "genes.bed" FORMAT BED;\n'
+            'EXPORT genes TO "genes.gff3" FORMAT GFF3;\n'
+            'EXPORT genes TO "genes.tsv" FORMAT TSV;\n'
+            "ANALYZE GC_CONTENT WINDOW 1 KB AS profile;\n"
+            'EXPORT profile TO "profile.tsv" FORMAT TSV;\n',
+        )
+        require((workspace / "genes.bed").read_text(encoding="utf-8")
+                == "chr1\t0\t1200\tshort\t0\t+\n",
+                "BED export uses zero-based half-open coordinates")
+        gff_lines = (workspace / "genes.gff3").read_text(
+            encoding="utf-8"
+        ).splitlines()
+        require(gff_lines[0] == "##gff-version 3" and
+                gff_lines[1].split("\t")[3:5] == ["1", "1200"],
+                "GFF3 export converts starts to one-based coordinates")
+        require((workspace / "genes.tsv").read_text(
+                    encoding="utf-8"
+                ).splitlines()[0]
+                == "chromosome\tstart\tend\tstrand\ttype\tname\tlength",
+                "region TSV export")
+        profile_lines = (workspace / "profile.tsv").read_text(
+            encoding="utf-8"
+        ).splitlines()
+        require(profile_lines[0] == "chromosome\tstart\tgc_percent" and
+                profile_lines[1].startswith("chr1\t0\t"),
+                "GC profile TSV export")
+
+        runtime_error = run_invalid_query(
+            workspace,
+            "unsafe_export_path",
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            "EXTRACT GENE AS genes;\n"
+            'EXPORT genes TO "../outside.bed" FORMAT BED;\n',
+            4,
+        )
+        require("must be relative to the query workspace" in runtime_error,
+                "export path traversal is rejected")
 
         data, _ = run_query(
             workspace,
@@ -246,6 +357,16 @@ def main() -> int:
         )
         require("expects a matrix alias" in semantic_error,
                 "semantic alias type checking")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "wrong_dataset_type",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            "USE ANNOTATION genome;\n",
+            3,
+        )
+        require("expects a ANNOTATION_DATA alias" in semantic_error,
+                "dataset selector type checking")
 
         (workspace / "mismatch.gff3").write_text(
             "##gff-version 3\n"

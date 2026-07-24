@@ -6,6 +6,7 @@
 *.a
 cisql
 /tests/test_core
+/tests/cisql_sanitize
 /benchmarks/benchmark_core
 cmake-build-debug/
 pdf/
@@ -38,3 +39,6 @@ Thumbs.db
 temp_script.cql
 
 *.tex
+
+# Local manuscript build and visual-review artifacts
+/tmp/

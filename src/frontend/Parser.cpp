@@ -53,6 +53,8 @@ void Parser::synchronize() {
       return;
     switch (peek().type) {
     case TokenType::LOAD:
+    case TokenType::USE:
+    case TokenType::EXPORT:
     case TokenType::FIND:
     case TokenType::EXTRACT:
     case TokenType::INTERSECT:
@@ -84,6 +86,10 @@ std::unique_ptr<ProgramNode> Parser::parse() {
 std::unique_ptr<StatementNode> Parser::parseStatement() {
   if (match(TokenType::LOAD))
     return parseLoad();
+  if (match(TokenType::USE))
+    return parseUse();
+  if (match(TokenType::EXPORT))
+    return parseExport();
   if (match(TokenType::FIND))
     return parseFind();
   if (match(TokenType::EXTRACT))
@@ -106,9 +112,47 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
     return nullptr;
   }
 
-  reportError(peek(), "Expected start of a statement (LOAD, FIND, EXTRACT, "
-                      "INTERSECT, UNION, EXCEPT, SCAN, ANALYZE, IF, FOREACH)");
+  reportError(peek(), "Expected start of a statement (LOAD, USE, EXPORT, FIND, "
+                      "EXTRACT, INTERSECT, UNION, EXCEPT, SCAN, ANALYZE, IF, "
+                      "FOREACH)");
   throw std::runtime_error("Parse error");
+}
+
+std::unique_ptr<UseStmtNode> Parser::parseUse() {
+  std::string datasetType;
+  if (match(TokenType::SEQUENCE)) {
+    datasetType = "SEQUENCE";
+  } else if (match(TokenType::ANNOTATION)) {
+    datasetType = "ANNOTATION";
+  } else {
+    reportError(peek(), "Expected 'SEQUENCE' or 'ANNOTATION' after USE.");
+    throw std::runtime_error("Parse error");
+  }
+  consume(TokenType::ID, "Expected a dataset alias after USE.");
+  const std::string alias = previous().lexeme;
+  consume(TokenType::SEMICOLON, "Expected ';' at the end of USE.");
+  return std::unique_ptr<UseStmtNode>(new UseStmtNode(datasetType, alias));
+}
+
+std::unique_ptr<ExportStmtNode> Parser::parseExport() {
+  consume(TokenType::ID, "Expected a result alias after EXPORT.");
+  const std::string alias = previous().lexeme;
+  consume(TokenType::TO, "Expected 'TO' after the result alias.");
+  consume(TokenType::STRING, "Expected an output file name after TO.");
+  const std::string filename = previous().lexeme;
+  consume(TokenType::FORMAT, "Expected 'FORMAT' after the output file name.");
+
+  std::string format;
+  if (match(TokenType::BED) || match(TokenType::GFF3) ||
+      match(TokenType::TSV)) {
+    format = previous().lexeme;
+  } else {
+    reportError(peek(), "Expected BED, GFF3, or TSV after FORMAT.");
+    throw std::runtime_error("Parse error");
+  }
+  consume(TokenType::SEMICOLON, "Expected ';' at the end of EXPORT.");
+  return std::unique_ptr<ExportStmtNode>(
+      new ExportStmtNode(alias, filename, format));
 }
 
 std::unique_ptr<LoadStmtNode> Parser::parseLoad() {
@@ -217,10 +261,15 @@ std::unique_ptr<ExtractStmtNode> Parser::parseExtract() {
       match(TokenType::TSS) || match(TokenType::CDS) ||
       match(TokenType::REGION) || match(TokenType::ID)) {
     std::string entity = previous().lexeme;
+    std::string alias;
+    if (match(TokenType::AS)) {
+      consume(TokenType::ID, "Expected an alias identifier after AS.");
+      alias = previous().lexeme;
+    }
     auto whereClause = parseWhereClause();
     consume(TokenType::SEMICOLON, "Expected ';' at the end of EXTRACT.");
     return std::unique_ptr<ExtractStmtNode>(
-        new ExtractStmtNode(entity, std::move(whereClause)));
+        new ExtractStmtNode(entity, alias, std::move(whereClause)));
   }
   reportError(peek(), "Expected an entity or alias for EXTRACT.");
   throw std::runtime_error("Parse error");
@@ -255,11 +304,16 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
         match(TokenType::TSS) || match(TokenType::CDS) ||
         match(TokenType::REGION) || match(TokenType::ID)) {
       std::string e2 = previous().lexeme;
+      std::string alias;
+      if (match(TokenType::AS)) {
+        consume(TokenType::ID, "Expected an alias identifier after AS.");
+        alias = previous().lexeme;
+      }
       auto whereClause = parseWhereClause();
       consume(TokenType::SEMICOLON,
               "Expected ';' at the end of the set operation.");
       return std::unique_ptr<SetOpStmtNode>(
-          new SetOpStmtNode(op, e1, e2, std::move(whereClause)));
+          new SetOpStmtNode(op, e1, e2, alias, std::move(whereClause)));
     }
   }
   reportError(peek(), "Expected an entity or alias in the set operation.");
@@ -377,6 +431,13 @@ std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
     throw std::runtime_error("Parse error");
   }
 
+  std::string reference;
+  if (prop == "SIMILARITY" && match(TokenType::TO)) {
+    consume(TokenType::ID,
+            "Expected a result-set alias after 'SIMILARITY TO'.");
+    reference = previous().lexeme;
+  }
+
   std::string op;
   if (match(TokenType::GREATER) || match(TokenType::LESS) ||
       match(TokenType::GREATER_EQ) || match(TokenType::LESS_EQ) ||
@@ -401,7 +462,7 @@ std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
   }
 
   return std::unique_ptr<SimpleConditionNode>(
-      new SimpleConditionNode(prop, op, val));
+      new SimpleConditionNode(prop, op, val, reference));
 }
 
 std::unique_ptr<AnalyzeStmtNode> Parser::parseAnalyze() {

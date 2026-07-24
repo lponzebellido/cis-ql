@@ -8,6 +8,7 @@
 struct GCWindow {
   size_t position;
   double gcPercent;
+  std::string chr;
 };
 
 class GCAnalyzer {
