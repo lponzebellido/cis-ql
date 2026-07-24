@@ -38,7 +38,7 @@ Cis-QL operates across three primary modes:
 - **Sweep-Line Interval Algebra:** Evaluates set operations (`INTERSECT`, `UNION`, `EXCEPT`) on genomic intervals using an $O(N \log N)$ two-pointer sweep-line algorithm.
 - **Pairwise Smith-Waterman Local Alignment:** Performs dynamic programming local sequence alignment in native C++ to filter candidate features by sequence similarity (`WHERE SIMILARITY > 70 %`).
 - **Control Flow & Scripting (v2.0):** Supports conditional execution (`IF / ELSE`) based on sequence metrics and batch iteration (`FOREACH`) over matrix collections.
-- **Cis-QL Studio (GUI):** Desktop workspace built with Electron and React 18, featuring a visual editor, interactive track canvas and live JSON data export.
+- **Cis-QL Studio (GUI):** Desktop environment built with Electron and React 18 for interactive query authoring, multi-track genomic visualization, and live result inspection.
 
 ---
 
@@ -164,6 +164,66 @@ ENDFOR;
 
 ---
 
+## Formal Syntax & Grammar (CFG)
+
+Cis-QL is formally specified by an LL(1) Context-Free Grammar. Below is the complete EBNF specification matching `GRAMMAR.TXT`:
+
+```ebnf
+Program            ::= StatementList
+StatementList      ::= Statement StatementList | λ
+
+Statement          ::= LoadStmt | FindStmt | ExtractStmt | SetOperationStmt 
+                     | ScanStmt | AnalyzeStmt | IfStmt | ForeachStmt
+
+LoadStmt           ::= LOAD (SEQUENCE | ANNOTATION | MATRIX) STRING AS ID SEMICOLON
+
+AnalyzeStmt        ::= ANALYZE (GC_CONTENT | CPG_ISLANDS) (WINDOW NUM Unit)? AliasOpt WhereClause SEMICOLON
+
+FindStmt           ::= FIND MOTIF STRING FindOpts AliasOpt WhereClause SEMICOLON
+FindOpts           ::= FindOpt FindOpts | λ
+FindOpt            ::= WITHIN NUM Unit Direction FROM EntityRef EntityName
+                     | STRAND StrandType
+                     | CHR STRING
+
+ScanStmt           ::= SCAN ID ScanOpts AliasOpt WhereClause SEMICOLON
+ScanOpts           ::= ScanOpt ScanOpts | λ
+ScanOpt            ::= STRAND StrandType
+                     | THRESHOLD NUM PERCENT
+
+SetOperationStmt   ::= SetOp EntityRef AND EntityRef WhereClause SEMICOLON
+SetOp              ::= INTERSECT | UNION | EXCEPT
+
+ExtractStmt        ::= EXTRACT EntityRef WhereClause SEMICOLON
+
+IfStmt             ::= IF Condition THEN StatementList (ELSE StatementList)? ENDIF (SEMICOLON)?
+
+ForeachStmt        ::= FOREACH ID IN "[" CollectionList "]" DO StatementList ENDFOR (SEMICOLON)?
+CollectionList     ::= CollectionItem ("," CollectionItem)* | λ
+CollectionItem     ::= ID | STRING | NUM
+
+WhereClause        ::= WHERE Condition | λ
+
+Condition          ::= Term ConditionPrime
+ConditionPrime     ::= OR Term ConditionPrime | λ
+Term               ::= Factor TermPrime
+TermPrime          ::= AND Factor TermPrime | λ
+Factor             ::= NOT Factor | SimpleCondition | "(" Condition ")"
+
+SimpleCondition    ::= Property RelOp Value
+Property           ::= LENGTH | SIMILARITY | GC_CONTENT | ID
+RelOp              ::= ">" | "<" | ">=" | "<=" | "="
+Value              ::= NUM Unit | FLOAT PERCENT | NUM | STRING
+
+Unit               ::= BP | KB | MB | λ
+Direction          ::= UPSTREAM | DOWNSTREAM
+Entity             ::= GENE | PROMOTER | ENHANCER | EXON | INTRON | UTR | TSS | CDS | REGION
+EntityRef          ::= Entity | ID
+EntityName         ::= STRING | λ
+StrandType         ::= POSITIVE | NEGATIVE
+```
+
+---
+
 ## Curated Examples Suite (`cql_examples/`)
 
 The repository includes 16 structured `.cql` scripts demonstrating specific language capabilities:
@@ -191,10 +251,11 @@ The repository includes 16 structured `.cql` scripts demonstrating specific lang
 
 ## Cis-QL Studio Interface
 
-Cis-QL Studio provides a graphical user interface for query development and visualization:
+Cis-QL Studio provides a desktop graphical environment for query development, execution, and visual exploration:
 
-- **Interactive Track Canvas:** Renders ruler coordinates, GC content curves, feature annotation boxes, and nucleotide text at high zoom.
-- **Data Export:** Exports execution results to `.cisql_results.json` for external downstream integration.
+- **Integrated Code Editor & Console:** Write, load, and execute `.cql` queries with real-time terminal output.
+- **Multi-Track Visualizer Canvas:** Displays ruler coordinates, GC content profiles, feature annotation tracks, and sequence details.
+- **Data Synchronization:** Automatically synchronizes execution results via `.cisql_results.json` for live inspection.
 
 ---
 
