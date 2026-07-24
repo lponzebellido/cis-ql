@@ -15,6 +15,8 @@ enum class TokenType {
     SIMILARITY, REVERSE_COMPLEMENT,
     MATRIX, SCAN, THRESHOLD,
     ANALYZE, GC_CONTENT, CPG_ISLANDS, WINDOW,
+    IF, THEN, ELSE, ENDIF,
+    FOREACH, IN, DO, ENDFOR,
 
     ID,
     NUM,       
@@ -30,6 +32,8 @@ enum class TokenType {
     LESS_EQ,   
     LPAREN,    
     RPAREN,    
+    LBRACKET,
+    RBRACKET,
     PERCENT,   
 
     END_OF_FILE,

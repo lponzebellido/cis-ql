@@ -7,18 +7,29 @@ std::vector<GenomicRegion> SetOperations::intersect(
   std::sort(a.begin(), a.end());
   std::sort(b.begin(), b.end());
 
+  size_t j = 0;
   for (const auto& ra : a) {
+    while (j < b.size() && (b[j].chr < ra.chr || (b[j].chr == ra.chr && b[j].end <= ra.start))) {
+      j++;
+    }
+
     bool foundOverlap = false;
-    for (const auto& rb : b) {
-      if (ra.overlaps(rb)) {
+    std::string matchedType = "";
+    for (size_t k = j; k < b.size(); ++k) {
+      if (b[k].chr > ra.chr || b[k].start >= ra.end) {
+        break;
+      }
+      if (ra.overlaps(b[k])) {
         foundOverlap = true;
+        matchedType = b[k].type;
         break;
       }
     }
+
     if (foundOverlap) {
       GenomicRegion overlappingA = ra;
-      if (!b.empty()) {
-        overlappingA.type = ra.type + " ∩ " + b[0].type;
+      if (!matchedType.empty()) {
+        overlappingA.type = ra.type + " ∩ " + matchedType;
       }
       result.push_back(overlappingA);
     }
@@ -29,6 +40,7 @@ std::vector<GenomicRegion> SetOperations::intersect(
 std::vector<GenomicRegion> SetOperations::unite(
     std::vector<GenomicRegion> a, std::vector<GenomicRegion> b) {
   std::vector<GenomicRegion> all;
+  all.reserve(a.size() + b.size());
   all.insert(all.end(), a.begin(), a.end());
   all.insert(all.end(), b.begin(), b.end());
   std::sort(all.begin(), all.end());
@@ -56,14 +68,23 @@ std::vector<GenomicRegion> SetOperations::except(
   std::sort(a.begin(), a.end());
   std::sort(b.begin(), b.end());
 
+  size_t j = 0;
   for (const auto& ra : a) {
+    while (j < b.size() && (b[j].chr < ra.chr || (b[j].chr == ra.chr && b[j].end <= ra.start))) {
+      j++;
+    }
+
     bool excluded = false;
-    for (const auto& rb : b) {
-      if (ra.overlaps(rb)) {
+    for (size_t k = j; k < b.size(); ++k) {
+      if (b[k].chr > ra.chr || b[k].start >= ra.end) {
+        break;
+      }
+      if (ra.overlaps(b[k])) {
         excluded = true;
         break;
       }
     }
+
     if (!excluded) {
       result.push_back(ra);
     }

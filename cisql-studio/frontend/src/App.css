@@ -989,7 +989,8 @@ body {
 .track-canvas-wrap {
   flex: 1;
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .track-empty {

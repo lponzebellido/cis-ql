@@ -203,3 +203,20 @@ void SemanticAnalyzer::visit(AnalyzeStmtNode *node) {
     node->whereClause->accept(*this);
   }
 }
+
+void SemanticAnalyzer::visit(IfStmtNode *node) {
+  if (node->condition) node->condition->accept(*this);
+  for (auto &stmt : node->thenStatements) {
+    if (stmt) stmt->accept(*this);
+  }
+  for (auto &stmt : node->elseStatements) {
+    if (stmt) stmt->accept(*this);
+  }
+}
+
+void SemanticAnalyzer::visit(ForeachStmtNode *node) {
+  symbolTable.insert(node->iteratorVar, "ITERATOR_VAR");
+  for (auto &stmt : node->bodyStatements) {
+    if (stmt) stmt->accept(*this);
+  }
+}

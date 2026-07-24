@@ -102,17 +102,16 @@ void Interpreter::executeLoadSeq(const IRInstruction &instr) {
     return;
   }
 
-  sequences[alias] = records[0];
+  sequenceDatasets[alias] = records;
+  for (const auto &rec : records) {
+    sequenceChrMaps[alias][rec.sequenceId] = rec;
+  }
   activeSequenceAlias = alias;
   if (debugMode) {
-    std::cout << "  Loaded " << records[0].sequence.size()
-              << " base pairs from " << filename << " ("
-              << records[0].sequenceId << ")" << std::endl;
-    if (records.size() > 1) {
-      std::cout << "  (File contains " << records.size()
-                << " sequences, using first: " << records[0].sequenceId << ")"
-                << std::endl;
-    }
+    size_t totalBP = 0;
+    for (const auto &rec : records) totalBP += rec.sequence.size();
+    std::cout << "  Loaded " << records.size() << " sequence(s) / chromosome(s), total "
+              << totalBP << " base pairs from " << filename << std::endl;
   }
 }
 
@@ -183,15 +182,16 @@ void Interpreter::executeFindExec(const IRInstruction &instr) {
     std::cout << std::endl;
   }
 
-  if (sequences.empty()) {
+  if (sequenceDatasets.empty()) {
     std::cerr << "  Error: No sequence loaded." << std::endl;
     return;
   }
-  const FastaRecord &seq = sequences.begin()->second;
 
-  bool searchNeg = true;
-  if (currentFind.strandFilter == "POSITIVE")
-    searchNeg = false;
+  const auto &targetDataset = sequenceDatasets.count(activeSequenceAlias)
+                                  ? sequenceDatasets[activeSequenceAlias]
+                                  : sequenceDatasets.begin()->second;
+
+  bool searchNeg = (currentFind.strandFilter != "POSITIVE");
 
   std::vector<MotifMatch> matches;
 
@@ -220,6 +220,17 @@ void Interpreter::executeFindExec(const IRInstruction &instr) {
     }
 
     for (const auto &target : targets) {
+      if (!currentFind.chrFilter.empty() && target.chr != currentFind.chrFilter)
+        continue;
+
+      std::string seqData = "";
+      if (sequenceChrMaps[activeSequenceAlias].count(target.chr)) {
+        seqData = sequenceChrMaps[activeSequenceAlias][target.chr].sequence;
+      } else if (!targetDataset.empty()) {
+        seqData = targetDataset[0].sequence;
+      }
+      if (seqData.empty()) continue;
+
       size_t windowStart, windowEnd;
       std::string effectiveStrand = target.strand.empty() ? "+" : target.strand;
       if (currentFind.withinDirection == "UPSTREAM") {
@@ -228,39 +239,53 @@ void Interpreter::executeFindExec(const IRInstruction &instr) {
           windowEnd = target.start;
         } else {
           windowStart = target.end;
-          windowEnd = std::min(target.end + distBP, seq.sequence.size());
+          windowEnd = std::min(target.end + distBP, seqData.size());
         }
       } else {
         if (effectiveStrand == "+") {
           windowStart = target.end;
-          windowEnd = std::min(target.end + distBP, seq.sequence.size());
+          windowEnd = std::min(target.end + distBP, seqData.size());
         } else {
           windowStart = (target.start > distBP) ? target.start - distBP : 0;
           windowEnd = target.start;
         }
       }
       auto windowMatches =
-          MotifFinder::findInWindow(seq.sequence, currentFind.pattern,
-                                    windowStart, windowEnd, seq.sequenceId);
+          MotifFinder::findInWindow(seqData, currentFind.pattern,
+                                    windowStart, windowEnd, target.chr);
       matches.insert(matches.end(), windowMatches.begin(), windowMatches.end());
     }
   } else {
-    matches = MotifFinder::findAll(seq.sequence, currentFind.pattern,
-                                   seq.sequenceId, searchNeg);
+    std::vector<std::future<std::vector<MotifMatch>>> futures;
+    for (const auto &seqRec : targetDataset) {
+      if (!currentFind.chrFilter.empty() && seqRec.sequenceId != currentFind.chrFilter)
+        continue;
+
+      std::string seqStr = seqRec.sequence;
+      std::string chrId = seqRec.sequenceId;
+      std::string pat = currentFind.pattern;
+
+      futures.push_back(std::async(std::launch::async, [seqStr, pat, chrId, searchNeg]() {
+        return MotifFinder::findAll(seqStr, pat, chrId, searchNeg);
+      }));
+    }
+
+    for (auto &f : futures) {
+      auto res = f.get();
+      matches.insert(matches.end(), res.begin(), res.end());
+    }
   }
 
   if (currentFind.strandFilter == "NEGATIVE") {
     std::vector<MotifMatch> filtered;
     for (const auto &m : matches) {
-      if (m.strand == "-")
-        filtered.push_back(m);
+      if (m.strand == "-") filtered.push_back(m);
     }
     matches = filtered;
   } else if (currentFind.strandFilter == "POSITIVE") {
     std::vector<MotifMatch> filtered;
     for (const auto &m : matches) {
-      if (m.strand == "+")
-        filtered.push_back(m);
+      if (m.strand == "+") filtered.push_back(m);
     }
     matches = filtered;
   }
@@ -272,23 +297,21 @@ void Interpreter::executeFindAlias(const IRInstruction &instr) {
   std::string resultId = instr.arg1;
   std::string alias = instr.arg2;
 
-  std::string chrId = "";
-  if (!sequences.empty()) {
-    chrId = sequences.begin()->second.sequenceId;
-  }
-  const std::string &seqData =
-      sequences.empty() ? "" : sequences.begin()->second.sequence;
-
   std::vector<GenomicRegion> regions;
   if (motifResults.count(resultId)) {
     for (const auto &m : motifResults[resultId]) {
       GenomicRegion r;
-      r.chr = chrId;
+      r.chr = m.chr.empty() ? (sequenceDatasets.empty() ? "" : sequenceDatasets.begin()->second[0].sequenceId) : m.chr;
       r.start = m.position;
       r.end = m.position + m.matchLength;
       r.strand = m.strand;
       r.type = alias;
       r.name = alias + "_" + std::to_string(m.position);
+
+      std::string seqData = "";
+      if (sequenceChrMaps[activeSequenceAlias].count(r.chr)) {
+        seqData = sequenceChrMaps[activeSequenceAlias][r.chr].sequence;
+      }
       if (!seqData.empty() && r.end <= seqData.size()) {
         r.sequence = seqData.substr(r.start, r.end - r.start);
       }
@@ -313,11 +336,14 @@ void Interpreter::executeExtract(const IRInstruction &instr) {
 
   std::vector<GenomicRegion> regions = resolveEntity(entityType);
 
-  if (!sequences.empty()) {
-    const std::string &seq = sequences.begin()->second.sequence;
+  if (!sequenceDatasets.empty()) {
+    const auto &chrMap = sequenceChrMaps[activeSequenceAlias];
     for (auto &r : regions) {
-      if (r.sequence.empty() && r.start < seq.size() && r.end <= seq.size()) {
-        r.sequence = seq.substr(r.start, r.end - r.start);
+      if (r.sequence.empty() && chrMap.count(r.chr)) {
+        const std::string &seq = chrMap.at(r.chr).sequence;
+        if (r.start < seq.size() && r.end <= seq.size()) {
+          r.sequence = seq.substr(r.start, r.end - r.start);
+        }
       }
     }
   }
@@ -432,15 +458,21 @@ void Interpreter::executeSetOp(const IRInstruction &instr) {
   auto regions1 = resolveEntity(entity1);
   auto regions2 = resolveEntity(entity2);
 
-  if (!sequences.empty()) {
-    const std::string &seq = sequences.begin()->second.sequence;
+  if (!sequenceDatasets.empty()) {
+    const auto &chrMap = sequenceChrMaps[activeSequenceAlias];
     for (auto &r : regions1) {
-      if (r.sequence.empty() && r.start < seq.size() && r.end <= seq.size())
-        r.sequence = seq.substr(r.start, r.end - r.start);
+      if (r.sequence.empty() && chrMap.count(r.chr)) {
+        const std::string &seq = chrMap.at(r.chr).sequence;
+        if (r.start < seq.size() && r.end <= seq.size())
+          r.sequence = seq.substr(r.start, r.end - r.start);
+      }
     }
     for (auto &r : regions2) {
-      if (r.sequence.empty() && r.start < seq.size() && r.end <= seq.size())
-        r.sequence = seq.substr(r.start, r.end - r.start);
+      if (r.sequence.empty() && chrMap.count(r.chr)) {
+        const std::string &seq = chrMap.at(r.chr).sequence;
+        if (r.start < seq.size() && r.end <= seq.size())
+          r.sequence = seq.substr(r.start, r.end - r.start);
+      }
     }
   }
 
@@ -533,7 +565,6 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
   std::string matrixAlias = instr.arg1;
   std::string resultId = instr.arg2;
 
-  
   if (currentScan.threshold <= 0.0) {
     currentScan.threshold = 75.0;
   }
@@ -547,7 +578,7 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
     std::cout << std::endl;
   }
 
-  if (sequences.empty()) {
+  if (sequenceDatasets.empty()) {
     std::cerr << "  Error: No sequence loaded." << std::endl;
     return;
   }
@@ -558,25 +589,39 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
     return;
   }
 
-  const FastaRecord &seq = sequences.begin()->second;
+  const auto &targetDataset = sequenceDatasets.count(activeSequenceAlias)
+                                  ? sequenceDatasets[activeSequenceAlias]
+                                  : sequenceDatasets.begin()->second;
   const PSSM &pssm = loadedPSSMs[matrixAlias];
 
-  bool searchPos = true, searchNeg = true;
-  if (currentScan.strandFilter == "POSITIVE") searchNeg = false;
-  if (currentScan.strandFilter == "NEGATIVE") searchPos = false;
+  bool searchPos = (currentScan.strandFilter != "NEGATIVE");
+  bool searchNeg = (currentScan.strandFilter != "POSITIVE");
 
-  std::vector<MotifMatch> matches = PWMScanner::scan(
-      seq.sequence, pssm, currentScan.threshold,
-      seq.sequenceId, searchPos, searchNeg);
+  std::vector<std::future<std::vector<MotifMatch>>> futures;
+  for (const auto &seqRec : targetDataset) {
+    std::string seqStr = seqRec.sequence;
+    std::string chrId = seqRec.sequenceId;
+    double thresh = currentScan.threshold;
+
+    futures.push_back(std::async(std::launch::async, [seqStr, pssm, thresh, chrId, searchPos, searchNeg]() {
+      return PWMScanner::scan(seqStr, pssm, thresh, chrId, searchPos, searchNeg);
+    }));
+  }
+
+  std::vector<MotifMatch> matches;
+  for (auto &f : futures) {
+    auto res = f.get();
+    matches.insert(matches.end(), res.begin(), res.end());
+  }
 
   motifResults[resultId] = matches;
 
   if (debugMode) {
     std::cout << "  PWM scan found " << matches.size() << " site(s) above "
-              << currentScan.threshold << "% threshold." << std::endl;
+              << currentScan.threshold << "% threshold across " << targetDataset.size()
+              << " chromosome(s)." << std::endl;
   }
 
-  
   currentScan = ScanContext();
 }
 
@@ -584,23 +629,21 @@ void Interpreter::executeScanAlias(const IRInstruction &instr) {
   std::string resultId = instr.arg1;
   std::string alias = instr.arg2;
 
-  std::string chrId = "";
-  if (!sequences.empty()) {
-    chrId = sequences.begin()->second.sequenceId;
-  }
-  const std::string &seqData =
-      sequences.empty() ? "" : sequences.begin()->second.sequence;
-
   std::vector<GenomicRegion> regions;
   if (motifResults.count(resultId)) {
     for (const auto &m : motifResults[resultId]) {
       GenomicRegion r;
-      r.chr = chrId;
+      r.chr = m.chr.empty() ? (sequenceDatasets.empty() ? "" : sequenceDatasets.begin()->second[0].sequenceId) : m.chr;
       r.start = m.position;
       r.end = m.position + m.matchLength;
       r.strand = m.strand;
       r.type = alias;
       r.name = alias + "_" + std::to_string(m.position);
+
+      std::string seqData = "";
+      if (sequenceChrMaps[activeSequenceAlias].count(r.chr)) {
+        seqData = sequenceChrMaps[activeSequenceAlias][r.chr].sequence;
+      }
       if (!seqData.empty() && r.end <= seqData.size()) {
         r.sequence = seqData.substr(r.start, r.end - r.start);
       }
@@ -615,6 +658,7 @@ void Interpreter::executeScanAlias(const IRInstruction &instr) {
               << "\"" << std::endl;
   }
 }
+
 void Interpreter::executeAnalyzeGC(const IRInstruction &instr) {
   std::string windowSizeStr = instr.arg1;
   std::string resultId = instr.arg2;
@@ -629,32 +673,40 @@ void Interpreter::executeAnalyzeGC(const IRInstruction &instr) {
     }
   }
 
-  const std::string &seqData =
-      sequences.empty() ? "" : sequences.begin()->second.sequence;
+  const auto &targetDataset = sequenceDatasets.count(activeSequenceAlias)
+                                  ? sequenceDatasets[activeSequenceAlias]
+                                  : (sequenceDatasets.empty() ? std::vector<FastaRecord>{} : sequenceDatasets.begin()->second);
       
-  auto windows = GCAnalyzer::gcContentWindowed(seqData, windowSize, windowSize / 2);
-  gcResults[resultId] = windows;
+  std::vector<GCWindow> allWindows;
+  for (const auto &seqRec : targetDataset) {
+    auto windows = GCAnalyzer::gcContentWindowed(seqRec.sequence, windowSize, windowSize / 2);
+    allWindows.insert(allWindows.end(), windows.begin(), windows.end());
+  }
+
+  gcResults[resultId] = allWindows;
   
   if (debugMode) {
-    std::cout << "  Computed GC profile with " << windows.size() << " windows for \"" << resultId << "\"" << std::endl;
+    std::cout << "  Computed GC profile with " << allWindows.size() << " windows for \"" << resultId << "\"" << std::endl;
   }
 }
 
 void Interpreter::executeAnalyzeCpG(const IRInstruction &instr) {
   std::string resultId = instr.arg2;
   
-  std::string chrId = "";
-  if (!sequences.empty()) {
-    chrId = sequences.begin()->second.sequenceId;
-  }
-  const std::string &seqData =
-      sequences.empty() ? "" : sequences.begin()->second.sequence;
+  const auto &targetDataset = sequenceDatasets.count(activeSequenceAlias)
+                                  ? sequenceDatasets[activeSequenceAlias]
+                                  : (sequenceDatasets.empty() ? std::vector<FastaRecord>{} : sequenceDatasets.begin()->second);
       
-  auto islands = GCAnalyzer::findCpGIslands(seqData, chrId);
-  resultSets[resultId] = islands;
+  std::vector<GenomicRegion> allIslands;
+  for (const auto &seqRec : targetDataset) {
+    auto islands = GCAnalyzer::findCpGIslands(seqRec.sequence, seqRec.sequenceId);
+    allIslands.insert(allIslands.end(), islands.begin(), islands.end());
+  }
+
+  resultSets[resultId] = allIslands;
   
   if (debugMode) {
-    std::cout << "  Found " << islands.size() << " CpG islands for \"" << resultId << "\"" << std::endl;
+    std::cout << "  Found " << allIslands.size() << " CpG islands for \"" << resultId << "\"" << std::endl;
   }
 }
 
@@ -710,6 +762,43 @@ void Interpreter::dumpResultsJSON() const {
   out << "\n}\n";
 }
 
+bool Interpreter::evaluateCondition(const std::string &prop, const std::string &op, const std::string &val) {
+  double leftVal = 0.0;
+  if (prop == "GC_CONTENT") {
+    size_t totalBases = 0;
+    size_t gcBases = 0;
+    for (const auto &pair : sequenceDatasets) {
+      for (const auto &rec : pair.second) {
+        totalBases += rec.sequence.length();
+        for (char c : rec.sequence) {
+          if (c == 'G' || c == 'C' || c == 'g' || c == 'c') gcBases++;
+        }
+      }
+    }
+    leftVal = totalBases > 0 ? (100.0 * gcBases / totalBases) : 0.0;
+  } else if (resultSets.count(prop)) {
+    leftVal = static_cast<double>(resultSets[prop].size());
+  } else if (motifResults.count(prop)) {
+    leftVal = static_cast<double>(motifResults[prop].size());
+  } else {
+    leftVal = std::atof(prop.c_str());
+  }
+
+  double rightVal = std::atof(val.c_str());
+  size_t spacePos = val.find(' ');
+  if (spacePos != std::string::npos) {
+    rightVal = std::atof(val.substr(0, spacePos).c_str());
+  }
+
+  if (op == ">") return leftVal > rightVal;
+  if (op == ">=") return leftVal >= rightVal;
+  if (op == "<") return leftVal < rightVal;
+  if (op == "<=") return leftVal <= rightVal;
+  if (op == "=" || op == "==") return std::abs(leftVal - rightVal) < 1e-6;
+  if (op == "!=") return std::abs(leftVal - rightVal) >= 1e-6;
+  return false;
+}
+
 void Interpreter::execute(const std::vector<IRInstruction> &program,
                           bool debug) {
   debugMode = debug;
@@ -724,7 +813,47 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
     }
   }
 
-  for (const auto &instr : program) {
+  for (size_t i = 0; i < program.size(); ++i) {
+    const auto &instr = program[i];
+
+    if (instr.opcode == IROpCode::IF_BEGIN) {
+      bool cond = evaluateCondition(instr.arg1, instr.arg2, instr.arg3);
+      if (debugMode) {
+        std::cout << "> IF (" << instr.arg1 << " " << instr.arg2 << " " << instr.arg3 << ") -> " << (cond ? "TRUE" : "FALSE") << std::endl;
+      }
+      if (!cond) {
+        int depth = 1;
+        while (i + 1 < program.size()) {
+          i++;
+          if (program[i].opcode == IROpCode::IF_BEGIN) depth++;
+          else if (program[i].opcode == IROpCode::IF_END) {
+            depth--;
+            if (depth == 0) break;
+          } else if (program[i].opcode == IROpCode::IF_ELSE && depth == 1) {
+            break;
+          }
+        }
+      }
+      continue;
+    }
+
+    if (instr.opcode == IROpCode::IF_ELSE) {
+      int depth = 1;
+      while (i + 1 < program.size()) {
+        i++;
+        if (program[i].opcode == IROpCode::IF_BEGIN) depth++;
+        else if (program[i].opcode == IROpCode::IF_END) {
+          depth--;
+          if (depth == 0) break;
+        }
+      }
+      continue;
+    }
+
+    if (instr.opcode == IROpCode::IF_END) {
+      continue;
+    }
+
     switch (instr.opcode) {
     case IROpCode::LOAD_SEQ:
       executeLoadSeq(instr);
@@ -787,6 +916,8 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
       break;
     case IROpCode::ANALYZE_CPG:
       executeAnalyzeCpG(instr);
+      break;
+    default:
       break;
     }
   }

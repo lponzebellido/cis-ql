@@ -1,289 +1,246 @@
-# Cis-QL: Cis-Regulatory Query Language
+# Cis-QL: Cis-Regulatory Query Language & Studio
 
-![Status: In Development](https://img.shields.io/badge/status-in%20development-orange)
-
-**Cis-QL** is a specialized, SQL-like Domain-Specific Language (DSL) designed for bioinformatics and genomic analysis. It enables researchers to intuitively search, filter, extract, and manipulate genomic regions, regulatory motifs, and sequence features using a human-readable, declarative syntax.
+**Cis-QL** is a specialized Domain-Specific Language (DSL) and desktop environment engineered for bioinformatics, computational genomics, and cis-regulatory element discovery. Built on a native C++11 core, it enables researchers to search, filter, extract, and manipulate genomic regions, regulatory motifs, and sequence features using a human-readable, declarative syntax.
 
 ---
 
-## What is Cis-QL?
+## Overview & Purpose
 
-Finding cis-regulatory elements (promoters, enhancers, transcription factor binding sites) in massive genomic datasets usually requires stringing together multiple command-line tools (e.g., `bedtools`, `grep`, custom Python scripts) or writing complex code.
+Identifying cis-regulatory elements (such as promoters, enhancers, and transcription factor binding sites) within large genomic datasets traditionally requires stringing together multiple command-line utilities (e.g., `bedtools`, `grep`, `awk`) or writing custom scripts in Python or Perl. These imperative approaches often result in complex, hard-to-maintain pipelines that are difficult to reproduce.
 
-**Cis-QL solves this by providing a unified, declarative interface.** Instead of writing imperative code to parse files, perform string matching, calculate distances, and run set intersections, you simply *declare what you want to find*.
-
-Cis-QL operates in three primary modes:
-1. **Annotation-driven:** Works with established `GFF3` annotation files to query known genes, exons, and regulatory elements.
-2. **De novo Discovery:** Works directly on raw `.fasta` files. It can discover regulatory motifs or genes on the fly using literal sequences or **Regular Expressions**, and construct a virtual annotation layer in-memory.
-3. **PWM Scanning:** Uses **Position Weight Matrices (PWMs)** from standard databases (JASPAR format) to identify transcription factor binding sites with probabilistic scoring — the industry-standard method for cis-regulatory element discovery.
-
-## What Problems Does It Solve?
-
-- **Transcription Factor Binding Sites:** Use pre-built PWMs (JASPAR, TRANSFAC) to find where specific TFs bind, going far beyond exact-match searches.
-- **Metagenomic Bioprospecting:** When dealing with newly sequenced environmental samples lacking curated GFF3 files, Cis-QL's *de novo* mode allows researchers to hunt for hypothetical operons or gene clusters on the fly.
-- **Spatial Queries:** Easily finding motifs relative to other genomic features (e.g., "Find this motif within 200 base pairs upstream of a gene").
-- **Pipeline Simplification:** Reduces complex bioinformatic pipelines into readable, reproducible, and easily shareable query scripts.
+**Cis-QL provides a unified, declarative interface.** Instead of writing imperative code to parse files, perform string matching, compute spatial distances, and calculate set intersections, researchers declare the desired biological criteria. The underlying C++ execution engine handles parsing, spatial indexing, multi-threaded alignment, and interval arithmetic automatically.
 
 ---
 
-## How to Use It
+## What Problems Does Cis-QL Solve?
 
-### Compilation
+- **Transcription Factor Binding Site Discovery:** Integrates Position Weight Matrices (PWMs) from standard databases (such as JASPAR) to identify TF binding sites using probabilistic log-odds scoring rather than rigid exact matching.
+- **Metagenomic Bioprospecting:** Enables *de novo* motif and open reading frame (ORF) discovery on raw, unannotated FASTA contigs from environmental samples lacking curated GFF3 annotations.
+- **Spatial Relative Queries:** Simplifies relative proximity searches (e.g., locating specific consensus motifs within designated base-pair windows upstream or downstream of coding sequences).
+- **Pipeline Unification & Reproducibility:** Condenses multi-step bioinformatic shell workflows into concise, shareable, and self-documenting query scripts.
 
-Cis-QL is written in modern C++ (C++11). To compile the interpreter:
+---
+
+## Primary Operational Modes
+
+Cis-QL operates across three primary modes:
+
+1. **Annotation-Driven Analysis:** Queries established `GFF3` annotation files to analyze known genes, exons, CDS, and regulatory features.
+2. **De Novo Discovery Mode:** Constructs a virtual annotation layer in memory directly from raw `.fasta` sequence data using literal strings, IUPAC ambiguity codes, or Regular Expressions.
+3. **Probabilistic PWM Scanning:** Scans sequences using Position Weight Matrices with log-odds PSSM scoring, evaluating hit thresholds as percentages of maximum theoretical scores.
+
+---
+
+## Key Technical Features
+
+- **Native IUPAC Degeneration Engine:** Translates IUPAC nucleotide ambiguity codes (`R`, `Y`, `S`, `W`, `K`, `M`, `B`, `D`, `H`, `V`, `N`) automatically into regular expression search patterns (e.g., `TATAWAW` translates to `TATA[AT]A[AT]`).
+- **High-Performance Multi-Chromosome Parallelism:** Leverages `std::async` to execute sequence scanning across multiple contigs and chromosomes in parallel.
+- **Sweep-Line Interval Algebra:** Evaluates set operations (`INTERSECT`, `UNION`, `EXCEPT`) on genomic intervals using an $O(N \log N)$ two-pointer sweep-line algorithm.
+- **Pairwise Smith-Waterman Local Alignment:** Performs dynamic programming local sequence alignment in native C++ to filter candidate features by sequence similarity (`WHERE SIMILARITY > 70 %`).
+- **Control Flow & Scripting (v2.0):** Supports conditional execution (`IF / ELSE`) based on sequence metrics and batch iteration (`FOREACH`) over matrix collections.
+- **Cis-QL Studio (GUI):** Desktop workspace built with Electron and React 18, featuring a visual editor, interactive track canvas and live JSON data export.
+
+---
+
+## Compilation and Execution
+
+### Building the C++ Binary
+
+Cis-QL requires a standard C++11 compiler and `make`:
 
 ```bash
 make clean
 make
 ```
 
-### Execution
+### Running Queries via Command Line
 
-Run a Cis-QL script (`.cql`) by passing it to the interpreter:
+Execute a `.cql` script using the `cisql` binary:
 
 ```bash
-./cisql my_script.cql
+./cisql cql_examples/01_extract_genes.cql
 ```
 
-Use the `--debug` flag to see the underlying lexical analysis, AST (Abstract Syntax Tree), Symbol Table, Intermediate Representation (IR), and all intermediate results:
+Use the `--debug` flag to inspect compilation phases, including token stream, Abstract Syntax Tree (AST), Symbol Table, Intermediate Representation (IR), and execution steps:
 
 ```bash
-./cisql my_script.cql --debug
+./cisql cql_examples/14_integrated_query.cql --debug
+```
+
+### Launching Cis-QL Studio
+
+To run the interactive desktop graphical environment:
+
+```bash
+cd cisql-studio
+npm start
 ```
 
 ---
 
 ## Language Reference
 
-### 1. Loading Data
+### 1. Loading Data (`LOAD`)
 
-You can load sequence data (FASTA), annotation data (GFF3), and PWM matrices (JASPAR format).
-
-```sql
-LOAD SEQUENCE "genome.fasta" AS seq_1;
-LOAD ANNOTATION "annotations.gff3" AS annot_1;
-LOAD MATRIX "matrices/MA0108.1_TBP.pwm" AS tata_pwm;
-```
-
-### 2. Finding Motifs (Literal & Regex)
-
-Find motifs anywhere in the sequence, or spatially relative to other features.
-
-```sql
--- Literal search on the positive strand
-FIND MOTIF "TATAAT" STRAND POSITIVE AS tatabox;
-
--- Regular expression search
-FIND MOTIF "ATG(...)*?(TAA|TAG|TGA)" AS putative_genes;
-
--- Spatial search: Find motif near a known feature or a dynamically discovered feature
-FIND MOTIF "ATGCGA" WITHIN 500 BP UPSTREAM FROM tatabox;
-```
-
-### 3. PWM Scanning
-
-Scan a loaded sequence with a Position Weight Matrix to find transcription factor binding sites above a score threshold. The threshold is expressed as a percentage of the theoretical maximum PWM score (0–100%).
-
-```sql
--- Scan both strands, default threshold (75%)
-SCAN tata_pwm AS tata_sites;
-
--- Scan positive strand only with explicit threshold
-SCAN tata_pwm STRAND POSITIVE THRESHOLD 80% AS tata_sites;
-
--- Scan with a more permissive threshold for exploratory analysis
-SCAN sp1_pwm THRESHOLD 60% AS gc_boxes;
-```
-
-**Options (in any order, all optional):**
-| Option | Description | Default |
-|--------|-------------|---------|
-| `STRAND POSITIVE` / `STRAND NEGATIVE` | Restrict search to one strand | Both strands |
-| `THRESHOLD <value>%` | Minimum score as % of max PWM score | `75%` |
-| `AS <alias>` | Name the result set for later use | — |
-
-### 4. Filtering and Extracting
-
-Extract specific biological entities and apply filters using the `WHERE` clause.
-Supported properties: `LENGTH`, `SIMILARITY` (computed via Smith-Waterman local alignment).
-
-```sql
-EXTRACT GENE WHERE LENGTH > 1.5 KB;
-EXTRACT tata_sites WHERE LENGTH >= 8 BP;
-```
-
-### 5. Biological Analysis (GC & CpG)
-
-Perform genome-wide analysis to find structural properties like GC content and CpG islands.
-
-```sql
-// Profiling GC content with sliding windows
-ANALYZE GC_CONTENT WINDOW 100 BP AS ecoli_gc_profile;
-
-// Identifying CpG islands (promoter hallmarks)
-ANALYZE CPG_ISLANDS AS cpg_islands;
-```
-
-### 6. Set Operations
-
-Perform logical intersections, unions, or subtractions between feature sets.
-
-```sql
-INTERSECT tata_sites AND gc_boxes;
-EXCEPT GENE FROM REGION;
-UNION promoters AND enhancers;
-```
-
----
-
-## Included PWM Matrices (JASPAR)
-
-The `matrices/` directory includes ready-to-use Position Weight Matrices for common transcription factors:
-
-| File | Factor | JASPAR ID | Biological Role |
-|------|--------|-----------|-----------------|
-| `MA0108.1_TBP.pwm` | TBP | MA0108.1 | TATA-box binding; core promoter element |
-| `MA0079.5_SP1.pwm` | SP1 | MA0079.5 | GC-box binding; ubiquitous activator |
-| `MA0139.1_CTCF.pwm` | CTCF | MA0139.1 | Insulator / chromatin boundary element |
-| `MA0003.4_TFAP2A.pwm` | TFAP2A | MA0003.4 | Enhancer-binding; developmental regulation |
-| `MA0002.2_RUNX1.pwm` | RUNX1 | MA0002.2 | Core-binding factor; hematopoiesis |
-
-You can also load any custom PWM in JASPAR format using `LOAD MATRIX`.
-
----
-
-## Examples
-
-### Example 1: Traditional Annotation Query
-
-Find all genes larger than 500 base pairs in an annotated genome.
-
-```sql
-LOAD SEQUENCE "ecoli.fasta" AS genome;
-LOAD ANNOTATION "ecoli.gff3" AS annotations;
-
-EXTRACT GENE WHERE LENGTH > 500 BP;
-```
-
-### Example 2: De Novo Discovery (Regex & Spatial Targeting)
-
-Find hypothetical promoter sequences in a raw metagenome, then look for open reading frames downstream.
-
-```sql
-LOAD SEQUENCE "metagenoma_crudo.fasta" AS sample_1;
-
--- Discover putative promoters using regex
-FIND MOTIF "TATA[AT]A[AT]" STRAND POSITIVE AS putative_promoters;
-
--- Look for ORFs specifically downstream of the discovered promoters
-FIND MOTIF "ATG(...)*?(TAA|TAG|TGA)"
-  WITHIN 200 BP DOWNSTREAM FROM putative_promoters
-  AS putative_genes
-  WHERE LENGTH > 900 BP;
-
-EXTRACT putative_genes;
-```
-
-### Example 3: PWM-Based Cis-Regulatory Discovery
-
-Use a JASPAR matrix to find TATA box binding sites with probabilistic scoring.
+Load sequence files (FASTA), annotation files (GFF3), and matrix files (JASPAR format):
 
 ```sql
 LOAD SEQUENCE "data_examples/ecoli.fasta" AS genome;
-
-LOAD MATRIX "matrices/MA0108.1_TBP.pwm" AS tata_pwm;
-
--- Find high-confidence TATA box sites (>= 80% of max PWM score)
-SCAN tata_pwm STRAND POSITIVE THRESHOLD 80% AS tata_sites;
-
-EXTRACT tata_sites;
+LOAD ANNOTATION "data_examples/genomic.gff" AS annot;
+LOAD MATRIX "matrices/MA0108.1_TBP.pwm" AS tbp_matrix;
 ```
 
-### Example 4: Combining PWM Scanning with Set Operations
+### 2. Motif Searching & Spatial Conditions (`FIND MOTIF`)
 
-Find putative promoter regions where a TATA box overlaps with a GC-box.
+Locate exact motifs, regular expressions, or IUPAC degenerate strings, with optional spatial constraints relative to other features:
 
 ```sql
-LOAD SEQUENCE "genome.fasta" AS genome;
+-- IUPAC degenerate motif search on the positive strand
+FIND MOTIF "TATAWAW" STRAND POSITIVE AS tata_boxes;
 
-LOAD MATRIX "matrices/MA0108.1_TBP.pwm" AS tata_pwm;
-LOAD MATRIX "matrices/MA0079.5_SP1.pwm" AS sp1_pwm;
+-- Spatial constraint: motif within 200 BP upstream of coding sequences
+FIND MOTIF "TTGACA" WITHIN 200 BP UPSTREAM FROM CDS AS minus35_promoters;
 
-SCAN tata_pwm THRESHOLD 80% AS tata_sites;
-SCAN sp1_pwm THRESHOLD 75% AS gc_boxes;
+-- De novo ORF search downstream of putative promoters
+FIND MOTIF "ATG(...)*?(TAA|TAG|TGA)"
+    WITHIN 300 BP DOWNSTREAM FROM tata_boxes
+    AS candidate_orfs
+    WHERE LENGTH > 600 BP;
+```
 
--- Promoters where both elements co-occur
-INTERSECT tata_sites AND gc_boxes;
+### 3. Position Weight Matrix Scanning (`SCAN`)
+
+Scan loaded sequences using Position Weight Matrices with log-odds scoring:
+
+```sql
+SCAN tbp_matrix STRAND POSITIVE THRESHOLD 80 % AS tbp_sites;
+```
+
+### 4. Biological & Structural Analysis (`ANALYZE`)
+
+Calculate sliding-window GC content profiles or identify CpG islands:
+
+```sql
+ANALYZE GC_CONTENT WINDOW 1 KB AS gc_profile;
+ANALYZE CPG_ISLANDS AS cpg_islands;
+```
+
+### 5. Set Operations (`INTERSECT`, `UNION`, `EXCEPT`)
+
+Combine or filter interval sets using high-speed interval algebra:
+
+```sql
+INTERSECT sp1_sites AND cpg_islands;
+UNION minus35_box AND minus10_box;
+EXCEPT ctcf_sites FROM CDS;
+```
+
+### 6. Feature Extraction & Filtering (`EXTRACT`, `WHERE`)
+
+Filter genomic entities by physical length or alignment similarity:
+
+```sql
+EXTRACT GENE WHERE LENGTH >= 500 BP AND LENGTH <= 3 KB;
+EXTRACT GENE WHERE LENGTH > 1 KB AND SIMILARITY > 70 %;
+```
+
+### 7. Control Flow (`IF`, `FOREACH`)
+
+Control query execution paths and iterate over collections:
+
+```sql
+-- Conditional execution based on sequence properties
+IF GC_CONTENT > 50 % THEN
+    SCAN sp1 THRESHOLD 80 % AS gc_sites;
+ELSE
+    SCAN tbp THRESHOLD 80 % AS at_sites;
+ENDIF;
+
+-- Batch processing over matrix lists
+FOREACH m IN [tbp, sp1, ctcf] DO
+    SCAN m THRESHOLD 80 % AS tf_sites;
+ENDFOR;
 ```
 
 ---
 
-## Syntax & Grammar Overview
+## Curated Examples Suite (`cql_examples/`)
 
-Cis-QL reads like SQL but is tailored for genomics.
+The repository includes 16 structured `.cql` scripts demonstrating specific language capabilities:
 
-### Formal Grammar (CFG)
-
-| Non-Terminal | | Expansion |
-| :--- | :---: | :--- |
-| `Program` | → | `StatementList` |
-| `StatementList` | → | `Statement` `StatementList` <br> \| `λ` (epsilon) |
-| `Statement` | → | `LoadStmt` \| `FindStmt` \| `ExtractStmt` \| `SetOperationStmt` \| `ScanStmt` |
-| `LoadStmt` | → | **`LOAD`** (**`SEQUENCE`** \| **`ANNOTATION`** \| **`MATRIX`**) *`STRING`* **`AS`** *`ID`* **`;`** |
-| `FindStmt` | → | **`FIND MOTIF`** *`STRING`* `FindOpts` `AliasOpt` `WhereClause` **`;`** |
-| `FindOpts` | → | `FindOpt` `FindOpts` <br> \| `λ` |
-| `FindOpt` | → | **`WITHIN`** *`NUM`* `Unit` `Direction` **`FROM`** `EntityRef` `EntityName` <br> \| **`STRAND`** `StrandType` <br> \| **`CHR`** *`STRING`* |
-| `ScanStmt` | → | **`SCAN`** *`ID`* `ScanOpts` `AliasOpt` `WhereClause` **`;`** |
-| `ScanOpts` | → | `ScanOpt` `ScanOpts` <br> \| `λ` |
-| `ScanOpt` | → | **`STRAND`** `StrandType` <br> \| **`THRESHOLD`** *`NUM`* **`%`** |
-| `AliasOpt` | → | **`AS`** *`ID`* <br> \| `λ` |
-| `SetOperationStmt`| → | `SetOp` `EntityRef` **`AND`** `EntityRef` `WhereClause` **`;`** |
-| `SetOp` | → | **`INTERSECT`** \| **`UNION`** \| **`EXCEPT`** |
-| `ExtractStmt` | → | **`EXTRACT`** `EntityRef` `WhereClause` **`;`** |
-| `WhereClause` | → | **`WHERE`** `Condition` <br> \| `λ` |
-| `Condition` | → | `Term` `ConditionPrime` |
-| `ConditionPrime`| → | **`OR`** `Term` `ConditionPrime` <br> \| `λ` |
-| `Term` | → | `Factor` `TermPrime` |
-| `TermPrime` | → | **`AND`** `Factor` `TermPrime` <br> \| `λ` |
-| `Factor` | → | **`NOT`** `Factor` <br> \| `SimpleCondition` <br> \| **`(`** `Condition` **`)`** |
-| `SimpleCondition`| → | `Property` `RelOp` `Value` |
-| `Property` | → | **`LENGTH`** \| **`SIMILARITY`** |
-| `RelOp` | → | **`>`** \| **`<`** \| **`>=`** \| **`<=`** \| **`=`** |
-| `Value` | → | *`NUM`* `Unit` <br> \| *`FLOAT`* **`%`** <br> \| *`NUM`* <br> \| *`STRING`* |
-| `Unit` | → | **`BP`** \| **`KB`** \| **`MB`** <br> \| `λ` |
-| `Direction` | → | **`UPSTREAM`** \| **`DOWNSTREAM`** |
-| `Entity` | → | **`GENE`** \| **`PROMOTER`** \| **`ENHANCER`** \| **`EXON`** \| **`INTRON`** \| **`UTR`** \| **`TSS`** \| **`CDS`** \| **`REGION`** |
-| `EntityRef` | → | `Entity` \| *`ID`* |
-| `EntityName` | → | *`STRING`* <br> \| `λ` |
-| `StrandType` | → | **`POSITIVE`** \| **`NEGATIVE`** |
-
-*(Keywords and terminals are highlighted in **`bold code`**. Identifiers and literals are in *`italic code`*. Non-terminals are in `regular code`)*
+| Script | Description | Primary Features |
+| :--- | :--- | :--- |
+| `01_extract_genes.cql` | Structural gene extraction | `EXTRACT`, `WHERE LENGTH` |
+| `02_length_filter.cql` | Multi-condition range filtering | Logical `AND`, bounded intervals |
+| `03_similarity_align.cql` | Paralog discovery via local alignment | Smith-Waterman `SIMILARITY > 70 %` |
+| `04_iupac_motifs.cql` | Degenerate promoter motif search | IUPAC translation engine (`TATAWAW`) |
+| `05_spatial_promoters.cql` | Upstream regulatory element search | `WITHIN 200 BP UPSTREAM FROM` |
+| `06_denovo_orfs.cql` | Unannotated ORF discovery | Regex matching, virtual annotations |
+| `07_pwm_scanning.cql` | JASPAR matrix scanning | Log-odds PSSM scoring (`THRESHOLD 80 %`) |
+| `08_ctcf_insulators.cql` | Chromatin insulator mapping | `EXCEPT` set subtraction |
+| `09_cpg_islands.cql` | Epigenetic CpG island profiling | `ANALYZE CPG_ISLANDS`, `INTERSECT` |
+| `10_promoter_union.cql` | Bipartite promoter element merger | Multi-track consolidation via `UNION` |
+| `11_strand_search.cql` | Sense vs. antisense motif profiling | `STRAND POSITIVE / NEGATIVE` |
+| `12_gc_content.cql` | Sliding-window GC landscape | `ANALYZE GC_CONTENT WINDOW` |
+| `13_complex_where.cql` | Multi-property conditional queries | Combined `LENGTH` & `SIMILARITY` |
+| `14_integrated_query.cql` | Master genome-wide regulatory map | Complete multi-track pipeline |
+| `15_if_else_branching.cql` | Conditional flow execution | `IF / ELSE / ENDIF` |
+| `16_foreach_batch_scan.cql` | Batch processing over matrix lists | `FOREACH / DO / ENDFOR` |
 
 ---
 
-## Current Status
+## Cis-QL Studio Interface
 
-**Cis-QL is actively under development.**
+Cis-QL Studio provides a graphical user interface for query development and visualization:
 
-Current working features:
-- Lexical, syntactic, and semantic analysis engines.
-- Virtual `GFF3` annotation building (in-memory).
-- KMP string matching and `std::regex` engine integrations.
-- **PWM/PSSM scanning** (JASPAR format) with log-odds scoring and sliding-window search on both strands.
-- Local alignment (Smith-Waterman) for sequence similarity filtering.
-- Fully operational set logic (Intersect, Union, Except).
-- `--debug` mode exposing the full compilation pipeline (tokens, AST, IR, intermediate results).
-
-*Note: This language is a research project and compiler design implementation. Expect syntax expansions and further optimizations in future releases.*
+- **Interactive Track Canvas:** Renders ruler coordinates, GC content curves, feature annotation boxes, and nucleotide text at high zoom.
+- **Data Export:** Exports execution results to `.cisql_results.json` for external downstream integration.
 
 ---
 
-## Output Naming & Intermediate Results
+## Compiler Architecture
 
-When a query is executed without an explicit `AS <alias>` clause, Cis-QL automatically generates a descriptive track name for the result set. This provides much clearer context when visualizing the tracks in Cis-QL Studio.
+```
+                                  [ .cql Source Query ]
+                                            │
+                                            ▼
+                                   Lexical Analyzer (Lexer)
+                                            │
+                                            ▼
+                                  LL(1) Recursive Parser
+                                            │
+                                            ▼
+                                  Abstract Syntax Tree (AST)
+                                            │
+                                            ▼
+                                    Semantic Analyzer
+                                            │
+                                            ▼
+                               Intermediate Representation (IR)
+                                            │
+                                            ▼
+                       Multithreaded C++11 Execution Engine
+                 (FastaReader, GFFReader, Sweep-Line, PWMScanner)
+                                            │
+                                            ▼
+                                [ .cisql_results.json ]
+                                            │
+                                            ▼
+                              Cis-QL Studio GUI Visualizer
+```
 
-Examples of automatic naming:
-- `EXTRACT PROMOTER;` -> `Extract_PROMOTER_0`
-- `FIND MOTIF "GCGCG";` -> `Find_GCGCG_1`
-- `INTERSECT GENE AND CDS;` -> `INTERSECT_GENE_CDS_2`
-- `SCAN tata_pwm;` -> `Scan_tata_pwm_3`
+---
+
+## Current Project Status
+
+Cis-QL is an active academic research project and compiler design implementation.
+
+Current operational components:
+- LL(1) Lexical, syntactic, and semantic analyzers.
+- Virtual annotation engine for unannotated sequence data.
+- IUPAC degeneration engine and regex matching integration.
+- Parallel multithreaded PSSM matrix scanner.
+- Smith-Waterman pairwise alignment module.
+- Sweep-line interval algebra engine (`INTERSECT`, `UNION`, `EXCEPT`).
+- Control flow execution engine (`IF/ELSE` and `FOREACH`).
+- Desktop GUI workspace (`Cis-QL Studio`).

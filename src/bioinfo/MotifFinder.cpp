@@ -17,6 +17,35 @@ std::string MotifFinder::reverseComplement(const std::string& seq) {
   return rc;
 }
 
+std::string MotifFinder::translateIUPAC(const std::string& pattern) {
+  std::string translated;
+  bool inBracket = false;
+  for (char c : pattern) {
+    if (c == '[') inBracket = true;
+    else if (c == ']') inBracket = false;
+
+    if (!inBracket) {
+      switch (std::toupper(c)) {
+        case 'R': translated += "[AG]"; break;
+        case 'Y': translated += "[CT]"; break;
+        case 'S': translated += "[GC]"; break;
+        case 'W': translated += "[AT]"; break;
+        case 'K': translated += "[GT]"; break;
+        case 'M': translated += "[AC]"; break;
+        case 'B': translated += "[CGT]"; break;
+        case 'D': translated += "[AGT]"; break;
+        case 'H': translated += "[ACT]"; break;
+        case 'V': translated += "[ACG]"; break;
+        case 'N': translated += "[ACGT]"; break;
+        default: translated += c; break;
+      }
+    } else {
+      translated += c;
+    }
+  }
+  return translated;
+}
+
 bool MotifFinder::isRegexPattern(const std::string& pattern) {
   for (char c : pattern) {
     if (c == '[' || c == ']' || c == '(' || c == ')' ||
@@ -25,7 +54,7 @@ bool MotifFinder::isRegexPattern(const std::string& pattern) {
       return true;
     }
   }
-  return false;
+  return translateIUPAC(pattern) != pattern;
 }
 
 std::vector<int> MotifFinder::computeKMPTable(const std::string& pattern) {
@@ -79,11 +108,12 @@ std::vector<size_t> MotifFinder::kmpSearch(const std::string& text, const std::s
 }
 
 std::vector<MotifMatch> MotifFinder::regexSearch(
-    const std::string& text, const std::string& pattern,
+    const std::string& text, const std::string& rawPattern,
     const std::string& strand) {
 
   std::vector<MotifMatch> matches;
   size_t contextSize = 20;
+  std::string pattern = translateIUPAC(rawPattern);
 
   try {
     std::regex re(pattern, std::regex::icase | std::regex::optimize);
@@ -156,8 +186,13 @@ std::vector<MotifMatch> MotifFinder::findAll(
     }
   }
 
+  for (auto& m : matches) {
+    m.chr = chr;
+  }
+
   std::sort(matches.begin(), matches.end(),
             [](const MotifMatch& a, const MotifMatch& b) {
+              if (a.chr != b.chr) return a.chr < b.chr;
               return a.position < b.position;
             });
 
@@ -177,6 +212,7 @@ std::vector<MotifMatch> MotifFinder::findInWindow(
 
   for (auto& m : matches) {
     m.position += windowStart;
+    m.chr = chr;
     size_t ctxStart = (m.position > 20) ? m.position - 20 : 0;
     size_t ctxEnd = std::min(m.position + m.matchLength + 20, sequence.size());
     m.context = sequence.substr(ctxStart, ctxEnd - ctxStart);

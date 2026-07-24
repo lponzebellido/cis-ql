@@ -27,7 +27,10 @@ enum class IROpCode {
   SCAN_OPT_THRESHOLD,
   SCAN_ALIAS,
   ANALYZE_GC,
-  ANALYZE_CPG
+  ANALYZE_CPG,
+  IF_BEGIN,
+  IF_ELSE,
+  IF_END
 };
 
 struct IRInstruction {
@@ -67,6 +70,8 @@ public:
   void visit(SetOpStmtNode *node) override;
   void visit(ScanStmtNode *node) override;
   void visit(AnalyzeStmtNode *node) override;
+  void visit(IfStmtNode *node) override;
+  void visit(ForeachStmtNode *node) override;
   void visit(ProgramNode *node) override;
 };
 

@@ -15,8 +15,10 @@ struct GenomicRegion {
 
   size_t length() const { return end - start; }
 
-  bool overlaps(const GenomicRegion& other) const {
-    return chr == other.chr && start < other.end && end > other.start;
+  bool overlaps(const GenomicRegion& other, bool matchStrand = false) const {
+    if (chr != other.chr) return false;
+    if (matchStrand && !strand.empty() && !other.strand.empty() && strand != other.strand) return false;
+    return start < other.end && end > other.start;
   }
 
   bool operator<(const GenomicRegion& other) const {

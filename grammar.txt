@@ -1,60 +1,68 @@
-Context-Free Grammar (CFG) for Cis-QL
+Context-Free Grammar (CFG) for Cis-QL (v2.0)
 
 Terminals (Tokens):
 
-LOAD, SEQUENCE, ANNOTATION, STRING, AS, ID, SEMICOLON, FIND, MOTIF, WITHIN, NUM,
-FROM, GENE, PROMOTER, ENHANCER, EXON, INTRON, UTR, TSS, CDS, REGION, STRAND,
-POSITIVE, NEGATIVE, CHR, EXTRACT, WHERE, INTERSECT, UNION, EXCEPT, AND,
-OR, NOT, LPAREN, RPAREN, LENGTH, SIMILARITY, GREATER, LESS, GREATER_EQ,
-LESS_EQ, ASSIGN, FLOAT, PERCENT, BP, KB, MB, UPSTREAM, DOWNSTREAM.
+LOAD, SEQUENCE, ANNOTATION, MATRIX, STRING, AS, ID, SEMICOLON, FIND, MOTIF, WITHIN, NUM,
+FROM, GENE, PROMOTER, ENHANCER, EXON, INTRON, UTR, TSS, CDS, REGION, STRAND, POSITIVE, NEGATIVE,
+CHR, EXTRACT, WHERE, INTERSECT, UNION, EXCEPT, AND, OR, NOT, LPAREN, RPAREN, LBRACKET, RBRACKET,
+LENGTH, SIMILARITY, GREATER, LESS, GREATER_EQ, LESS_EQ, ASSIGN, FLOAT, PERCENT, BP, KB, MB,
+UPSTREAM, DOWNSTREAM, SCAN, THRESHOLD, ANALYZE, GC_CONTENT, CPG_ISLANDS, WINDOW,
+IF, THEN, ELSE, ENDIF, FOREACH, IN, DO, ENDFOR, COMMA.
 
-Grammar:
+Grammar Rules:
 
-Program         -> StatementList
-StatementList   -> Statement StatementList | λ
+Program            -> StatementList
+StatementList      -> Statement StatementList | λ
 
-Statement       -> LoadStmt | FindStmt | ExtractStmt | SetOperationStmt | ScanStmt | AnalyzeStmt
+Statement          -> LoadStmt | FindStmt | ExtractStmt | SetOperationStmt | ScanStmt | AnalyzeStmt | IfStmt | ForeachStmt
 
-LoadStmt        -> LOAD (SEQUENCE | ANNOTATION | MATRIX) STRING AS ID SEMICOLON
+LoadStmt           -> LOAD (SEQUENCE | ANNOTATION | MATRIX) STRING AS ID SEMICOLON
 
-AnalyzeStmt     -> ANALYZE (GC_CONTENT | CPG_ISLANDS) (WINDOW NUM Unit)? AliasOpt WhereClause SEMICOLON
+AnalyzeStmt        -> ANALYZE (GC_CONTENT | CPG_ISLANDS) (WINDOW NUM Unit)? AliasOpt WhereClause SEMICOLON
 
-FindStmt        -> FIND MOTIF STRING FindOpts AliasOpt WhereClause SEMICOLON
-FindOpts        -> FindOpt FindOpts | λ
-FindOpt         -> WITHIN NUM Unit Direction FROM EntityRef EntityName
-                 | STRAND StrandType
-                 | CHR STRING
-AliasOpt        -> AS ID | λ
+FindStmt           -> FIND MOTIF STRING FindOpts AliasOpt WhereClause SEMICOLON
+FindOpts           -> FindOpt FindOpts | λ
+FindOpt            -> WITHIN NUM Unit Direction FROM EntityRef EntityName
+                    | STRAND StrandType
+                    | CHR STRING
 
-ScanStmt        -> SCAN ID ScanOpts AliasOpt WhereClause SEMICOLON
-ScanOpts        -> ScanOpt ScanOpts | λ
-ScanOpt         -> STRAND StrandType
-                 | THRESHOLD NUM PERCENT
+ScanStmt           -> SCAN ID ScanOpts AliasOpt WhereClause SEMICOLON
+ScanOpts           -> ScanOpt ScanOpts | λ
+ScanOpt            -> STRAND StrandType
+                    | THRESHOLD NUM PERCENT
 
-SetOperationStmt-> SetOp EntityRef AND EntityRef WhereClause SEMICOLON
-SetOp           -> INTERSECT | UNION | EXCEPT
+SetOperationStmt   -> SetOp EntityRef AND EntityRef WhereClause SEMICOLON
+SetOp              -> INTERSECT | UNION | EXCEPT
 
-ExtractStmt     -> EXTRACT EntityRef WhereClause SEMICOLON
+ExtractStmt        -> EXTRACT EntityRef WhereClause SEMICOLON
 
-WhereClause     -> WHERE Condition | λ
+IfStmt             -> IF Condition THEN StatementList (ELSE StatementList)? ENDIF (SEMICOLON)?
 
-Condition       -> Term ConditionPrime
-ConditionPrime  -> OR Term ConditionPrime | λ
-Term            -> Factor TermPrime
-TermPrime       -> AND Factor TermPrime | λ
-Factor          -> NOT Factor | SimpleCondition | LPAREN Condition RPAREN
+ForeachStmt        -> FOREACH ID IN LBRACKET CollectionList RBRACKET DO StatementList ENDFOR (SEMICOLON)?
+CollectionList     -> CollectionItem (COMMA CollectionItem)* | λ
+CollectionItem     -> ID | STRING | NUM
 
-SimpleCondition -> Property RelOp Value
-Property        -> LENGTH | SIMILARITY
-RelOp           -> GREATER | LESS | GREATER_EQ | LESS_EQ | ASSIGN
-Value           -> NUM Unit | FLOAT PERCENT | NUM | STRING
+WhereClause        -> WHERE Condition | λ
 
-Unit            -> BP | KB | MB | λ
-Direction       -> UPSTREAM | DOWNSTREAM
-Entity          -> GENE | PROMOTER | ENHANCER | EXON | INTRON | UTR | TSS | CDS | REGION
-EntityRef       -> Entity | ID
-EntityName      -> STRING | λ
-StrandType      -> POSITIVE | NEGATIVE
+Condition          -> Term ConditionPrime
+ConditionPrime     -> OR Term ConditionPrime | λ
+Term               -> Factor TermPrime
+TermPrime          -> AND Factor TermPrime | λ
+Factor             -> NOT Factor | SimpleCondition | LPAREN Condition RPAREN
 
-Note on Result Naming:
-If an `AliasOpt` (AS ID) is not provided for queries like FIND, SCAN, or for operations like EXTRACT and INTERSECT, Cis-QL automatically generates a descriptive track name to clarify the results (e.g., `Find_TATAAT_0`, `Extract_PROMOTER_1`, `INTERSECT_GENE_CDS_2`).
+SimpleCondition    -> Property RelOp Value
+Property           -> LENGTH | SIMILARITY | GC_CONTENT | ID
+RelOp              -> GREATER | LESS | GREATER_EQ | LESS_EQ | ASSIGN
+Value              -> NUM Unit | FLOAT PERCENT | NUM | STRING
+
+Unit               -> BP | KB | MB | λ
+Direction          -> UPSTREAM | DOWNSTREAM
+Entity             -> GENE | PROMOTER | ENHANCER | EXON | INTRON | UTR | TSS | CDS | REGION
+EntityRef          -> Entity | ID
+EntityName         -> STRING | λ
+StrandType         -> POSITIVE | NEGATIVE
+
+Note on Execution Engine & Studio Integration:
+1. Cis-QL automatically compiles degenerate IUPAC nucleotide codes (e.g. TATAWAW) into regex patterns.
+2. If an `AliasOpt` (AS ID) is not provided, Cis-QL auto-generates descriptive track names (e.g., `Find_TATAAT_0`, `Scan_tbp_1`).
+3. Execution outputs are formatted into `.cisql_results.json` for live visualization in Cis-QL Studio.

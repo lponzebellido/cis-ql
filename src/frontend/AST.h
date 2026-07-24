@@ -17,6 +17,8 @@ class ExtractStmtNode;
 class SetOpStmtNode;
 class ScanStmtNode;
 class AnalyzeStmtNode;
+class IfStmtNode;
+class ForeachStmtNode;
 class ProgramNode;
 
 class ASTVisitor {
@@ -32,6 +34,8 @@ public:
   virtual void visit(SetOpStmtNode* node) = 0;
   virtual void visit(ScanStmtNode* node) = 0;
   virtual void visit(AnalyzeStmtNode* node) = 0;
+  virtual void visit(IfStmtNode* node) = 0;
+  virtual void visit(ForeachStmtNode* node) = 0;
   virtual void visit(ProgramNode* node) = 0;
 };
 
@@ -163,6 +167,36 @@ public:
         whereClause(std::move(w)) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;
+};
+
+class IfStmtNode : public StatementNode {
+public:
+  std::unique_ptr<ConditionNode> condition;
+  std::vector<std::unique_ptr<StatementNode>> thenStatements;
+  std::vector<std::unique_ptr<StatementNode>> elseStatements;
+
+  IfStmtNode(std::unique_ptr<ConditionNode> cond,
+             std::vector<std::unique_ptr<StatementNode>> thenStmts,
+             std::vector<std::unique_ptr<StatementNode>> elseStmts = {})
+      : condition(std::move(cond)), thenStatements(std::move(thenStmts)),
+        elseStatements(std::move(elseStmts)) {}
+
+  void print(std::string prefix = "", bool isLast = true) const override;
+  void accept(ASTVisitor &visitor) override;
+};
+
+class ForeachStmtNode : public StatementNode {
+public:
+  std::string iteratorVar;
+  std::vector<std::string> collection;
+  std::vector<std::unique_ptr<StatementNode>> bodyStatements;
+
+  ForeachStmtNode(std::string var, std::vector<std::string> coll,
+                  std::vector<std::unique_ptr<StatementNode>> body)
+      : iteratorVar(var), collection(coll), bodyStatements(std::move(body)) {}
+
+  void print(std::string prefix = "", bool isLast = true) const override;
+  void accept(ASTVisitor &visitor) override;
 };
 
 class ProgramNode : public ASTNode {

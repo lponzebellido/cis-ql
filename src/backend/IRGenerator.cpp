@@ -25,6 +25,9 @@ std::string irOpcodeToString(IROpCode op) {
     case IROpCode::SCAN_ALIAS:       return "SCAN_ALIAS";
     case IROpCode::ANALYZE_GC:       return "ANALYZE_GC";
     case IROpCode::ANALYZE_CPG:      return "ANALYZE_CPG";
+    case IROpCode::IF_BEGIN:         return "IF_BEGIN";
+    case IROpCode::IF_ELSE:          return "IF_ELSE";
+    case IROpCode::IF_END:           return "IF_END";
     default: return "UNKNOWN";
   }
 }
@@ -265,4 +268,52 @@ void IRGenerator::visit(AnalyzeStmtNode *node) {
   printInstr.arg1 = node->alias.empty() ? currentTemp : node->alias;
   printInstr.arg2 = "ANALYZE";
   instructions.push_back(printInstr);
+}
+
+void IRGenerator::visit(IfStmtNode *node) {
+  std::string prop, op, val;
+  if (auto simple = dynamic_cast<SimpleConditionNode*>(node->condition.get())) {
+    prop = simple->property;
+    op = simple->op;
+    val = simple->value;
+  }
+  IRInstruction ifBegin;
+  ifBegin.opcode = IROpCode::IF_BEGIN;
+  ifBegin.arg1 = prop;
+  ifBegin.arg2 = op;
+  ifBegin.arg3 = val;
+  instructions.push_back(ifBegin);
+
+  for (auto &stmt : node->thenStatements) {
+    if (stmt) stmt->accept(*this);
+  }
+
+  if (!node->elseStatements.empty()) {
+    IRInstruction ifElse;
+    ifElse.opcode = IROpCode::IF_ELSE;
+    instructions.push_back(ifElse);
+    for (auto &stmt : node->elseStatements) {
+      if (stmt) stmt->accept(*this);
+    }
+  }
+
+  IRInstruction ifEnd;
+  ifEnd.opcode = IROpCode::IF_END;
+  instructions.push_back(ifEnd);
+}
+
+void IRGenerator::visit(ForeachStmtNode *node) {
+  for (const auto &val : node->collection) {
+    size_t startIdx = instructions.size();
+    for (auto &stmt : node->bodyStatements) {
+      if (stmt) stmt->accept(*this);
+    }
+    for (size_t i = startIdx; i < instructions.size(); ++i) {
+      if (instructions[i].arg1 == node->iteratorVar) instructions[i].arg1 = val;
+      if (instructions[i].arg2 == node->iteratorVar) instructions[i].arg2 = val;
+      if (instructions[i].arg3 == node->iteratorVar) instructions[i].arg3 = val;
+      if (instructions[i].arg4 == node->iteratorVar) instructions[i].arg4 = val;
+      if (instructions[i].arg5 == node->iteratorVar) instructions[i].arg5 = val;
+    }
+  }
 }

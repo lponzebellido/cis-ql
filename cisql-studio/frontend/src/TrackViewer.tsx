@@ -99,14 +99,17 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
 
     const rect = container.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
+    const requiredH = RULER_H + (gcProfileNames.length * 60) + (trackNames.length * 50) + 30;
+    const contentH = Math.max(rect.height, requiredH);
+
     canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
+    canvas.height = contentH * dpr;
     ctx.scale(dpr, dpr);
     canvas.style.width = `${rect.width}px`;
-    canvas.style.height = `${rect.height}px`;
+    canvas.style.height = `${contentH}px`;
 
     const w = rect.width;
-    const h = rect.height;
+    const h = contentH;
     const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
     ctx.fillStyle = dark ? '#0d1117' : '#fff';
@@ -115,8 +118,9 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
     if (trackNames.length === 0 && gcProfileNames.length === 0) return;
 
     const viewRange = totalRange / zoom;
-    const viewMin = globalMin - pad + panOffset;
-    const viewMax = viewMin + viewRange + pad * 2;
+    const padVal = viewRange * 0.02;
+    const viewMin = globalMin - padVal + panOffset;
+    const viewMax = viewMin + viewRange + padVal * 2;
     const effRange = viewMax - viewMin;
     const toX = (bp: number) => LABEL_W + ((bp - viewMin) / effRange) * (w - LABEL_W);
 
@@ -387,16 +391,17 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return null;
     const viewRange = totalRange / zoom;
-    const viewMin = globalMin - pad + panOffset;
-    const viewMax = viewMin + viewRange + pad * 2;
+    const padVal = viewRange * 0.02;
+    const viewMin = globalMin - padVal + panOffset;
+    const viewMax = viewMin + viewRange + padVal * 2;
     const effRange = viewMax - viewMin;
     return { viewMin, effRange, w: rect.width, h: rect.height };
   };
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    const factor = e.deltaY > 0 ? 0.85 : 1.18;
-    setZoom(prev => Math.max(0.5, Math.min(50000, prev * factor)));
+    const factor = e.deltaY > 0 ? 0.8 : 1.25;
+    setZoom(prev => Math.max(0.5, Math.min(10000000, prev * factor)));
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -410,8 +415,9 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
     const p = getViewParams();
     if (!p) return;
     const rect = containerRef.current!.getBoundingClientRect();
+    const scrollTop = containerRef.current ? containerRef.current.scrollTop : 0;
     const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const y = e.clientY - rect.top + scrollTop;
 
     const bp = p.viewMin + ((x - LABEL_W) / (p.w - LABEL_W)) * p.effRange;
     setCursorBp(bp);
@@ -423,7 +429,8 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
       return;
     }
 
-    const trackIdx = Math.floor((y - RULER_H) / TRACK_H);
+    const gcOffsetH = gcProfileNames.length * 60;
+    const trackIdx = Math.floor((y - RULER_H - gcOffsetH) / TRACK_H);
     let found: GenomicRegion | null = null;
     if (trackIdx >= 0 && trackIdx < trackNames.length && x > LABEL_W) {
       const hitPad = p.effRange * 0.002;
@@ -460,7 +467,7 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
     const buffer = regionRange * 2;
     const center = (region.start + region.end) / 2;
     const newZoom = totalRange / (regionRange + buffer);
-    setZoom(Math.min(50000, Math.max(0.5, newZoom)));
+    setZoom(Math.min(10000000, Math.max(0.5, newZoom)));
     setPanOffset(center - globalMin - totalRange / (2 * newZoom));
   };
 
@@ -480,8 +487,8 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
   return (
     <div className="track-viewer-container">
       <div className="track-toolbar">
-        <button onClick={() => setZoom(prev => Math.min(50000, prev * 1.5))}>+ Zoom In</button>
-        <button onClick={() => setZoom(prev => Math.max(0.5, prev / 1.5))}>- Zoom Out</button>
+        <button onClick={() => setZoom(prev => Math.min(10000000, prev * 2))}>+ Zoom In</button>
+        <button onClick={() => setZoom(prev => Math.max(0.5, prev / 2))}>- Zoom Out</button>
         <button onClick={() => { setZoom(1); setPanOffset(0); setSelectedRegion(null); }}>Reset</button>
         {selectedRegion && (
           <button onClick={() => zoomToRegion(selectedRegion)}>Focus Selected</button>

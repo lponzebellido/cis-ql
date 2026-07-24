@@ -79,14 +79,38 @@ void ScanStmtNode::print(std::string prefix, bool isLast) const {
 }
 
 void AnalyzeStmtNode::print(std::string prefix, bool isLast) const {
-    std::cout << prefix << (isLast ? "\u2514\u2500\u2500 " : "\u251c\u2500\u2500 ") << "AnalyzeStmt(" << analysisType;
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "AnalyzeStmt(" << analysisType;
     if (!windowSize.empty()) std::cout << ", Window: " << windowSize;
     if (!alias.empty()) std::cout << ", AS: " << alias;
     std::cout << ")" << std::endl;
-    std::string childPrefix = prefix + (isLast ? "    " : "\u2502   ");
+    std::string childPrefix = prefix + (isLast ? "    " : "│   ");
     if (whereClause) {
-        std::cout << childPrefix << "\u2514\u2500\u2500 Where:" << std::endl;
+        std::cout << childPrefix << "└── Where:" << std::endl;
         whereClause->print(childPrefix + "    ", true);
+    }
+}
+
+void IfStmtNode::print(std::string prefix, bool isLast) const {
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "IfStmt" << std::endl;
+    std::string childPrefix = prefix + (isLast ? "    " : "│   ");
+    if (condition) condition->print(childPrefix, false);
+    for (size_t i = 0; i < thenStatements.size(); ++i) {
+        thenStatements[i]->print(childPrefix, elseStatements.empty() && i == thenStatements.size() - 1);
+    }
+    for (size_t i = 0; i < elseStatements.size(); ++i) {
+        elseStatements[i]->print(childPrefix, i == elseStatements.size() - 1);
+    }
+}
+
+void ForeachStmtNode::print(std::string prefix, bool isLast) const {
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "ForeachStmt(" << iteratorVar << " IN [";
+    for (size_t i = 0; i < collection.size(); ++i) {
+        std::cout << collection[i] << (i + 1 < collection.size() ? ", " : "");
+    }
+    std::cout << "])" << std::endl;
+    std::string childPrefix = prefix + (isLast ? "    " : "│   ");
+    for (size_t i = 0; i < bodyStatements.size(); ++i) {
+        bodyStatements[i]->print(childPrefix, i == bodyStatements.size() - 1);
     }
 }
 
@@ -112,4 +136,6 @@ void ExtractStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void SetOpStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ScanStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void AnalyzeStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
+void IfStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
+void ForeachStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ProgramNode::accept(ASTVisitor& visitor) { visitor.visit(this); }

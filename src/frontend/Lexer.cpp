@@ -65,6 +65,15 @@ void Lexer::initKeywords() {
     keywords["GC_CONTENT"] = TokenType::GC_CONTENT;
     keywords["CPG_ISLANDS"] = TokenType::CPG_ISLANDS;
     keywords["WINDOW"] = TokenType::WINDOW;
+
+    keywords["IF"] = TokenType::IF;
+    keywords["THEN"] = TokenType::THEN;
+    keywords["ELSE"] = TokenType::ELSE;
+    keywords["ENDIF"] = TokenType::ENDIF;
+    keywords["FOREACH"] = TokenType::FOREACH;
+    keywords["IN"] = TokenType::IN;
+    keywords["DO"] = TokenType::DO;
+    keywords["ENDFOR"] = TokenType::ENDFOR;
 }
 
 char Lexer::getChar() {
@@ -235,6 +244,8 @@ std::vector<Token> Lexer::tokenize() {
                 case ',': tokens.push_back(createToken(TokenType::COMMA, lexeme, startLine, startCol)); break;
                 case '(': tokens.push_back(createToken(TokenType::LPAREN, lexeme, startLine, startCol)); break;
                 case ')': tokens.push_back(createToken(TokenType::RPAREN, lexeme, startLine, startCol)); break;
+                case '[': tokens.push_back(createToken(TokenType::LBRACKET, lexeme, startLine, startCol)); break;
+                case ']': tokens.push_back(createToken(TokenType::RBRACKET, lexeme, startLine, startCol)); break;
                 case '%': tokens.push_back(createToken(TokenType::PERCENT, lexeme, startLine, startCol)); break;
                 case '=': 
                     tokens.push_back(createToken(TokenType::ASSIGN, lexeme, startLine, startCol)); 

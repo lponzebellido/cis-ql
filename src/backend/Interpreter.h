@@ -10,6 +10,7 @@
 #include "../bioinfo/PWMScanner.h"
 #include "../bioinfo/GCAnalyzer.h"
 #include "IRGenerator.h"
+#include <future>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -33,7 +34,8 @@ struct ScanContext {
 
 class Interpreter {
 private:
-  std::unordered_map<std::string, FastaRecord> sequences;
+  std::unordered_map<std::string, std::vector<FastaRecord>> sequenceDatasets;
+  std::unordered_map<std::string, std::unordered_map<std::string, FastaRecord>> sequenceChrMaps;
   std::vector<GenomicRegion> annotations;
   std::unordered_map<std::string, std::vector<GenomicRegion>> resultSets;
   std::unordered_map<std::string, std::vector<MotifMatch>> motifResults;
@@ -77,6 +79,7 @@ private:
   void executeScanAlias(const IRInstruction &instr);
   void executeAnalyzeGC(const IRInstruction &instr);
   void executeAnalyzeCpG(const IRInstruction &instr);
+  bool evaluateCondition(const std::string &prop, const std::string &op, const std::string &val);
   
   void dumpResultsJSON() const;
 

@@ -97,13 +97,17 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
     return parseScan();
   if (match(TokenType::ANALYZE))
     return parseAnalyze();
+  if (match(TokenType::IF))
+    return parseIf();
+  if (match(TokenType::FOREACH))
+    return parseForeach();
 
   if (match(TokenType::ERROR_TOKEN)) {
     return nullptr;
   }
 
   reportError(peek(), "Expected start of a statement (LOAD, FIND, EXTRACT, "
-                      "INTERSECT, UNION, EXCEPT, SCAN, ANALYZE)");
+                      "INTERSECT, UNION, EXCEPT, SCAN, ANALYZE, IF, FOREACH)");
   throw std::runtime_error("Parse error");
 }
 
@@ -362,10 +366,10 @@ std::unique_ptr<ConditionNode> Parser::parseFactor() {
 
 std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
   std::string prop;
-  if (match(TokenType::LENGTH) || match(TokenType::SIMILARITY)) {
+  if (match(TokenType::LENGTH) || match(TokenType::SIMILARITY) || match(TokenType::GC_CONTENT) || match(TokenType::ID)) {
     prop = previous().lexeme;
   } else {
-    reportError(peek(), "Expected 'LENGTH' or 'SIMILARITY'.");
+    reportError(peek(), "Expected property name ('LENGTH', 'SIMILARITY', 'GC_CONTENT', or identifier).");
     throw std::runtime_error("Parse error");
   }
 
@@ -432,4 +436,53 @@ std::unique_ptr<AnalyzeStmtNode> Parser::parseAnalyze() {
 
   return std::unique_ptr<AnalyzeStmtNode>(
       new AnalyzeStmtNode(analysisType, windowSize, alias, std::move(where)));
+}
+
+std::unique_ptr<IfStmtNode> Parser::parseIf() {
+  auto cond = parseCondition();
+  consume(TokenType::THEN, "Expected 'THEN' after IF condition.");
+  std::vector<std::unique_ptr<StatementNode>> thenStmts;
+  while (!check(TokenType::ELSE) && !check(TokenType::ENDIF) && !isAtEnd()) {
+    auto s = parseStatement();
+    if (s) thenStmts.push_back(std::move(s));
+  }
+  std::vector<std::unique_ptr<StatementNode>> elseStmts;
+  if (match(TokenType::ELSE)) {
+    while (!check(TokenType::ENDIF) && !isAtEnd()) {
+      auto s = parseStatement();
+      if (s) elseStmts.push_back(std::move(s));
+    }
+  }
+  consume(TokenType::ENDIF, "Expected 'ENDIF' after IF statement.");
+  match(TokenType::SEMICOLON);
+  return std::unique_ptr<IfStmtNode>(new IfStmtNode(std::move(cond), std::move(thenStmts), std::move(elseStmts)));
+}
+
+std::unique_ptr<ForeachStmtNode> Parser::parseForeach() {
+  consume(TokenType::ID, "Expected loop variable after FOREACH.");
+  std::string var = previous().lexeme;
+  consume(TokenType::IN, "Expected 'IN' after loop variable.");
+  consume(TokenType::LBRACKET, "Expected '[' before FOREACH collection.");
+  std::vector<std::string> coll;
+  if (!check(TokenType::RBRACKET)) {
+    do {
+      if (match(TokenType::ID) || match(TokenType::STRING) || match(TokenType::NUM)) {
+        coll.push_back(previous().lexeme);
+      } else {
+        reportError(peek(), "Expected item identifier in FOREACH collection.");
+        throw std::runtime_error("Parse error");
+      }
+    } while (match(TokenType::COMMA));
+  }
+  consume(TokenType::RBRACKET, "Expected ']' after FOREACH collection.");
+  consume(TokenType::DO, "Expected 'DO' after FOREACH collection.");
+
+  std::vector<std::unique_ptr<StatementNode>> bodyStmts;
+  while (!check(TokenType::ENDFOR) && !isAtEnd()) {
+    auto s = parseStatement();
+    if (s) bodyStmts.push_back(std::move(s));
+  }
+  consume(TokenType::ENDFOR, "Expected 'ENDFOR' after FOREACH body.");
+  match(TokenType::SEMICOLON);
+  return std::unique_ptr<ForeachStmtNode>(new ForeachStmtNode(var, coll, std::move(bodyStmts)));
 }
