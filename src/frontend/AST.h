@@ -13,6 +13,7 @@ class NotConditionNode;
 class LoadStmtNode;
 class UseStmtNode;
 class ExportStmtNode;
+class DefinePromotersStmtNode;
 class FindOptNode;
 class FindStmtNode;
 class ExtractStmtNode;
@@ -32,6 +33,7 @@ public:
   virtual void visit(LoadStmtNode* node) = 0;
   virtual void visit(UseStmtNode* node) = 0;
   virtual void visit(ExportStmtNode* node) = 0;
+  virtual void visit(DefinePromotersStmtNode* node) = 0;
   virtual void visit(FindOptNode* node) = 0;
   virtual void visit(FindStmtNode* node) = 0;
   virtual void visit(ExtractStmtNode* node) = 0;
@@ -116,6 +118,24 @@ public:
   std::string format;
   ExportStmtNode(std::string a, std::string f, std::string fmt)
       : alias(a), filename(f), format(fmt) {}
+  void print(std::string prefix = "", bool isLast = true) const override;
+  void accept(ASTVisitor& visitor) override;
+};
+
+class DefinePromotersStmtNode : public StatementNode {
+public:
+  std::string source;
+  std::string upstreamValue;
+  std::string upstreamUnit;
+  std::string downstreamValue;
+  std::string downstreamUnit;
+  std::string alias;
+
+  DefinePromotersStmtNode(std::string src, std::string upValue,
+                          std::string upUnit, std::string downValue,
+                          std::string downUnit, std::string a)
+      : source(src), upstreamValue(upValue), upstreamUnit(upUnit),
+        downstreamValue(downValue), downstreamUnit(downUnit), alias(a) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;
 };

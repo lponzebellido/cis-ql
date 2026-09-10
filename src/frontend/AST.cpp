@@ -36,6 +36,14 @@ void ExportStmtNode::print(std::string prefix, bool isLast) const {
               << " FORMAT " << format << ")" << std::endl;
 }
 
+void DefinePromotersStmtNode::print(std::string prefix, bool isLast) const {
+    std::cout << prefix << (isLast ? "└── " : "├── ")
+              << "DefinePromotersStmt(Source: " << source
+              << ", From: TSS, Upstream: " << upstreamValue << " "
+              << upstreamUnit << ", Downstream: " << downstreamValue << " "
+              << downstreamUnit << ", AS: " << alias << ")" << std::endl;
+}
+
 void FindOptNode::print(std::string prefix, bool isLast) const {
     std::cout << prefix << (isLast ? "└── " : "├── ") << "FindOpt(" << type;
     if (!value1.empty()) std::cout << ", " << value1;
@@ -150,6 +158,7 @@ void NotConditionNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void LoadStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void UseStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ExportStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
+void DefinePromotersStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void FindOptNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void FindStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ExtractStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }

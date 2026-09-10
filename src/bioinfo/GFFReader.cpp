@@ -35,8 +35,6 @@ std::vector<GenomicRegion> GFFReader::read(const std::string& filename) {
   }
 
   std::string line;
-  std::vector<GenomicRegion> genes;
-
   while (std::getline(file, line)) {
     if (line.empty() || line[0] == '#') continue;
     if (line.find("##FASTA") != std::string::npos) break;
@@ -67,41 +65,6 @@ std::vector<GenomicRegion> GFFReader::read(const std::string& filename) {
 
     regions.push_back(region);
 
-    if (type == "gene") {
-      genes.push_back(region);
-    }
-  }
-
-  for (const auto& gene : genes) {
-    GenomicRegion promoter;
-    promoter.chr = gene.chr;
-    promoter.strand = gene.strand;
-    promoter.type = "promoter";
-    promoter.name = gene.name + "_promoter";
-    if (gene.strand == "+") {
-      promoter.start = (gene.start > 250) ? gene.start - 250 : 0;
-      promoter.end = gene.start;
-    } else {
-      promoter.start = gene.end;
-      promoter.end = gene.end + 250;
-    }
-    if (promoter.start < promoter.end) {
-      regions.push_back(promoter);
-    }
-
-    GenomicRegion tss;
-    tss.chr = gene.chr;
-    tss.strand = gene.strand;
-    tss.type = "TSS";
-    tss.name = gene.name + "_TSS";
-    if (gene.strand == "+") {
-      tss.start = gene.start;
-      tss.end = gene.start + 1;
-    } else {
-      tss.start = gene.end - 1;
-      tss.end = gene.end;
-    }
-    regions.push_back(tss);
   }
 
   return regions;

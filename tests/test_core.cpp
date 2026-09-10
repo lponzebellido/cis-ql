@@ -1,6 +1,7 @@
 #include "../src/bioinfo/GCAnalyzer.h"
 #include "../src/bioinfo/MotifFinder.h"
 #include "../src/bioinfo/PWMScanner.h"
+#include "../src/bioinfo/RegulatoryRegions.h"
 #include "../src/bioinfo/SetOperations.h"
 #include "../src/bioinfo/SmithWaterman.h"
 
@@ -9,6 +10,7 @@
 #include <iostream>
 #include <random>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -112,6 +114,45 @@ int main() {
   require(merged.size() == 1 && merged[0].start == 0 &&
               merged[0].end == 15 && merged[0].sequence.empty(),
           "merged intervals do not retain stale sequence data");
+
+  GenomicRegion positiveGene = region(100, 200);
+  positiveGene.name = "positive";
+  GenomicRegion negativeGene = region(300, 400);
+  negativeGene.name = "negative";
+  negativeGene.strand = "-";
+  std::vector<GenomicRegion> promoters;
+  std::string promoterError;
+  require(RegulatoryRegions::buildPromoters(
+              {positiveGene, negativeGene}, {{"chr1", 500}}, 50, 10,
+              promoters, promoterError),
+          "TSS-relative promoter construction succeeds");
+  require(promoters.size() == 2 && promoters[0].start == 50 &&
+              promoters[0].end == 110 && promoters[0].strand == "+" &&
+              promoters[1].start == 390 && promoters[1].end == 450 &&
+              promoters[1].strand == "-",
+          "promoter coordinates respect source strand");
+
+  GenomicRegion chromosomeEdge = region(5, 25);
+  chromosomeEdge.name = "edge";
+  require(RegulatoryRegions::buildPromoters(
+              {chromosomeEdge}, {{"chr1", 500}}, 50, 10, promoters,
+              promoterError) &&
+              promoters.size() == 1 && promoters[0].start == 0 &&
+              promoters[0].end == 15,
+          "promoters are clamped to chromosome bounds");
+
+  GenomicRegion unstranded = region(100, 200);
+  unstranded.strand = ".";
+  require(!RegulatoryRegions::buildPromoters(
+              {unstranded}, {{"chr1", 500}}, 50, 10, promoters,
+              promoterError) &&
+              promoterError.find("strand") != std::string::npos,
+          "unstranded promoter sources are rejected");
+  require(!RegulatoryRegions::buildPromoters(
+              {positiveGene}, {{"chr2", 500}}, 50, 10, promoters,
+              promoterError) &&
+              promoterError.find("active FASTA") != std::string::npos,
+          "promoter sources must match the active genome");
 
   const auto gc = GCAnalyzer::gcContentWindowed("GGCCAAAA", 4, 4);
   require(gc.size() == 2 && std::abs(gc[0].gcPercent - 100.0) < 1e-9 &&

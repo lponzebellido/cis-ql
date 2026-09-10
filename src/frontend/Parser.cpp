@@ -55,6 +55,7 @@ void Parser::synchronize() {
     case TokenType::LOAD:
     case TokenType::USE:
     case TokenType::EXPORT:
+    case TokenType::DEFINE:
     case TokenType::FIND:
     case TokenType::EXTRACT:
     case TokenType::INTERSECT:
@@ -90,6 +91,8 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
     return parseUse();
   if (match(TokenType::EXPORT))
     return parseExport();
+  if (match(TokenType::DEFINE))
+    return parseDefinePromoters();
   if (match(TokenType::FIND))
     return parseFind();
   if (match(TokenType::EXTRACT))
@@ -114,8 +117,62 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
 
   reportError(peek(), "Expected start of a statement (LOAD, USE, EXPORT, FIND, "
                       "EXTRACT, INTERSECT, UNION, EXCEPT, SCAN, ANALYZE, IF, "
-                      "FOREACH)");
+                      "FOREACH, DEFINE)");
   throw std::runtime_error("Parse error");
+}
+
+std::unique_ptr<DefinePromotersStmtNode> Parser::parseDefinePromoters() {
+  consume(TokenType::PROMOTERS, "Expected 'PROMOTERS' after DEFINE.");
+  consume(TokenType::OF, "Expected 'OF' after DEFINE PROMOTERS.");
+
+  std::string source;
+  if (match(TokenType::GENE) || match(TokenType::TSS) ||
+      match(TokenType::ID)) {
+    source = previous().lexeme;
+  } else {
+    reportError(peek(), "Expected GENE, TSS, or a result-set alias after OF.");
+    throw std::runtime_error("Parse error");
+  }
+
+  consume(TokenType::FROM, "Expected 'FROM TSS' after the promoter source.");
+  consume(TokenType::TSS, "Expected 'TSS' after FROM.");
+  consume(TokenType::UPSTREAM, "Expected 'UPSTREAM' after FROM TSS.");
+  if (!match(TokenType::NUM) && !match(TokenType::FLOAT)) {
+    reportError(peek(), "Expected an upstream distance.");
+    throw std::runtime_error("Parse error");
+  }
+  const std::string upstreamValue = previous().lexeme;
+  if (!match(TokenType::BP) && !match(TokenType::KB) &&
+      !match(TokenType::MB)) {
+    reportError(peek(), "Expected BP, KB, or MB after the upstream distance.");
+    throw std::runtime_error("Parse error");
+  }
+  const std::string upstreamUnit = previous().lexeme;
+
+  consume(TokenType::DOWNSTREAM,
+          "Expected 'DOWNSTREAM' after the upstream window.");
+  if (!match(TokenType::NUM) && !match(TokenType::FLOAT)) {
+    reportError(peek(), "Expected a downstream distance.");
+    throw std::runtime_error("Parse error");
+  }
+  const std::string downstreamValue = previous().lexeme;
+  if (!match(TokenType::BP) && !match(TokenType::KB) &&
+      !match(TokenType::MB)) {
+    reportError(peek(),
+                "Expected BP, KB, or MB after the downstream distance.");
+    throw std::runtime_error("Parse error");
+  }
+  const std::string downstreamUnit = previous().lexeme;
+
+  consume(TokenType::AS, "Expected 'AS' after the promoter window.");
+  consume(TokenType::ID, "Expected an alias after AS.");
+  const std::string alias = previous().lexeme;
+  consume(TokenType::SEMICOLON,
+          "Expected ';' at the end of DEFINE PROMOTERS.");
+
+  return std::unique_ptr<DefinePromotersStmtNode>(
+      new DefinePromotersStmtNode(source, upstreamValue, upstreamUnit,
+                                  downstreamValue, downstreamUnit, alias));
 }
 
 std::unique_ptr<UseStmtNode> Parser::parseUse() {

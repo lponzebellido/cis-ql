@@ -8,6 +8,7 @@
 #include "../bioinfo/SetOperations.h"
 #include "../bioinfo/SmithWaterman.h"
 #include "../bioinfo/PWMScanner.h"
+#include "../bioinfo/RegulatoryRegions.h"
 #include "../bioinfo/GCAnalyzer.h"
 #include "IRGenerator.h"
 #include <future>
@@ -68,6 +69,7 @@ private:
   void executeLoadAnnot(const IRInstruction &instr);
   void executeUseDataset(const IRInstruction &instr);
   void executeExport(const IRInstruction &instr);
+  void executeDefinePromoters(const IRInstruction &instr);
   void executeFindMotif(const IRInstruction &instr);
   void executeFindOptWithin(const IRInstruction &instr);
   void executeFindOptStrand(const IRInstruction &instr);

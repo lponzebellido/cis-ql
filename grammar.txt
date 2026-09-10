@@ -1,8 +1,8 @@
-Context-Free Grammar (CFG) for Cis-QL (v2.0)
+Context-Free Grammar (CFG) for Cis-QL (v3.0-dev, regulatory foundation)
 
 Terminals (Tokens):
 
-LOAD, USE, EXPORT, SEQUENCE, ANNOTATION, MATRIX, STRING, AS, ID, SEMICOLON, FIND, MOTIF, WITHIN, NUM,
+LOAD, USE, EXPORT, DEFINE, PROMOTERS, OF, SEQUENCE, ANNOTATION, MATRIX, STRING, AS, ID, SEMICOLON, FIND, MOTIF, WITHIN, NUM,
 FROM, GENE, PROMOTER, ENHANCER, EXON, INTRON, UTR, TSS, CDS, REGION, STRAND, POSITIVE, NEGATIVE,
 CHR, EXTRACT, WHERE, INTERSECT, UNION, EXCEPT, AND, OR, NOT, LPAREN, RPAREN, LBRACKET, RBRACKET,
 LENGTH, SIMILARITY, GREATER, LESS, GREATER_EQ, LESS_EQ, ASSIGN, FLOAT, PERCENT, BP, KB, MB,
@@ -14,11 +14,14 @@ Grammar Rules:
 Program            -> StatementList
 StatementList      -> Statement StatementList | λ
 
-Statement          -> LoadStmt | UseStmt | ExportStmt | FindStmt | ExtractStmt | SetOperationStmt | ScanStmt | AnalyzeStmt | IfStmt | ForeachStmt
+Statement          -> LoadStmt | UseStmt | ExportStmt | DefinePromotersStmt | FindStmt | ExtractStmt | SetOperationStmt | ScanStmt | AnalyzeStmt | IfStmt | ForeachStmt
 
 LoadStmt           -> LOAD (SEQUENCE | ANNOTATION | MATRIX) STRING AS ID SEMICOLON
 UseStmt            -> USE (SEQUENCE | ANNOTATION) ID SEMICOLON
 ExportStmt         -> EXPORT ID TO STRING FORMAT (BED | GFF3 | TSV) SEMICOLON
+DefinePromotersStmt -> DEFINE PROMOTERS OF (GENE | TSS | ID) FROM TSS
+                       UPSTREAM (NUM | FLOAT) RequiredUnit
+                       DOWNSTREAM (NUM | FLOAT) RequiredUnit AS ID SEMICOLON
 
 AnalyzeStmt        -> ANALYZE (GC_CONTENT | CPG_ISLANDS) (WINDOW (NUM | FLOAT) Unit)? AliasOpt WhereClause SEMICOLON
 
@@ -59,6 +62,7 @@ RelOp              -> GREATER | LESS | GREATER_EQ | LESS_EQ | ASSIGN
 Value              -> (NUM | FLOAT) Unit | (NUM | FLOAT) PERCENT | NUM | FLOAT | STRING
 
 Unit               -> BP | KB | MB | λ
+RequiredUnit       -> BP | KB | MB
 Direction          -> UPSTREAM | DOWNSTREAM
 Entity             -> GENE | PROMOTER | ENHANCER | EXON | INTRON | UTR | TSS | CDS | REGION
 EntityRef          -> Entity | ID
@@ -70,3 +74,5 @@ Note on Execution Engine & Studio Integration:
 1. Cis-QL automatically compiles degenerate IUPAC nucleotide codes (e.g. TATAWAW) into regex patterns.
 2. If an `AliasOpt` (AS ID) is not provided, Cis-QL auto-generates descriptive track names (e.g., `Find_TATAAT_0`, `Scan_tbp_1`).
 3. Execution outputs are formatted into `.cisql_results.json` for live visualization in Cis-QL Studio.
+4. GFF features are loaded exactly as annotated. Cis-QL does not synthesize promoters or TSS records during import.
+5. `DEFINE PROMOTERS` requires an active sequence, explicit upstream/downstream distances, and stranded source features. Generated intervals are oriented from the TSS and clamped to chromosome bounds.

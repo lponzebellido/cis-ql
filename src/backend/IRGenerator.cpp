@@ -30,6 +30,7 @@ std::string irOpcodeToString(IROpCode op) {
     case IROpCode::RESULT_ALIAS:     return "RESULT_ALIAS";
     case IROpCode::ANALYZE_GC:       return "ANALYZE_GC";
     case IROpCode::ANALYZE_CPG:      return "ANALYZE_CPG";
+    case IROpCode::DEFINE_PROMOTERS: return "DEFINE_PROMOTERS";
     case IROpCode::IF_BEGIN:         return "IF_BEGIN";
     case IROpCode::IF_ELSE:          return "IF_ELSE";
     case IROpCode::IF_END:           return "IF_END";
@@ -125,6 +126,22 @@ void IRGenerator::visit(ExportStmtNode *node) {
   instr.arg2 = node->filename;
   instr.arg3 = node->format;
   instructions.push_back(instr);
+}
+
+void IRGenerator::visit(DefinePromotersStmtNode *node) {
+  IRInstruction define;
+  define.opcode = IROpCode::DEFINE_PROMOTERS;
+  define.arg1 = node->source;
+  define.arg2 = node->upstreamValue + " " + node->upstreamUnit;
+  define.arg3 = node->downstreamValue + " " + node->downstreamUnit;
+  define.arg4 = node->alias;
+  instructions.push_back(define);
+
+  IRInstruction print;
+  print.opcode = IROpCode::PRINT_RESULTS;
+  print.arg1 = node->alias;
+  print.arg2 = "DEFINE_PROMOTERS";
+  instructions.push_back(print);
 }
 
 void IRGenerator::visit(FindStmtNode* node) {

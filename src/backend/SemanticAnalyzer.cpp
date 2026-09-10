@@ -101,6 +101,40 @@ void SemanticAnalyzer::visit(ExportStmtNode *node) {
   }
 }
 
+void SemanticAnalyzer::visit(DefinePromotersStmtNode *node) {
+  if (!sequenceLoaded) {
+    reportError("DEFINE PROMOTERS requires sequence data so intervals can be "
+                "validated and clamped to chromosome bounds.");
+  }
+
+  const bool builtinSource = node->source == "GENE" || node->source == "TSS";
+  if (builtinSource && !annotationLoaded) {
+    reportError("DEFINE PROMOTERS OF " + node->source +
+                " requires annotation data.");
+  } else if (!builtinSource && !symbolTable.lookup(node->source)) {
+    reportError("Promoter source alias '" + node->source +
+                "' is not defined.");
+  } else if (!builtinSource && !isResultAlias(symbolTable, node->source)) {
+    reportError("DEFINE PROMOTERS expects a result-set alias, but '" +
+                node->source + "' has type " +
+                symbolTable.typeOf(node->source) + ".");
+  }
+
+  const double upstream = parseValue(node->upstreamValue);
+  const double downstream = parseValue(node->downstreamValue);
+  if (upstream < 0.0 || downstream < 0.0) {
+    reportError("Promoter distances cannot be negative.");
+  } else if (upstream == 0.0 && downstream == 0.0) {
+    reportError("A promoter window cannot have both distances set to zero.");
+  }
+
+  if (symbolTable.lookup(node->alias)) {
+    reportError("Alias '" + node->alias + "' is already defined.");
+  } else {
+    symbolTable.insert(node->alias, "RESULT_SET");
+  }
+}
+
 void SemanticAnalyzer::visit(FindStmtNode *node) {
   if (!sequenceLoaded) {
     reportError("FIND requires sequence data. Use: LOAD SEQUENCE "

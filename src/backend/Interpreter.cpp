@@ -353,6 +353,62 @@ void Interpreter::executeExport(const IRInstruction &instr) {
   }
 }
 
+void Interpreter::executeDefinePromoters(const IRInstruction &instr) {
+  const std::string &source = instr.arg1;
+  const std::string &alias = instr.arg4;
+
+  auto parseDistance = [this](const std::string &value) {
+    const size_t separator = value.find(' ');
+    const double number =
+        std::atof(value.substr(0, separator).c_str());
+    const std::string unit = separator == std::string::npos
+                                 ? "BP"
+                                 : value.substr(separator + 1);
+    return toBasePairs(number, unit);
+  };
+
+  const size_t upstream = parseDistance(instr.arg2);
+  const size_t downstream = parseDistance(instr.arg3);
+  const auto activeGenome = sequenceChrMaps.find(activeSequenceAlias);
+  if (activeGenome == sequenceChrMaps.end()) {
+    reportRuntimeError("DEFINE PROMOTERS requires an active FASTA dataset.");
+    return;
+  }
+
+  std::unordered_map<std::string, size_t> chromosomeLengths;
+  for (const auto &entry : activeGenome->second)
+    chromosomeLengths[entry.first] = entry.second.sequence.size();
+
+  const std::vector<GenomicRegion> sources = resolveEntity(source);
+  std::vector<GenomicRegion> promoters;
+  std::string error;
+  if (!RegulatoryRegions::buildPromoters(sources, chromosomeLengths,
+                                         upstream, downstream, promoters,
+                                         error)) {
+    reportRuntimeError(error);
+    return;
+  }
+
+  for (auto &promoter : promoters) {
+    const auto sequence = activeGenome->second.find(promoter.chr);
+    if (sequence != activeGenome->second.end()) {
+      promoter.sequence = sequence->second.sequence.substr(
+          promoter.start, promoter.end - promoter.start);
+    }
+  }
+
+  namedRegions[alias] = promoters;
+  resultSets[alias] = std::move(promoters);
+  if (debugMode) {
+    std::cout << "> DEFINE PROMOTERS OF " << source
+              << " FROM TSS UPSTREAM " << instr.arg2
+              << " DOWNSTREAM " << instr.arg3 << " AS " << alias
+              << std::endl;
+    std::cout << "  Defined " << resultSets[alias].size()
+              << " explicit promoter interval(s)." << std::endl;
+  }
+}
+
 void Interpreter::executeFindMotif(const IRInstruction &instr) {
   currentFind = FindContext();
   currentFind.pattern = stripQuotes(instr.arg1);
@@ -1494,6 +1550,9 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
       break;
     case IROpCode::EXPORT_RESULTS:
       executeExport(instr);
+      break;
+    case IROpCode::DEFINE_PROMOTERS:
+      executeDefinePromoters(instr);
       break;
     case IROpCode::FIND_MOTIF:
       executeFindMotif(instr);

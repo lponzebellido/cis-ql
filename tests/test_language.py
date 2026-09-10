@@ -99,6 +99,78 @@ def main() -> int:
 
         data, _ = run_query(
             workspace,
+            "explicit_promoters",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            "DEFINE PROMOTERS OF GENE FROM TSS "
+            "UPSTREAM 100 BP DOWNSTREAM 20 BP AS promoters;\n",
+        )
+        promoters = data["resultSets"]["promoters"]
+        require(
+            [(item["name"], item["start"], item["end"])
+             for item in promoters]
+            == [
+                ("short_promoter", 0, 20),
+                ("long_promoter", 1200, 1320),
+                ("tiny_promoter", 2900, 3020),
+            ],
+            "explicit positive-strand promoter coordinates",
+        )
+        require(all(len(item["sequence"]) == item["end"] - item["start"]
+                    for item in promoters),
+                "explicit promoters retain their active-genome sequence")
+
+        data, _ = run_query(
+            workspace,
+            "negative_strand_promoter",
+            'LOAD SEQUENCE "alternate.fasta" AS genome;\n'
+            'LOAD ANNOTATION "alternate.gff3" AS annot;\n'
+            "DEFINE PROMOTERS OF GENE FROM TSS "
+            "UPSTREAM 50 BP DOWNSTREAM 10 BP AS promoters;\n",
+        )
+        negative = data["resultSets"]["promoters"]
+        require(len(negative) == 1 and negative[0]["start"] == 190 and
+                negative[0]["end"] == 250 and negative[0]["strand"] == "-",
+                "explicit promoters are oriented on the negative strand")
+
+        data, _ = run_query(
+            workspace,
+            "promoters_from_alias",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            'EXTRACT GENE AS selected WHERE ID = "long";\n'
+            "DEFINE PROMOTERS OF selected FROM TSS "
+            "UPSTREAM 100 BP DOWNSTREAM 20 BP AS promoters;\n",
+        )
+        require([item["name"] for item in data["resultSets"]["promoters"]]
+                == ["long_promoter"],
+                "promoters can be built from a filtered result set")
+
+        data, _ = run_query(
+            workspace,
+            "no_implicit_promoters",
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            "EXTRACT PROMOTER AS annotated_promoters;\n"
+            "EXTRACT TSS AS annotated_tss;\n",
+        )
+        require(data["resultSets"]["annotated_promoters"] == [] and
+                data["resultSets"]["annotated_tss"] == [],
+                "GFF import does not invent promoter or TSS features")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "zero_promoter_window",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            "DEFINE PROMOTERS OF GENE FROM TSS "
+            "UPSTREAM 0 BP DOWNSTREAM 0 BP AS promoters;\n",
+            3,
+        )
+        require("cannot have both distances set to zero" in semantic_error,
+                "zero-length promoter windows are rejected")
+
+        data, _ = run_query(
+            workspace,
             "decimal_units",
             'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
             'LOAD ANNOTATION "fixture.gff3" AS annot;\n'

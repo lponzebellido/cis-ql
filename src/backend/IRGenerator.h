@@ -46,6 +46,7 @@ enum class IROpCode {
   RESULT_ALIAS,
   ANALYZE_GC,
   ANALYZE_CPG,
+  DEFINE_PROMOTERS,
   IF_BEGIN,
   IF_ELSE,
   IF_END
@@ -87,6 +88,7 @@ public:
   void visit(LoadStmtNode *node) override;
   void visit(UseStmtNode *node) override;
   void visit(ExportStmtNode *node) override;
+  void visit(DefinePromotersStmtNode *node) override;
   void visit(FindOptNode *node) override;
   void visit(FindStmtNode *node) override;
   void visit(ExtractStmtNode *node) override;
