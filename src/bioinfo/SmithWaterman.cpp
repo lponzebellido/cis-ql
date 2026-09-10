@@ -63,11 +63,11 @@ AlignmentResult SmithWaterman::align(const std::string &query,
   AlignmentResult result;
   result.score = maxScore;
   const size_t normalizer = std::min(query.size(), target.size());
-  result.similarity =
-      normalizer == 0
-          ? 0.0
-          : static_cast<double>(maxScore) /
-                (static_cast<double>(normalizer) * matchScore) * 100.0;
+  result.similarity = normalizer == 0
+                          ? 0.0
+                          : static_cast<double>(maxScore) /
+                                (static_cast<double>(normalizer) * matchScore) *
+                                100.0;
   result.similarity = std::max(0.0, std::min(result.similarity, 100.0));
   result.alignedQuery = alignedQuery;
   result.alignedTarget = alignedTarget;
@@ -95,8 +95,6 @@ AlignmentResult SmithWaterman::alignBanded(const std::string &query,
         continue;
 
       int diagB = b;
-      // H(i-1, j) is one diagonal to the right in the previous row because
-      // b encodes j = i - W + b.
       int upB = b + 1;
       int leftB = b - 1;
 
@@ -146,9 +144,6 @@ double SmithWaterman::computeSimilarity(const std::string &seq1,
     return alignBanded(seq1, seq2, bandwidth, 2, -1, -2).similarity;
   }
 
-  // Similarity filtering only needs the maximum local-alignment score, not a
-  // traceback. Two rows preserve the exact recurrence while reducing memory
-  // from O(m*n) to O(min(m,n)).
   const std::string *rows = &seq1;
   const std::string *columns = &seq2;
   if (columns->size() > rows->size())
@@ -166,8 +161,7 @@ double SmithWaterman::computeSimilarity(const std::string &seq1,
                    std::toupper(static_cast<unsigned char>((*columns)[j - 1]))
                ? 2
                : -1);
-      current[j] =
-          std::max({0, diagonal, previous[j] - 2, current[j - 1] - 2});
+      current[j] = std::max({0, diagonal, previous[j] - 2, current[j - 1] - 2});
       maxScore = std::max(maxScore, current[j]);
     }
     std::swap(previous, current);

@@ -1,8 +1,9 @@
 #include "SetOperations.h"
 #include <algorithm>
 
-std::vector<GenomicRegion> SetOperations::intersect(
-    std::vector<GenomicRegion> a, std::vector<GenomicRegion> b) {
+std::vector<GenomicRegion>
+SetOperations::intersect(std::vector<GenomicRegion> a,
+                         std::vector<GenomicRegion> b) {
   std::vector<GenomicRegion> result;
   std::sort(a.begin(), a.end());
   std::sort(b.begin(), b.end());
@@ -29,8 +30,7 @@ std::vector<GenomicRegion> SetOperations::intersect(
       overlap.name = a[i].name + "_intersect_" + b[j].name;
       if (!overlap.sequence.empty()) {
         const size_t offset = start - a[i].start;
-        overlap.sequence =
-            overlap.sequence.substr(offset, end - start);
+        overlap.sequence = overlap.sequence.substr(offset, end - start);
       }
       result.push_back(std::move(overlap));
     }
@@ -43,27 +43,25 @@ std::vector<GenomicRegion> SetOperations::intersect(
   return result;
 }
 
-std::vector<GenomicRegion> SetOperations::unite(
-    std::vector<GenomicRegion> a, std::vector<GenomicRegion> b) {
+std::vector<GenomicRegion> SetOperations::unite(std::vector<GenomicRegion> a,
+                                                std::vector<GenomicRegion> b) {
   std::vector<GenomicRegion> all;
   all.reserve(a.size() + b.size());
   all.insert(all.end(), a.begin(), a.end());
   all.insert(all.end(), b.begin(), b.end());
   std::sort(all.begin(), all.end());
 
-  if (all.empty()) return all;
+  if (all.empty())
+    return all;
 
   std::vector<GenomicRegion> result;
   result.push_back(all[0]);
 
   for (size_t i = 1; i < all.size(); i++) {
-    GenomicRegion& last = result.back();
+    GenomicRegion &last = result.back();
     if (all[i].chr == last.chr && all[i].start <= last.end) {
       if (all[i].end > last.end) {
         last.end = all[i].end;
-        // A sequence attached to the former interval no longer spans the
-        // merged coordinates. It must be re-extracted from the genome before
-        // sequence-based filtering.
         last.sequence.clear();
       }
       last.type = "union";
@@ -74,8 +72,8 @@ std::vector<GenomicRegion> SetOperations::unite(
   return result;
 }
 
-std::vector<GenomicRegion> SetOperations::except(
-    std::vector<GenomicRegion> a, std::vector<GenomicRegion> b) {
+std::vector<GenomicRegion> SetOperations::except(std::vector<GenomicRegion> a,
+                                                 std::vector<GenomicRegion> b) {
   std::vector<GenomicRegion> result;
   std::sort(a.begin(), a.end());
   std::sort(b.begin(), b.end());
@@ -90,8 +88,7 @@ std::vector<GenomicRegion> SetOperations::except(
 
     size_t cursor = region.start;
     size_t k = j;
-    while (k < b.size() && b[k].chr == region.chr &&
-           b[k].start < region.end) {
+    while (k < b.size() && b[k].chr == region.chr && b[k].start < region.end) {
       if (b[k].end <= cursor) {
         ++k;
         continue;
@@ -100,7 +97,8 @@ std::vector<GenomicRegion> SetOperations::except(
         GenomicRegion fragment = region;
         fragment.start = cursor;
         fragment.end = std::min(b[k].start, region.end);
-        fragment.name = region.name + "_except_" + std::to_string(fragment.start);
+        fragment.name =
+            region.name + "_except_" + std::to_string(fragment.start);
         if (!region.sequence.empty()) {
           fragment.sequence = region.sequence.substr(
               fragment.start - region.start, fragment.end - fragment.start);
