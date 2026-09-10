@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Repeatable wall-clock benchmark for representative Cis-QL examples."""
 
 from __future__ import annotations
 

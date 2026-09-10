@@ -1,12 +1,4 @@
 #!/usr/bin/env python3
-"""
-11_strand_search.py
-Conventional Python script for strand-specific motif searching (sense vs antisense).
-Equivalent Cis-QL Query:
-FIND MOTIF "TATAAT" STRAND POSITIVE AS sense_promoters;
-FIND MOTIF "TATAAT" STRAND NEGATIVE AS antisense_promoters;
-EXTRACT sense_promoters;
-"""
 
 import re
 

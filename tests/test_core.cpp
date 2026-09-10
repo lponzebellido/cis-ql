@@ -34,7 +34,8 @@ GenomicRegion region(size_t start, size_t end,
   return value;
 }
 
-} // namespace
+}
+
 
 int main() {
   const auto exact = MotifFinder::findAll("ACGTACGT", "ACG", "chr1", false);

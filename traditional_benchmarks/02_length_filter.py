@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-02_length_filter.py
-Conventional Python implementation filtering features by bounded range intervals.
-Equivalent Cis-QL query: EXTRACT GENE WHERE LENGTH >= 500 BP AND LENGTH <= 3 KB;
-"""
 
 def filter_genes_by_range(gff_path, min_len=500, max_len=3000):
     results = []

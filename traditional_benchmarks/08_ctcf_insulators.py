@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-08_ctcf_insulators.py
-Conventional Python script scanning CTCF PWM and using EXCEPT interval subtraction to remove CDS overlaps.
-Equivalent Cis-QL Query: SCAN ctcf_matrix THRESHOLD 75 % AS ctcf_sites; EXCEPT ctcf_sites FROM CDS;
-"""
 
 def except_set_subtraction(ctcf_sites, cds_regions):
     intergenic_ctcf = []

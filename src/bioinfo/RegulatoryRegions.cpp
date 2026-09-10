@@ -15,8 +15,7 @@ std::string sourceLabel(const GenomicRegion &source) {
   return source.chr + "_" + std::to_string(source.start) + "_" +
          std::to_string(source.end);
 }
-
-} // namespace
+}
 
 bool RegulatoryRegions::buildPromoters(
     const std::vector<GenomicRegion> &sources,
@@ -31,8 +30,6 @@ bool RegulatoryRegions::buildPromoters(
     return false;
   }
 
-  // Validate the complete input before producing output. A partially built
-  // promoter set would be scientifically ambiguous.
   for (const auto &source : sources) {
     const auto chromosome = chromosomeLengths.find(source.chr);
     if (chromosome == chromosomeLengths.end()) {

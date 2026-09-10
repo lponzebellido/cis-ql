@@ -1,12 +1,4 @@
 #!/usr/bin/env python3
-"""
-10_promoter_union.py
-Conventional Python script finding -35 and -10 boxes and executing interval UNION merging.
-Equivalent Cis-QL Query:
-FIND MOTIF "TTGACA" WITHIN 200 BP UPSTREAM FROM CDS AS minus35_box;
-FIND MOTIF "TATAAT" WITHIN 50 BP UPSTREAM FROM CDS AS minus10_box;
-UNION minus35_box AND minus10_box;
-"""
 
 def union_interval_sets(set1, set2):
     combined = sorted(set1 + set2, key=lambda x: x[0])

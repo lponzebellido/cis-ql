@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-01_extract_genes.py
-Conventional Python implementation using imperative GFF3 file parsing and length filtering.
-Equivalent Cis-QL query: EXTRACT GENE WHERE LENGTH > 1.5 KB;
-"""
 
 import sys
 

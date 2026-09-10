@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-07_pwm_scanning.py
-Conventional Python implementation parsing JASPAR matrices and computing log-odds PSSM scores.
-Equivalent Cis-QL query: SCAN tbp_matrix STRAND POSITIVE THRESHOLD 80 % AS tbp_sites;
-"""
 
 import math
 

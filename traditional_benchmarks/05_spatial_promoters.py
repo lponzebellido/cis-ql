@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-05_spatial_promoters.py
-Conventional Python implementation for relative spatial proximity searching upstream of features.
-Equivalent Cis-QL query: FIND MOTIF "TTGACA" WITHIN 200 BP UPSTREAM FROM CDS AS minus35_promoters;
-"""
 
 import re
 

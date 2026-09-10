@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Validate Cis-QL outputs against small independent reference implementations."""
 
 from __future__ import annotations
 

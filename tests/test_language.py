@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""End-to-end correctness tests for the Cis-QL language."""
 
 from __future__ import annotations
 

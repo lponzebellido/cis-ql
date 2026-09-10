@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-12_gc_content.py
-Conventional Python script calculating sliding-window GC content profiles.
-Equivalent Cis-QL Query: ANALYZE GC_CONTENT WINDOW 1 KB AS gc_profile;
-"""
 
 def compute_gc_landscape(sequence, window_size=1000):
     landscape = []

@@ -143,7 +143,6 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
       setCopiedIdx(idx);
       setTimeout(() => setCopiedIdx(null), 1500);
     } catch {
-      // fallback
     }
   };
 

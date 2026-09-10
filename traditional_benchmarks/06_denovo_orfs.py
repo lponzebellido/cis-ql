@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-"""
-06_denovo_orfs.py
-Conventional Python script for de novo ORF discovery downstream of putative promoters.
-Equivalent Cis-QL Query:
-FIND MOTIF "TATA[AT]A[AT]" STRAND POSITIVE AS putative_promoters;
-FIND MOTIF "ATG(...)*?(TAA|TAG|TGA)" WITHIN 300 BP DOWNSTREAM FROM putative_promoters AS candidate_orfs WHERE LENGTH > 600 BP;
-"""
 
 import re
 

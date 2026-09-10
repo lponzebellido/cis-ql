@@ -28,7 +28,6 @@ function createWindow(port) {
 }
 
 app.whenReady().then(() => {
-  // Start Backend
   backendProcess = spawn('node', ['backend/server.js'], {
     cwd: __dirname,
     stdio: 'pipe'
@@ -36,7 +35,6 @@ app.whenReady().then(() => {
   backendProcess.stdout.on('data', (data) => console.log(`[Backend] ${data}`));
   backendProcess.stderr.on('data', (data) => console.error(`[Backend] ${data}`));
 
-  // Start Frontend
   frontendProcess = spawn('npm', ['run', 'dev'], {
     cwd: path.join(__dirname, 'frontend'),
     stdio: 'pipe',

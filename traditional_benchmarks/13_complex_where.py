@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-13_complex_where.py
-Conventional Python script combining physical length filters and Smith-Waterman similarity scoring.
-Equivalent Cis-QL Query: EXTRACT GENE WHERE LENGTH > 800 BP AND SIMILARITY > 65 %;
-"""
 
 def smith_waterman_score(seq1, seq2):
     m, n = len(seq1), len(seq2)

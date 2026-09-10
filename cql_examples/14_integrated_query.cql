@@ -1,12 +1,3 @@
-/*
- * 14_integrated_query.cql
- *
- * This script integrates multiple analysis types into a single query pipeline.
- * It computes genome-wide GC content and CpG islands, searches for upstream promoter elements 
- * (-35, -10) and ribosome binding sites (Shine-Dalgarno: AGGAGG), scans for TBP and SP1 binding sites, 
- * excludes coding region overlaps using EXCEPT, and extracts structural genes over 2 KB.
- */
-
 LOAD SEQUENCE "data_examples/ecoli2.fna" AS genome;
 LOAD ANNOTATION "data_examples/genomic.gff" AS annot;
 LOAD MATRIX "matrices/MA0108.1_TBP.pwm" AS tbp;

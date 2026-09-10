@@ -83,7 +83,8 @@ bool isSafeRelativeExportPath(const std::string &path) {
   return true;
 }
 
-} // namespace
+}
+
 
 std::string Interpreter::stripQuotes(const std::string &s) const {
   if (s.size() >= 2 && s.front() == '"' && s.back() == '"') {
@@ -932,8 +933,6 @@ bool Interpreter::evaluateReferenceEligibility(
     return evaluateReferenceEligibility(condition->left, region) &&
            evaluateReferenceEligibility(condition->right, region);
   }
-  // OR and NOT expressions involving similarity do not define a unique
-  // pre-filter. They therefore use the first sequence-bearing candidate.
   if (conditionContainsSimilarity(condition))
     return true;
   return evaluateRegionCondition(condition, region, "");

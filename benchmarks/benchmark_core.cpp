@@ -29,7 +29,7 @@ std::string randomDna(size_t length, uint32_t seed) {
 
 template <typename Function>
 double medianElapsed(Function function, size_t repetitions = 5) {
-  function(); // Warm up instruction and data paths before measuring.
+  function();
   std::vector<double> samples;
   samples.reserve(repetitions);
   for (size_t repetition = 0; repetition < repetitions; ++repetition) {
@@ -58,7 +58,8 @@ void printResult(const std::string &operation, size_t size, double seconds,
             << resultValue << "," << resultUnit << "\n";
 }
 
-} // namespace
+}
+
 
 int main() {
   std::cout << std::setprecision(9);

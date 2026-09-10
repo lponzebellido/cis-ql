@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-09_cpg_islands.py
-Conventional Python implementation calculating sliding window GC content, CpG ratios, and interval intersections.
-Equivalent Cis-QL query: ANALYZE CPG_ISLANDS AS cpg_islands; INTERSECT sp1_sites AND cpg_islands;
-"""
 
 def find_cpg_islands(sequence, window_size=200, step=100, min_gc=50.0, min_oe=0.6):
     islands = []

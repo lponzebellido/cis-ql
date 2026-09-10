@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-15_if_else_branching.py
-Conventional Python script evaluating GC content and branching logic.
-Equivalent Cis-QL Query: IF GC_CONTENT > 50 % THEN SCAN sp1 THRESHOLD 80 % AS gc_sites; ELSE SCAN tbp THRESHOLD 80 % AS at_sites; ENDIF;
-"""
 
 def if_else_branching(sequence):
     gc_count = sum(1 for b in sequence.upper() if b in 'GC')

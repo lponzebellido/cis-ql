@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-16_foreach_batch_scan.py
-Conventional Python script performing batch iteration over a list of PWM matrices.
-Equivalent Cis-QL Query: FOREACH m IN [tbp, sp1, ctcf] DO SCAN m THRESHOLD 80 % AS tf_sites; ENDFOR;
-"""
 
 def foreach_batch_scan(matrices, sequence, threshold=80.0):
     batch_results = {}

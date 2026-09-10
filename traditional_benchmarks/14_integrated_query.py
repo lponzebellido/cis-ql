@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-"""
-14_integrated_query.py
-Conventional Python implementation of the multi-track genomic regulatory pipeline.
-Demonstrates the extensive imperative boilerplate (file I/O, regex, PSSM math, interval overlaps)
-required in traditional Python compared to 10 lines of declarative Cis-QL code.
-
-"""
 
 import sys
 import re

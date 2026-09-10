@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-04_iupac_motifs.py
-Conventional Python script converting IUPAC degenerate ambiguity codes into regular expressions.
-Equivalent Cis-QL query: FIND MOTIF "TATAWAW" STRAND POSITIVE AS tata_boxes;
-"""
 
 import re
 

@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-03_similarity_align.py
-Conventional Python implementation using Smith-Waterman local alignment for similarity filtering.
-Equivalent Cis-QL query: EXTRACT GENE WHERE LENGTH > 1 KB AND SIMILARITY > 70 %;
-"""
 
 import sys
 
