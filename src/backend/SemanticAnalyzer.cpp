@@ -13,7 +13,8 @@ static bool isBuiltinEntity(const std::string &name) {
 
 static bool isResultAlias(const SymbolTable &symbolTable,
                           const std::string &name) {
-  return symbolTable.typeOf(name) == "RESULT_SET";
+  const std::string type = symbolTable.typeOf(name);
+  return type == "RESULT_SET" || type == "MOTIF_HITS";
 }
 
 SemanticAnalyzer::SemanticAnalyzer(SymbolTable &symTab)
@@ -92,7 +93,8 @@ void SemanticAnalyzer::visit(ExportStmtNode *node) {
     return;
   }
   const std::string type = symbolTable.typeOf(node->alias);
-  if (type != "RESULT_SET" && type != "GC_PROFILE") {
+  if (type != "RESULT_SET" && type != "MOTIF_HITS" &&
+      type != "GC_PROFILE") {
     reportError("EXPORT expects a result-set or GC-profile alias, but '" +
                 node->alias + "' has type " + type + ".");
   }
@@ -114,7 +116,8 @@ void SemanticAnalyzer::visit(DefinePromotersStmtNode *node) {
   } else if (!builtinSource && !symbolTable.lookup(node->source)) {
     reportError("Promoter source alias '" + node->source +
                 "' is not defined.");
-  } else if (!builtinSource && !isResultAlias(symbolTable, node->source)) {
+  } else if (!builtinSource &&
+             symbolTable.typeOf(node->source) != "RESULT_SET") {
     reportError("DEFINE PROMOTERS expects a result-set alias, but '" +
                 node->source + "' has type " +
                 symbolTable.typeOf(node->source) + ".");
@@ -314,6 +317,21 @@ void SemanticAnalyzer::visit(ScanStmtNode *node) {
     }
   }
 
+  if (!node->target.empty()) {
+    if (isBuiltinEntity(node->target) && !annotationLoaded) {
+      reportError("SCAN IN " + node->target + " requires annotation data.");
+    } else if (!isBuiltinEntity(node->target) &&
+               !symbolTable.lookup(node->target)) {
+      reportError("SCAN target alias '" + node->target +
+                  "' is not defined.");
+    } else if (!isBuiltinEntity(node->target) &&
+               !isResultAlias(symbolTable, node->target)) {
+      reportError("SCAN IN expects a region or motif-hit set, but '" +
+                  node->target + "' has type " +
+                  symbolTable.typeOf(node->target) + ".");
+    }
+  }
+
   
   if (!node->threshold.empty()) {
     double threshold = parseValue(node->threshold);
@@ -330,7 +348,7 @@ void SemanticAnalyzer::visit(ScanStmtNode *node) {
     if (symbolTable.lookup(node->alias)) {
       reportError("Alias '" + node->alias + "' is already defined.");
     } else {
-      symbolTable.insert(node->alias, "RESULT_SET");
+      symbolTable.insert(node->alias, "MOTIF_HITS");
     }
   }
 }

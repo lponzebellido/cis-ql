@@ -183,6 +183,7 @@ int main() {
   PWMatrix matrix;
   matrix.id = "TEST";
   matrix.name = "TEST";
+  matrix.source = "test-matrix.pwm";
   matrix.length = 2;
   matrix.counts = {{10, 10}, {0, 0}, {0, 0}, {0, 0}};
   const PSSM pssm = PWMScanner::computePSSM(matrix);
@@ -190,6 +191,22 @@ int main() {
                                         false);
   require(pwmHits.size() == 3 && pwmHits[0].chr == "chrPWM",
           "PWM scanning preserves chromosome identifiers");
+  require(pwmHits[0].evidence.present &&
+              pwmHits[0].evidence.matrixId == "TEST" &&
+              pwmHits[0].evidence.matrixName == "TEST" &&
+              pwmHits[0].evidence.matrixSource == "test-matrix.pwm" &&
+              std::abs(pwmHits[0].evidence.rawScore - pssm.maxScore) < 1e-9 &&
+              std::abs(pwmHits[0].evidence.scorePercent - 100.0) < 1e-9,
+          "PWM matches retain matrix provenance and scores");
+
+  GenomicRegion scoredHit = region(0, 10);
+  scoredHit.motifEvidence.present = true;
+  scoredHit.motifEvidence.matrixId = "TEST";
+  const auto croppedHit =
+      SetOperations::intersect({scoredHit}, {region(5, 15)});
+  require(croppedHit.size() == 1 &&
+              !croppedHit[0].motifEvidence.present,
+          "interval operations discard evidence when hit geometry changes");
   PWMatrix invalidMatrix = matrix;
   invalidMatrix.counts[3].pop_back();
   require(PWMScanner::computePSSM(invalidMatrix).length == 0,

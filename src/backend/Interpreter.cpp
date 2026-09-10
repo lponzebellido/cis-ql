@@ -141,8 +141,16 @@ void Interpreter::printMotifMatches(const std::vector<MotifMatch> &matches,
       break;
     }
     std::cout << "  [" << (shown + 1) << "] pos:" << m.position
-              << "  strand:" << m.strand << "  context: ..." << m.context
-              << "..." << std::endl;
+              << "  strand:" << m.strand;
+    if (m.evidence.present) {
+      std::cout << "  matrix:" << m.evidence.matrixId
+                << "  score:" << m.evidence.rawScore
+                << "  relative:" << m.evidence.scorePercent << "%";
+    }
+    if (m.evidence.hasSourceRegion)
+      std::cout << "  source:" << m.evidence.sourceRegionName
+                << "  source-offset:" << m.evidence.relativeStart;
+    std::cout << "  context: ..." << m.context << "..." << std::endl;
     shown++;
   }
 }
@@ -187,6 +195,42 @@ Interpreter::resolveEntity(const std::string &entity) {
   if (annotations == annotationDatasets.end())
     return {};
   return GFFReader::filterByType(annotations->second, entity);
+}
+
+GenomicRegion
+Interpreter::motifMatchToRegion(const MotifMatch &match,
+                                const std::string &alias) const {
+  GenomicRegion region;
+  region.chr = match.chr;
+  if (region.chr.empty()) {
+    const auto active = sequenceDatasets.find(activeSequenceAlias);
+    if (active != sequenceDatasets.end() && !active->second.empty())
+      region.chr = active->second.front().sequenceId;
+  }
+  region.start = match.position;
+  region.end = match.position + match.matchLength;
+  region.strand = match.strand;
+  region.type = match.evidence.present ? "motif_hit" : alias;
+  region.name = alias + "_" + region.chr + "_" +
+                std::to_string(match.position);
+  if (match.evidence.present)
+    region.name += match.strand == "-" ? "_minus" : "_plus";
+  if (match.evidence.hasSourceRegion &&
+      !match.evidence.sourceRegionName.empty()) {
+    region.name += "_in_" + match.evidence.sourceRegionName;
+  }
+  region.motifEvidence = match.evidence;
+
+  const auto chromosomeMap = sequenceChrMaps.find(activeSequenceAlias);
+  if (chromosomeMap != sequenceChrMaps.end()) {
+    const auto sequence = chromosomeMap->second.find(region.chr);
+    if (sequence != chromosomeMap->second.end() &&
+        region.end <= sequence->second.sequence.size()) {
+      region.sequence = sequence->second.sequence.substr(
+          region.start, region.end - region.start);
+    }
+  }
+  return region;
 }
 
 void Interpreter::executeLoadSeq(const IRInstruction &instr) {
@@ -313,8 +357,15 @@ void Interpreter::executeExport(const IRInstruction &instr) {
           region.name.empty() ? "." : cleanTabularField(region.name);
       const std::string strand =
           (region.strand == "+" || region.strand == "-") ? region.strand : ".";
+      int bedScore = 0;
+      if (region.motifEvidence.present) {
+        bedScore = static_cast<int>(
+            std::round(region.motifEvidence.scorePercent * 10.0));
+        bedScore = std::max(0, std::min(1000, bedScore));
+      }
       out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
-          << region.end << '\t' << name << "\t0\t" << strand << '\n';
+          << region.end << '\t' << name << '\t' << bedScore << '\t'
+          << strand << '\n';
     }
   } else if (format == "GFF3") {
     out << "##gff-version 3\n";
@@ -326,20 +377,72 @@ void Interpreter::executeExport(const IRInstruction &instr) {
       const std::string name =
           region.name.empty() ? alias + "_" + std::to_string(generatedId++)
                               : region.name;
+      const std::string score = region.motifEvidence.present
+                                    ? std::to_string(
+                                          region.motifEvidence.rawScore)
+                                    : ".";
       out << cleanTabularField(region.chr) << "\tCis-QL\t"
           << cleanTabularField(type) << '\t' << (region.start + 1) << '\t'
-          << region.end << "\t.\t" << strand << "\t.\tID="
+          << region.end << '\t' << score << '\t' << strand << "\t.\tID="
           << gffAttributeEscape(name) << ";Name="
-          << gffAttributeEscape(name) << '\n';
+          << gffAttributeEscape(name);
+      if (region.motifEvidence.present) {
+        out << ";MatrixAlias="
+            << gffAttributeEscape(region.motifEvidence.matrixAlias)
+            << ";MatrixID="
+            << gffAttributeEscape(region.motifEvidence.matrixId)
+            << ";MatrixName="
+            << gffAttributeEscape(region.motifEvidence.matrixName)
+            << ";MatrixSource="
+            << gffAttributeEscape(region.motifEvidence.matrixSource)
+            << ";ScorePercent=" << region.motifEvidence.scorePercent;
+        if (region.motifEvidence.hasSourceRegion) {
+          out << ";SourceRegion="
+              << gffAttributeEscape(
+                     region.motifEvidence.sourceRegionName)
+              << ";SourceRegionType="
+              << gffAttributeEscape(
+                     region.motifEvidence.sourceRegionType)
+              << ";RelativeStart="
+              << region.motifEvidence.relativeStart;
+        }
+      }
+      out << '\n';
     }
   } else if (format == "TSV") {
-    out << "chromosome\tstart\tend\tstrand\ttype\tname\tlength\n";
+    out << "chromosome\tstart\tend\tstrand\ttype\tname\tlength"
+           "\tmatrix_alias\tmatrix_id\tmatrix_name\tmatrix_source"
+           "\traw_score\tscore_percent\tsource_region\tsource_type"
+           "\tsource_start\tsource_end\trelative_start\n";
     for (const auto &region : regionsIt->second) {
       out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
           << region.end << '\t' << cleanTabularField(region.strand) << '\t'
           << cleanTabularField(region.type) << '\t'
           << cleanTabularField(region.name) << '\t' << region.length()
-          << '\n';
+          << '\t';
+      if (region.motifEvidence.present) {
+        out << cleanTabularField(region.motifEvidence.matrixAlias) << '\t'
+            << cleanTabularField(region.motifEvidence.matrixId) << '\t'
+            << cleanTabularField(region.motifEvidence.matrixName) << '\t'
+            << cleanTabularField(region.motifEvidence.matrixSource) << '\t'
+            << region.motifEvidence.rawScore << '\t'
+            << region.motifEvidence.scorePercent << '\t';
+        if (region.motifEvidence.hasSourceRegion) {
+          out << cleanTabularField(
+                     region.motifEvidence.sourceRegionName)
+              << '\t' << cleanTabularField(
+                             region.motifEvidence.sourceRegionType)
+              << '\t' << region.motifEvidence.sourceRegionStart << '\t'
+              << region.motifEvidence.sourceRegionEnd << '\t'
+              << region.motifEvidence.relativeStart;
+        } else {
+          out << "\t\t\t\t";
+        }
+      } else {
+        for (int emptyColumn = 0; emptyColumn < 10; ++emptyColumn)
+          out << '\t';
+      }
+      out << '\n';
     }
   }
 
@@ -596,24 +699,8 @@ void Interpreter::executeFindAlias(const IRInstruction &instr) {
 
   std::vector<GenomicRegion> regions;
   if (motifResults.count(resultId)) {
-    for (const auto &m : motifResults[resultId]) {
-      GenomicRegion r;
-      r.chr = m.chr.empty() ? (sequenceDatasets.empty() ? "" : sequenceDatasets.begin()->second[0].sequenceId) : m.chr;
-      r.start = m.position;
-      r.end = m.position + m.matchLength;
-      r.strand = m.strand;
-      r.type = alias;
-      r.name = alias + "_" + std::to_string(m.position);
-
-      std::string seqData = "";
-      if (sequenceChrMaps[activeSequenceAlias].count(r.chr)) {
-        seqData = sequenceChrMaps[activeSequenceAlias][r.chr].sequence;
-      }
-      if (!seqData.empty() && r.end <= seqData.size()) {
-        r.sequence = seqData.substr(r.start, r.end - r.start);
-      }
-      regions.push_back(r);
-    }
+    for (const auto &match : motifResults[resultId])
+      regions.push_back(motifMatchToRegion(match, alias));
   }
 
   namedRegions[alias] = regions;
@@ -1173,6 +1260,7 @@ void Interpreter::executeScanOptThreshold(const IRInstruction &instr) {
 void Interpreter::executeScanExec(const IRInstruction &instr) {
   std::string matrixAlias = instr.arg1;
   std::string resultId = instr.arg2;
+  std::string target = instr.arg3;
 
   if (currentScan.threshold < 0.0) {
     currentScan.threshold = 75.0;
@@ -1180,6 +1268,9 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
 
   if (debugMode) {
     std::cout << "> SCAN " << matrixAlias;
+    if (!target.empty()) {
+      std::cout << " IN " << target;
+    }
     if (!currentScan.strandFilter.empty()) {
       std::cout << " STRAND " << currentScan.strandFilter;
     }
@@ -1197,39 +1288,109 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
     return;
   }
 
-  const auto &targetDataset = sequenceDatasets.count(activeSequenceAlias)
-                                  ? sequenceDatasets[activeSequenceAlias]
-                                  : sequenceDatasets.begin()->second;
   const PSSM &pssm = loadedPSSMs[matrixAlias];
 
   bool searchPos = (currentScan.strandFilter != "NEGATIVE");
   bool searchNeg = (currentScan.strandFilter != "POSITIVE");
 
-  std::vector<std::future<std::vector<MotifMatch>>> futures;
-  for (const auto &seqRec : targetDataset) {
-    const FastaRecord *record = &seqRec;
-    std::string chrId = seqRec.sequenceId;
-    double thresh = currentScan.threshold;
-    const PSSM *matrix = &pssm;
-
-    futures.push_back(std::async(std::launch::async, [record, matrix, thresh, chrId, searchPos, searchNeg]() {
-      return PWMScanner::scan(record->sequence, *matrix, thresh, chrId,
-                              searchPos, searchNeg);
-    }));
-  }
-
   std::vector<MotifMatch> matches;
-  for (auto &f : futures) {
-    auto res = f.get();
-    matches.insert(matches.end(), res.begin(), res.end());
+  size_t scannedUnits = 0;
+  if (target.empty()) {
+    const auto &targetDataset = sequenceDatasets.count(activeSequenceAlias)
+                                    ? sequenceDatasets[activeSequenceAlias]
+                                    : sequenceDatasets.begin()->second;
+    std::vector<std::future<std::vector<MotifMatch>>> futures;
+    for (const auto &seqRec : targetDataset) {
+      const FastaRecord *record = &seqRec;
+      const std::string chrId = seqRec.sequenceId;
+      const double threshold = currentScan.threshold;
+      const PSSM *matrix = &pssm;
+
+      futures.push_back(std::async(
+          std::launch::async,
+          [record, matrix, threshold, chrId, searchPos, searchNeg]() {
+            return PWMScanner::scan(record->sequence, *matrix, threshold,
+                                    chrId, searchPos, searchNeg);
+          }));
+    }
+    for (auto &future : futures) {
+      auto chromosomeMatches = future.get();
+      matches.insert(matches.end(), chromosomeMatches.begin(),
+                     chromosomeMatches.end());
+    }
+    scannedUnits = targetDataset.size();
+  } else {
+    const auto chromosomeMap = sequenceChrMaps.find(activeSequenceAlias);
+    if (chromosomeMap == sequenceChrMaps.end()) {
+      reportRuntimeError("SCAN IN requires an active FASTA dataset.");
+      currentScan = ScanContext();
+      return;
+    }
+
+    const std::vector<GenomicRegion> targetRegions = resolveEntity(target);
+    scannedUnits = targetRegions.size();
+    for (const auto &source : targetRegions) {
+      const auto chromosome = chromosomeMap->second.find(source.chr);
+      if (chromosome == chromosomeMap->second.end()) {
+        reportRuntimeError("SCAN target sequence identifier '" + source.chr +
+                           "' is not present in the active FASTA dataset.");
+        currentScan = ScanContext();
+        return;
+      }
+      if (source.start > source.end ||
+          source.end > chromosome->second.sequence.size()) {
+        reportRuntimeError("SCAN target region '" + source.name +
+                           "' lies outside chromosome '" + source.chr + "'.");
+        currentScan = ScanContext();
+        return;
+      }
+
+      const std::string sequence = chromosome->second.sequence.substr(
+          source.start, source.end - source.start);
+      auto regionMatches = PWMScanner::scan(
+          sequence, pssm, currentScan.threshold, source.chr, searchPos,
+          searchNeg);
+      for (auto &match : regionMatches) {
+        const size_t localPosition = match.position;
+        match.position = source.start + localPosition;
+        match.evidence.hasSourceRegion = true;
+        match.evidence.sourceRegionName = source.name;
+        match.evidence.sourceRegionType = source.type;
+        match.evidence.sourceRegionStart = source.start;
+        match.evidence.sourceRegionEnd = source.end;
+        match.evidence.relativeStart =
+            source.strand == "-"
+                ? source.end - (match.position + match.matchLength)
+                : localPosition;
+      }
+      matches.insert(matches.end(), regionMatches.begin(),
+                     regionMatches.end());
+    }
   }
+
+  for (auto &match : matches)
+    match.evidence.matrixAlias = matrixAlias;
+
+  std::sort(matches.begin(), matches.end(),
+            [](const MotifMatch &left, const MotifMatch &right) {
+              if (left.chr != right.chr)
+                return left.chr < right.chr;
+              if (left.position != right.position)
+                return left.position < right.position;
+              if (left.strand != right.strand)
+                return left.strand < right.strand;
+              return left.evidence.sourceRegionName <
+                     right.evidence.sourceRegionName;
+            });
 
   motifResults[resultId] = matches;
 
   if (debugMode) {
     std::cout << "  PWM scan found " << matches.size() << " site(s) above "
-              << currentScan.threshold << "% threshold across " << targetDataset.size()
-              << " chromosome(s)." << std::endl;
+              << currentScan.threshold << "% threshold across "
+              << scannedUnits
+              << (target.empty() ? " chromosome(s)." : " source region(s).")
+              << std::endl;
   }
 
   currentScan = ScanContext();
@@ -1241,24 +1402,8 @@ void Interpreter::executeScanAlias(const IRInstruction &instr) {
 
   std::vector<GenomicRegion> regions;
   if (motifResults.count(resultId)) {
-    for (const auto &m : motifResults[resultId]) {
-      GenomicRegion r;
-      r.chr = m.chr.empty() ? (sequenceDatasets.empty() ? "" : sequenceDatasets.begin()->second[0].sequenceId) : m.chr;
-      r.start = m.position;
-      r.end = m.position + m.matchLength;
-      r.strand = m.strand;
-      r.type = alias;
-      r.name = alias + "_" + std::to_string(m.position);
-
-      std::string seqData = "";
-      if (sequenceChrMaps[activeSequenceAlias].count(r.chr)) {
-        seqData = sequenceChrMaps[activeSequenceAlias][r.chr].sequence;
-      }
-      if (!seqData.empty() && r.end <= seqData.size()) {
-        r.sequence = seqData.substr(r.start, r.end - r.start);
-      }
-      regions.push_back(r);
-    }
+    for (const auto &match : motifResults[resultId])
+      regions.push_back(motifMatchToRegion(match, alias));
   }
 
   namedRegions[alias] = regions;
@@ -1293,26 +1438,8 @@ void Interpreter::executeResultAlias(const IRInstruction &instr) {
     return;
 
   std::vector<GenomicRegion> regions;
-  for (const auto &match : motifResults[resultId]) {
-    GenomicRegion region;
-    region.chr = match.chr;
-    region.start = match.position;
-    region.end = match.position + match.matchLength;
-    region.strand = match.strand;
-    region.type = alias;
-    region.name = alias + "_" + region.chr + "_" +
-                  std::to_string(match.position);
-    const auto chrMapIt = sequenceChrMaps.find(activeSequenceAlias);
-    if (chrMapIt != sequenceChrMaps.end()) {
-      const auto sequenceIt = chrMapIt->second.find(region.chr);
-      if (sequenceIt != chrMapIt->second.end() &&
-          region.end <= sequenceIt->second.sequence.size()) {
-        region.sequence = sequenceIt->second.sequence.substr(
-            region.start, region.end - region.start);
-      }
-    }
-    regions.push_back(std::move(region));
-  }
+  for (const auto &match : motifResults[resultId])
+    regions.push_back(motifMatchToRegion(match, alias));
   resultSets[alias] = regions;
   namedRegions[alias] = std::move(regions);
 }
@@ -1404,8 +1531,38 @@ void Interpreter::dumpResultsJSON() const {
           << "        \"strand\": \"" << jsonEscape(r.strand) << "\",\n"
           << "        \"type\": \"" << jsonEscape(r.type) << "\",\n"
           << "        \"name\": \"" << jsonEscape(r.name) << "\",\n"
-          << "        \"sequence\": \"" << jsonEscape(r.sequence) << "\"\n"
-          << "      }";
+          << "        \"sequence\": \"" << jsonEscape(r.sequence) << "\"";
+      if (r.motifEvidence.present) {
+        out << ",\n        \"motifEvidence\": {\n"
+            << "          \"matrixAlias\": \""
+            << jsonEscape(r.motifEvidence.matrixAlias) << "\",\n"
+            << "          \"matrixId\": \""
+            << jsonEscape(r.motifEvidence.matrixId) << "\",\n"
+            << "          \"matrixName\": \""
+            << jsonEscape(r.motifEvidence.matrixName) << "\",\n"
+            << "          \"matrixSource\": \""
+            << jsonEscape(r.motifEvidence.matrixSource) << "\",\n"
+            << "          \"rawScore\": "
+            << r.motifEvidence.rawScore << ",\n"
+            << "          \"scorePercent\": "
+            << r.motifEvidence.scorePercent;
+        if (r.motifEvidence.hasSourceRegion) {
+          out << ",\n          \"sourceRegion\": {\n"
+              << "            \"name\": \""
+              << jsonEscape(r.motifEvidence.sourceRegionName) << "\",\n"
+              << "            \"type\": \""
+              << jsonEscape(r.motifEvidence.sourceRegionType) << "\",\n"
+              << "            \"start\": "
+              << r.motifEvidence.sourceRegionStart << ",\n"
+              << "            \"end\": "
+              << r.motifEvidence.sourceRegionEnd << ",\n"
+              << "            \"relativeStart\": "
+              << r.motifEvidence.relativeStart << "\n"
+              << "          }";
+        }
+        out << "\n        }";
+      }
+      out << "\n      }";
     }
     out << "\n    ]";
   }

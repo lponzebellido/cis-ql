@@ -298,7 +298,10 @@ def main() -> int:
         require((workspace / "genes.tsv").read_text(
                     encoding="utf-8"
                 ).splitlines()[0]
-                == "chromosome\tstart\tend\tstrand\ttype\tname\tlength",
+                == "chromosome\tstart\tend\tstrand\ttype\tname\tlength"
+                "\tmatrix_alias\tmatrix_id\tmatrix_name\tmatrix_source"
+                "\traw_score\tscore_percent\tsource_region\tsource_type"
+                "\tsource_start\tsource_end\trelative_start",
                 "region TSV export")
         profile_lines = (workspace / "profile.tsv").read_text(
             encoding="utf-8"
@@ -396,6 +399,96 @@ def main() -> int:
         )
         require(len(data["resultSets"]["all_windows"]) == len(sequence) - 1,
                 "explicit zero PWM threshold is not replaced by the default")
+
+        data, _ = run_query(
+            workspace,
+            "scoped_pwm_scan",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            'EXTRACT GENE AS selected WHERE ID = "short";\n'
+            "DEFINE PROMOTERS OF selected FROM TSS "
+            "UPSTREAM 0 BP DOWNSTREAM 10 BP AS promoters;\n"
+            "SCAN matrix IN promoters STRAND POSITIVE "
+            "THRESHOLD 100 % AS sites;\n"
+            'EXPORT sites TO "sites.bed" FORMAT BED;\n'
+            'EXPORT sites TO "sites.gff3" FORMAT GFF3;\n'
+            'EXPORT sites TO "sites.tsv" FORMAT TSV;\n',
+        )
+        sites = data["resultSets"]["sites"]
+        require(len(sites) == 9 and
+                [site["start"] for site in sites] == list(range(9)),
+                "SCAN IN searches only the selected region and remaps hits")
+        require(all(site["type"] == "motif_hit" and
+                    site["motifEvidence"]["matrixAlias"] == "matrix" and
+                    site["motifEvidence"]["matrixId"] == "TEST" and
+                    site["motifEvidence"]["matrixName"] == "test" and
+                    site["motifEvidence"]["scorePercent"] == 100 and
+                    site["motifEvidence"]["sourceRegion"]["name"]
+                    == "short_promoter" and
+                    site["motifEvidence"]["sourceRegion"]["relativeStart"]
+                    == site["start"]
+                    for site in sites),
+                "scoped PWM hits preserve scores and source-region evidence")
+        bed_rows = (workspace / "sites.bed").read_text(
+            encoding="utf-8"
+        ).splitlines()
+        require(len(bed_rows) == 9 and
+                all(row.split("\t")[4] == "1000" for row in bed_rows),
+                "motif BED export maps relative score to the BED scale")
+        gff_rows = (workspace / "sites.gff3").read_text(
+            encoding="utf-8"
+        ).splitlines()
+        require("MatrixID=TEST" in gff_rows[1] and
+                "MatrixSource=fixture.pwm" in gff_rows[1] and
+                "SourceRegion=short_promoter" in gff_rows[1] and
+                "SourceRegionType=promoter" in gff_rows[1] and
+                "RelativeStart=0" in gff_rows[1],
+                "motif GFF3 export retains evidence")
+        tsv_rows = (workspace / "sites.tsv").read_text(
+            encoding="utf-8"
+        ).splitlines()
+        first_tsv_site = tsv_rows[1].split("\t")
+        require(len(tsv_rows) == 10 and len(first_tsv_site) == 18 and
+                first_tsv_site[7:11]
+                == ["matrix", "TEST", "test", "fixture.pwm"] and
+                float(first_tsv_site[11]) > 0 and
+                first_tsv_site[12:15]
+                == ["100", "short_promoter", "promoter"] and
+                first_tsv_site[17] == "0",
+                "motif TSV export retains evidence columns")
+
+        data, _ = run_query(
+            workspace,
+            "negative_source_relative_coordinates",
+            'LOAD SEQUENCE "alternate.fasta" AS genome;\n'
+            'LOAD ANNOTATION "alternate.gff3" AS annot;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "DEFINE PROMOTERS OF GENE FROM TSS "
+            "UPSTREAM 50 BP DOWNSTREAM 10 BP AS promoters;\n"
+            "SCAN matrix IN promoters STRAND NEGATIVE "
+            "THRESHOLD 100 % AS sites;\n",
+        )
+        negative_sites = data["resultSets"]["sites"]
+        require(len(negative_sites) == 59 and
+                negative_sites[0]["start"] == 190 and
+                negative_sites[0]["motifEvidence"]["sourceRegion"]
+                ["relativeStart"] == 58 and
+                negative_sites[-1]["start"] == 248 and
+                negative_sites[-1]["motifEvidence"]["sourceRegion"]
+                ["relativeStart"] == 0,
+                "source-relative coordinates follow negative-strand orientation")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "wrong_scan_target_type",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix IN genome THRESHOLD 80 % AS sites;\n",
+            3,
+        )
+        require("SCAN IN expects a region or motif-hit set" in semantic_error,
+                "SCAN IN rejects dataset aliases as region targets")
 
         data, _ = run_query(
             workspace,

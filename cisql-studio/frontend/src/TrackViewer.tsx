@@ -1,5 +1,21 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 
+interface MotifEvidence {
+  matrixAlias: string;
+  matrixId: string;
+  matrixName: string;
+  matrixSource: string;
+  rawScore: number;
+  scorePercent: number;
+  sourceRegion?: {
+    name: string;
+    type: string;
+    start: number;
+    end: number;
+    relativeStart: number;
+  };
+}
+
 interface GenomicRegion {
   chr: string;
   start: number;
@@ -8,6 +24,7 @@ interface GenomicRegion {
   type: string;
   name: string;
   sequence?: string;
+  motifEvidence?: MotifEvidence;
 }
 
 interface TrackViewerProps {
@@ -527,6 +544,15 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
               <span className="tt-label">Pos:</span> {hoveredRegion.chr}:{hoveredRegion.start.toLocaleString()}-{hoveredRegion.end.toLocaleString()}<br />
               <span className="tt-label">Strand:</span> {hoveredRegion.strand === '+' ? 'Forward (+)' : 'Reverse (-)'}<br />
               <span className="tt-label">Length:</span> {(hoveredRegion.end - hoveredRegion.start).toLocaleString()} bp
+              {hoveredRegion.motifEvidence && (
+                <>
+                  <br /><span className="tt-label">Matrix:</span> {hoveredRegion.motifEvidence.matrixId || hoveredRegion.motifEvidence.matrixAlias}
+                  <br /><span className="tt-label">Score:</span> {hoveredRegion.motifEvidence.rawScore.toFixed(3)} ({hoveredRegion.motifEvidence.scorePercent.toFixed(1)}%)
+                  {hoveredRegion.motifEvidence.sourceRegion && (
+                    <><br /><span className="tt-label">Source:</span> {hoveredRegion.motifEvidence.sourceRegion.name} +{hoveredRegion.motifEvidence.sourceRegion.relativeStart} bp</>
+                  )}
+                </>
+              )}
               {hoveredRegion.sequence && (
                 <div style={{ marginTop: 6, fontFamily: "'JetBrains Mono', monospace", fontSize: '0.65rem', color: '#3fb950', wordBreak: 'break-all', maxWidth: 250 }}>
                   {hoveredRegion.sequence.substring(0, 40)}{hoveredRegion.sequence.length > 40 ? '...' : ''}
@@ -571,6 +597,24 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                 <span className="detail-label">Strand</span>
                 <span className="detail-value">{selectedRegion.strand === '+' ? 'Forward (+)' : 'Reverse (-)'}</span>
               </div>
+              {selectedRegion.motifEvidence && (
+                <>
+                  <div className="detail-field">
+                    <span className="detail-label">Matrix</span>
+                    <span className="detail-value">{selectedRegion.motifEvidence.matrixId || selectedRegion.motifEvidence.matrixAlias} ({selectedRegion.motifEvidence.matrixName})</span>
+                  </div>
+                  <div className="detail-field">
+                    <span className="detail-label">PWM score</span>
+                    <span className="detail-value">{selectedRegion.motifEvidence.rawScore.toFixed(3)} / {selectedRegion.motifEvidence.scorePercent.toFixed(1)}%</span>
+                  </div>
+                  {selectedRegion.motifEvidence.sourceRegion && (
+                    <div className="detail-field">
+                      <span className="detail-label">Source region</span>
+                      <span className="detail-value">{selectedRegion.motifEvidence.sourceRegion.name}, +{selectedRegion.motifEvidence.sourceRegion.relativeStart} bp</span>
+                    </div>
+                  )}
+                </>
+              )}
               {selectedRegion.sequence && (
                 <div className="detail-seq">
                   <div className="detail-label" style={{ marginBottom: 4 }}>Sequence ({selectedRegion.sequence.length} bp)</div>

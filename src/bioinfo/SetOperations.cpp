@@ -32,6 +32,8 @@ SetOperations::intersect(std::vector<GenomicRegion> a,
         const size_t offset = start - a[i].start;
         overlap.sequence = overlap.sequence.substr(offset, end - start);
       }
+      if (start != a[i].start || end != a[i].end)
+        overlap.motifEvidence = MotifEvidence();
       result.push_back(std::move(overlap));
     }
 
@@ -65,6 +67,7 @@ std::vector<GenomicRegion> SetOperations::unite(std::vector<GenomicRegion> a,
         last.sequence.clear();
       }
       last.type = "union";
+      last.motifEvidence = MotifEvidence();
     } else {
       result.push_back(all[i]);
     }
@@ -103,6 +106,7 @@ std::vector<GenomicRegion> SetOperations::except(std::vector<GenomicRegion> a,
           fragment.sequence = region.sequence.substr(
               fragment.start - region.start, fragment.end - fragment.start);
         }
+        fragment.motifEvidence = MotifEvidence();
         result.push_back(std::move(fragment));
       }
       cursor = std::max(cursor, b[k].end);
@@ -119,6 +123,8 @@ std::vector<GenomicRegion> SetOperations::except(std::vector<GenomicRegion> a,
         fragment.sequence = region.sequence.substr(
             fragment.start - region.start, fragment.end - fragment.start);
       }
+      if (fragment.start != region.start || fragment.end != region.end)
+        fragment.motifEvidence = MotifEvidence();
       result.push_back(std::move(fragment));
     }
   }

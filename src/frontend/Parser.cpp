@@ -382,13 +382,29 @@ std::unique_ptr<ScanStmtNode> Parser::parseScan() {
   consume(TokenType::ID, "Expected a matrix alias after SCAN.");
   std::string matrixAlias = previous().lexeme;
 
+  std::string target;
   std::string strandFilter;
   std::string threshold;
 
   
   while (!check(TokenType::SEMICOLON) && !check(TokenType::AS) &&
          !check(TokenType::WHERE) && !isAtEnd()) {
-    if (match(TokenType::STRAND)) {
+    if (match(TokenType::IN)) {
+      if (!target.empty()) {
+        reportError(previous(), "SCAN accepts only one IN target.");
+        throw std::runtime_error("Parse error");
+      }
+      if (match(TokenType::GENE) || match(TokenType::PROMOTER) ||
+          match(TokenType::ENHANCER) || match(TokenType::EXON) ||
+          match(TokenType::INTRON) || match(TokenType::UTR) ||
+          match(TokenType::TSS) || match(TokenType::CDS) ||
+          match(TokenType::REGION) || match(TokenType::ID)) {
+        target = previous().lexeme;
+      } else {
+        reportError(peek(), "Expected a biological entity or alias after IN.");
+        throw std::runtime_error("Parse error");
+      }
+    } else if (match(TokenType::STRAND)) {
       if (match(TokenType::POSITIVE) || match(TokenType::NEGATIVE)) {
         strandFilter = previous().lexeme;
       } else {
@@ -423,7 +439,7 @@ std::unique_ptr<ScanStmtNode> Parser::parseScan() {
   consume(TokenType::SEMICOLON, "Expected ';' at the end of SCAN.");
 
   return std::unique_ptr<ScanStmtNode>(
-      new ScanStmtNode(matrixAlias, strandFilter, threshold,
+      new ScanStmtNode(matrixAlias, target, strandFilter, threshold,
                        alias, std::move(whereClause)));
 }
 

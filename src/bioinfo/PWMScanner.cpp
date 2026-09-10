@@ -59,6 +59,7 @@ static std::vector<double> parseLine(const std::string &line) {
 PWMatrix PWMScanner::loadJASPAR(const std::string &filename) {
   PWMatrix pwm;
   pwm.length = 0;
+  pwm.source = filename;
 
   std::ifstream file(filename);
   if (!file.is_open()) {
@@ -141,6 +142,8 @@ PSSM PWMScanner::computePSSM(const PWMatrix &pwm, double bgA, double bgC,
                              double bgG, double bgT) {
   PSSM pssm;
   pssm.name = pwm.name;
+  pssm.id = pwm.id;
+  pssm.source = pwm.source;
   pssm.length = pwm.length;
   if (pwm.length <= 0 || pwm.counts.size() != 4 || bgA <= 0.0 || bgC <= 0.0 ||
       bgG <= 0.0 || bgT <= 0.0) {
@@ -236,6 +239,12 @@ std::vector<MotifMatch> PWMScanner::scanStrand(const std::string &sequence,
       m.position = (size_t)pos;
       m.matchLength = (size_t)motifLen;
       m.strand = strand;
+      m.evidence.present = true;
+      m.evidence.matrixId = pssm.id;
+      m.evidence.matrixName = pssm.name;
+      m.evidence.matrixSource = pssm.source;
+      m.evidence.rawScore = score;
+      m.evidence.scorePercent = scoreToPercent(score, pssm);
 
       size_t ctxStart =
           (m.position > contextSize) ? m.position - contextSize : 0;

@@ -1,5 +1,21 @@
 import React, { useState, useMemo } from 'react';
 
+interface MotifEvidence {
+  matrixAlias: string;
+  matrixId: string;
+  matrixName: string;
+  matrixSource: string;
+  rawScore: number;
+  scorePercent: number;
+  sourceRegion?: {
+    name: string;
+    type: string;
+    start: number;
+    end: number;
+    relativeStart: number;
+  };
+}
+
 interface GenomicRegion {
   chr: string;
   start: number;
@@ -8,6 +24,7 @@ interface GenomicRegion {
   type: string;
   name: string;
   sequence?: string;
+  motifEvidence?: MotifEvidence;
 }
 
 interface SequenceViewerProps {
@@ -230,6 +247,15 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
                             <div className="seq-body-stats">
                               <span>Length: {region.sequence.length} bp</span>
                               <span>GC Content: {gcContent(region.sequence)}</span>
+                              {region.motifEvidence && (
+                                <>
+                                  <span>Matrix: {region.motifEvidence.matrixId || region.motifEvidence.matrixAlias}</span>
+                                  <span>PWM score: {region.motifEvidence.rawScore.toFixed(3)} ({region.motifEvidence.scorePercent.toFixed(1)}%)</span>
+                                  {region.motifEvidence.sourceRegion && (
+                                    <span>Source: {region.motifEvidence.sourceRegion.name} +{region.motifEvidence.sourceRegion.relativeStart} bp</span>
+                                  )}
+                                </>
+                              )}
                               {(() => {
                                 const c = ntCounts(region.sequence!);
                                 return (

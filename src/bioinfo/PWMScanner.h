@@ -11,6 +11,7 @@
 struct PWMatrix {
   std::string name;
   std::string id;
+  std::string source;
   int length;                          
   std::vector<std::vector<double>> counts; 
 };
@@ -18,6 +19,8 @@ struct PWMatrix {
 
 struct PSSM {
   std::string name;
+  std::string id;
+  std::string source;
   int length;
   std::vector<std::vector<double>> scores; 
   double maxScore;  

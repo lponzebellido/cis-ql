@@ -193,14 +193,15 @@ public:
 
 class ScanStmtNode : public StatementNode {
 public:
-  std::string matrixAlias;    
-  std::string strandFilter;   
-  std::string threshold;      
-  std::string alias;          
+  std::string matrixAlias;
+  std::string target;
+  std::string strandFilter;
+  std::string threshold;
+  std::string alias;
   std::unique_ptr<ConditionNode> whereClause;
-  ScanStmtNode(std::string ma, std::string sf, std::string th,
+  ScanStmtNode(std::string ma, std::string t, std::string sf, std::string th,
                std::string a, std::unique_ptr<ConditionNode> w)
-      : matrixAlias(ma), strandFilter(sf), threshold(th),
+      : matrixAlias(ma), target(t), strandFilter(sf), threshold(th),
         alias(a), whereClause(std::move(w)) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;

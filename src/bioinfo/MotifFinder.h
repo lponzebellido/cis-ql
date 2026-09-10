@@ -1,6 +1,7 @@
 #ifndef MOTIF_FINDER_H
 #define MOTIF_FINDER_H
 
+#include "MotifEvidence.h"
 #include <string>
 #include <vector>
 
@@ -10,6 +11,7 @@ struct MotifMatch {
   std::string strand;
   std::string context;
   std::string chr;
+  MotifEvidence evidence;
 };
 
 class MotifFinder {

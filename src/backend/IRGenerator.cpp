@@ -284,6 +284,7 @@ void IRGenerator::visit(ScanStmtNode* node) {
   scanInstr.opcode = IROpCode::SCAN_EXEC;
   scanInstr.arg1 = node->matrixAlias;
   scanInstr.arg2 = currentTemp;
+  scanInstr.arg3 = node->target;
   instructions.push_back(scanInstr);
 
   

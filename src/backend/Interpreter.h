@@ -60,6 +60,8 @@ private:
   void reportRuntimeError(const std::string &message);
   size_t toBasePairs(double value, const std::string &unit);
   std::vector<GenomicRegion> resolveEntity(const std::string &entity);
+  GenomicRegion motifMatchToRegion(const MotifMatch &match,
+                                   const std::string &alias) const;
   void printRegions(const std::vector<GenomicRegion> &regions,
                     int maxShow = 20);
   void printMotifMatches(const std::vector<MotifMatch> &matches,

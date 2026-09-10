@@ -1,6 +1,7 @@
 #ifndef GENOMIC_REGION_H
 #define GENOMIC_REGION_H
 
+#include "MotifEvidence.h"
 #include <string>
 #include <algorithm>
 
@@ -12,6 +13,7 @@ struct GenomicRegion {
   std::string type;
   std::string name;
   std::string sequence;
+  MotifEvidence motifEvidence;
 
   size_t length() const { return end - start; }
 

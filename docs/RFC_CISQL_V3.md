@@ -1,7 +1,7 @@
 # Cis-QL v3: regulatory genomics direction
 
-Status: incremental implementation. Part 1 is implemented; later parts are a
-design contract, not yet accepted syntax.
+Status: incremental implementation. Part 1 and Part 2A are implemented; later
+parts are a design contract, not yet accepted syntax.
 
 ## Product definition
 
@@ -26,8 +26,9 @@ It must not equate a motif match or a coexpression edge with direct regulation.
 2. Genome assembly, annotation, and imported tracks must be compatible.
 3. Promoter boundaries are always explicit; importing a GFF never invents them.
 4. Transcript and TSS policy must be visible in the query.
-5. Motif hits retain matrix identity, score, background model, p-value, q-value,
-   database source, and version.
+5. Motif hits retain matrix identity and their available statistical evidence.
+   Background model, p-value, q-value, database source, and version become
+   mandatory once Part 2B introduces statistically calibrated scans.
 6. Enrichment requires an explicit or reproducibly generated background.
 7. Coexpression, motif presence, accessibility, conservation, and direct
    experimental validation are distinct evidence classes.
@@ -56,12 +57,34 @@ parent/child relationships and all attributes.
 
 ## Planned language layers
 
-### Part 2: evidence-preserving motif scans
+### Part 2A: scoped, evidence-preserving motif scans
 
-- Typed motif sets and motif hits.
+Implemented syntax:
+
+```cql
+SCAN myb_matrix IN proximal_promoters
+  STRAND POSITIVE
+  THRESHOLD 85 %
+  AS myb_sites;
+```
+
+`IN` accepts an annotated biological entity or a named region/motif-hit set.
+Coordinates are remapped back to the active genome. Every PWM hit retains the
+matrix alias, matrix identifier and name, matrix-file provenance, raw log-odds
+score, normalized score percentage, source interval, and a relative start
+oriented by the source interval strand. Omitting `IN` deliberately scans the
+complete active FASTA, preserving backward compatibility.
+
+Motif-hit aliases are a distinct semantic type and can be exported or reused in
+region operations. BED score carries the normalized score on its 0-1000 scale;
+GFF3, TSV, JSON, and Cis-QL Studio retain the richer evidence fields. Interval
+operations discard hit evidence whenever they change the hit geometry.
+
+### Part 2B: statistically calibrated motif scans
+
 - JASPAR identifiers, TF names/families, source and version.
-- Raw/log-odds score, configurable background, p-value and q-value.
-- Scan a named region set rather than only the complete active genome.
+- Configurable and recorded background models.
+- P-values and multiple-testing-corrected q-values.
 - A FIMO-compatible execution backend and parity tests.
 
 ### Part 3: regulatory interval algebra

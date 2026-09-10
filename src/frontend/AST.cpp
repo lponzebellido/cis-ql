@@ -93,6 +93,7 @@ void SetOpStmtNode::print(std::string prefix, bool isLast) const {
 
 void ScanStmtNode::print(std::string prefix, bool isLast) const {
     std::cout << prefix << (isLast ? "└── " : "├── ") << "ScanStmt(Matrix: " << matrixAlias;
+    if (!target.empty()) std::cout << ", IN: " << target;
     if (!strandFilter.empty()) std::cout << ", Strand: " << strandFilter;
     if (!threshold.empty()) std::cout << ", Threshold: " << threshold;
     if (!alias.empty()) std::cout << ", AS: " << alias;
