@@ -44,6 +44,16 @@ void DefinePromotersStmtNode::print(std::string prefix, bool isLast) const {
               << downstreamUnit << ", AS: " << alias << ")" << std::endl;
 }
 
+void DefineModuleStmtNode::print(std::string prefix, bool isLast) const {
+    std::cout << prefix << (isLast ? "└── " : "├── ")
+              << "DefineModuleStmt(From: " << firstSet << " WITH "
+              << secondSet << ", Spacing: " << minimumSpacingValue << " "
+              << minimumSpacingUnit << " TO " << maximumSpacingValue << " "
+              << maximumSpacingUnit << ", Order: " << orderPolicy
+              << ", Orientation: " << orientationPolicy << ", AS: "
+              << alias << ")" << std::endl;
+}
+
 void FindOptNode::print(std::string prefix, bool isLast) const {
     std::cout << prefix << (isLast ? "└── " : "├── ") << "FindOpt(" << type;
     if (!value1.empty()) std::cout << ", " << value1;
@@ -186,6 +196,7 @@ void LoadStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void UseStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ExportStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void DefinePromotersStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
+void DefineModuleStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void FindOptNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void FindStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ExtractStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }

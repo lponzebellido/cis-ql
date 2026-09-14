@@ -60,13 +60,13 @@ make
 Execute a `.cql` script using the `cisql` binary:
 
 ```bash
-./cisql cql_examples/01_extract_genes.cql
+./cisql cql_examples/01_define_promoters.cql
 ```
 
 Use the `--debug` flag to inspect compilation phases, including token stream, Abstract Syntax Tree (AST), Symbol Table, Intermediate Representation (IR), and execution steps:
 
 ```bash
-./cisql cql_examples/14_integrated_query.cql --debug
+./cisql cql_examples/08_integrated_anthocyanin_query.cql --debug
 ```
 
 ### Launching Cis-QL Studio
@@ -87,9 +87,9 @@ npm start
 Load sequence files (FASTA), annotation files (GFF3), and matrix files (JASPAR format):
 
 ```sql
-LOAD SEQUENCE "data_examples/ecoli2.fna" AS genome;
-LOAD ANNOTATION "data_examples/genomic.gff" AS annot;
-LOAD MATRIX "matrices/MA0108.1_TBP.pwm" AS tbp_matrix;
+LOAD SEQUENCE "data_examples/anthocyanin_regulatory_demo.fasta" AS genome;
+LOAD ANNOTATION "data_examples/anthocyanin_regulatory_demo.gff3" AS annotation;
+LOAD MATRIX "matrices/MA0054.1_myb.Ph3.pwm" AS myb_matrix;
 ```
 
 The example suite also includes the plant MYB profile `MA0054.1` from
@@ -110,28 +110,27 @@ USE ANNOTATION annot;
 Locate exact motifs, regular expressions, or IUPAC degenerate strings, with optional spatial constraints relative to other features:
 
 ```sql
-// IUPAC degenerate motif search on the positive strand
-FIND MOTIF "TATAWAW" STRAND POSITIVE AS tata_boxes;
+FIND MOTIF "TAACCGTTT" STRAND POSITIVE AS exact_myb_like_sites;
 
-// Spatial constraint: motif within 200 BP upstream of coding sequences
-FIND MOTIF "TTGACA" WITHIN 200 BP UPSTREAM FROM CDS AS minus35_promoters;
-
-// De novo ORF search downstream of putative promoters
-FIND MOTIF "ATG(...)*?(TAA|TAG|TGA)"
-    WITHIN 2500 BP DOWNSTREAM FROM tata_boxes
-    AS candidate_orfs
-    WHERE LENGTH > 600 BP;
+FIND MOTIF "WAACCGTTT"
+    WITHIN 100 BP UPSTREAM FROM GENE
+    AS degenerate_upstream_sites;
 ```
+
+`FIND MOTIF` is appropriate for exact strings, regular expressions, or
+documented IUPAC patterns. A short consensus is not equivalent to a TF-binding
+model; use `SCAN` with a sourced PWM when TF specificity and calibrated scores
+matter.
 
 ### 3. Position Weight Matrix Scanning (`SCAN`)
 
 Scan loaded sequences using Position Weight Matrices with log-odds scoring:
 
 ```sql
-SCAN tbp_matrix STRAND POSITIVE THRESHOLD 80 % AS tbp_sites;
+SCAN myb_matrix THRESHOLD 90 % AS high_scoring_myb_sites;
 
-SCAN tbp_matrix BACKGROUND FROM genome
-    QVALUE <= 0.05 AS significant_tbp_sites;
+SCAN myb_matrix BACKGROUND FROM genome
+    QVALUE <= 0.01 AS supported_myb_sites;
 ```
 
 ### 4. Biological & Structural Analysis (`ANALYZE`)
@@ -149,12 +148,9 @@ ANALYZE CPG_ISLANDS AS cpg_islands;
 Combine or filter interval sets using high-speed interval algebra:
 
 ```sql
-INTERSECT sp1_sites AND cpg_islands AS supported_sites;
-UNION minus35_box AND minus10_box AS promoter_boxes;
-EXCEPT ctcf_sites FROM CDS AS noncoding_ctcf_sites;
-OVERLAPS myb_sites WITH candidate_promoters AS promoter_myb_sites;
-NEAR significant_myb_sites TO GENE WITHIN 2 KB AS proximal_gene_candidates;
-COUNT significant_myb_sites IN candidate_promoters AS promoter_site_counts;
+OVERLAPS supported_myb_sites WITH candidate_promoters AS promoter_myb_sites;
+NEAR supported_myb_sites TO GENE WITHIN 2 KB AS proximal_gene_candidates;
+COUNT supported_myb_sites IN candidate_promoters AS promoter_site_counts;
 EXTRACT promoter_site_counts AS supported_promoters WHERE COUNT >= 1;
 ```
 
@@ -182,7 +178,34 @@ Counting is strand-agnostic and operates on input records; duplicate records
 are counted separately. Restrict or normalize the counted set first when that
 is not the intended universe.
 
-### 6. Feature Extraction & Filtering (`EXTRACT`, `WHERE`)
+### 6. Cis-regulatory modules (`DEFINE MODULE`)
+
+Pair motif or region records under explicit spacing, order, and orientation
+constraints:
+
+```sql
+DEFINE MODULE
+    FROM enhancer_myb_sites WITH enhancer_myb_sites
+    SPACING 5 BP TO 30 BP
+    ORDER ANY
+    ORIENTATION ANY
+    AS enhancer_myb_modules;
+```
+
+Spacing is the gap between half-open intervals and both bounds are inclusive;
+overlapping and adjacent intervals have gap zero. `ORDER AS_WRITTEN` requires a
+member from the first set to have a lower reference start than one from the
+second set; tied starts do not satisfy it. `ORDER ANY` accepts either order and
+records what was observed. `SAME` and `OPPOSITE` require known `+`/`-` strands.
+When one alias is used twice, Cis-QL excludes self-pairs and mirror duplicates.
+The output span
+retains both member identities and PWM evidence in JSON, GFF3, TSV, and Studio.
+
+This constructs candidates satisfying a declared grammar; it does not prove
+cooperative binding. Appropriate spacing bounds should come from a stated
+hypothesis, reference set, or sensitivity analysis.
+
+### 7. Feature Extraction & Filtering (`EXTRACT`, `WHERE`)
 
 Filter genomic entities by physical length or alignment similarity:
 
@@ -203,7 +226,7 @@ An explicit similarity reference must be a named result set containing exactly
 one region. Similarity percentages are normalized local-alignment scores, not
 percent identity.
 
-### 7. Result Export (`EXPORT`)
+### 8. Result Export (`EXPORT`)
 
 ```sql
 EXPORT homologous_genes TO "homologous_genes.bed" FORMAT BED;
@@ -217,41 +240,48 @@ the start coordinate to the one-based inclusive convention. Export paths are
 relative to the query workspace; absolute paths and parent-directory traversal
 are rejected.
 
-### 8. Control Flow (`IF`, `FOREACH`)
+### 9. Control Flow (`IF`, `FOREACH`)
 
 Control query execution paths and iterate over collections of loaded matrices:
 
 ```sql
-// Conditional execution based on sequence properties
-IF GC_CONTENT > 50 % THEN
-    SCAN sp1 THRESHOLD 80 % AS gc_sites;
-ELSE
-    SCAN tbp THRESHOLD 80 % AS at_sites;
-ENDIF;
-
-// Batch processing over matrix lists
-FOREACH m IN [tbp, sp1, ctcf] DO
-    SCAN m THRESHOLD 80 % AS tf_sites;
+FOREACH m IN [myb_a, myb_b, myb_c] DO
+    SCAN m BACKGROUND FROM genome QVALUE <= 0.01 AS tf_sites;
 ENDFOR;
 ```
+
+`IF` is also supported for execution control. The curated examples avoid using
+whole-genome composition to choose a TF model or threshold because that would
+hide a scientific decision inside a convenient branch.
 
 ---
 
 ## Formal Syntax & Grammar (CFG)
 
-Cis-QL is formally specified by an LL(1) Context-Free Grammar. Below is the complete EBNF specification matching `GRAMMAR.TXT`:
+Cis-QL is specified by the development CFG in [`grammar.txt`](grammar.txt).
+The following compact EBNF lists the main statement forms; the linked file is
+the authoritative grammar:
 
 ```ebnf
 Program            ::= StatementList
 StatementList      ::= Statement StatementList | λ
 
 Statement          ::= LoadStmt | UseStmt | ExportStmt | FindStmt | ExtractStmt
-                     | SetOperationStmt | ScanStmt | AnalyzeStmt | IfStmt
-                     | ForeachStmt
+                     | DefinePromotersStmt | DefineModuleStmt
+                     | SetOperationStmt | CountStmt | ScanStmt | AnalyzeStmt
+                     | IfStmt | ForeachStmt
 
 LoadStmt           ::= LOAD (SEQUENCE | ANNOTATION | MATRIX) STRING AS ID SEMICOLON
 UseStmt            ::= USE (SEQUENCE | ANNOTATION) ID SEMICOLON
 ExportStmt         ::= EXPORT ID TO STRING FORMAT (BED | GFF3 | TSV) SEMICOLON
+DefinePromotersStmt ::= DEFINE PROMOTERS OF (GENE | TSS | ID) FROM TSS
+                        UPSTREAM (NUM | FLOAT) RequiredUnit
+                        DOWNSTREAM (NUM | FLOAT) RequiredUnit AS ID SEMICOLON
+DefineModuleStmt   ::= DEFINE MODULE FROM ID WITH ID
+                       SPACING (NUM | FLOAT) RequiredUnit TO
+                               (NUM | FLOAT) RequiredUnit
+                       ORDER (ANY | AS_WRITTEN)
+                       ORIENTATION (ANY | SAME | OPPOSITE) AS ID SEMICOLON
 
 AnalyzeStmt        ::= ANALYZE (GC_CONTENT | CPG_ISLANDS) (WINDOW (NUM | FLOAT) Unit)? AliasOpt WhereClause SEMICOLON
 
@@ -263,11 +293,19 @@ FindOpt            ::= WITHIN (NUM | FLOAT) Unit Direction FROM EntityRef Entity
 
 ScanStmt           ::= SCAN ID ScanOpts AliasOpt WhereClause SEMICOLON
 ScanOpts           ::= ScanOpt ScanOpts | λ
-ScanOpt            ::= STRAND StrandType
+ScanOpt            ::= IN EntityRef
+                     | STRAND StrandType
                      | THRESHOLD (NUM | FLOAT) PERCENT
+                     | (PVALUE | QVALUE) (LESS | LESS_EQ) Probability
+                     | BACKGROUND (UNIFORM | FROM EntityRef)
 
 SetOperationStmt   ::= (INTERSECT | UNION) EntityRef AND EntityRef AliasOpt WhereClause SEMICOLON
                      | EXCEPT EntityRef FROM EntityRef AliasOpt WhereClause SEMICOLON
+                     | OVERLAPS EntityRef WITH EntityRef AliasOpt WhereClause SEMICOLON
+                     | NEAR EntityRef TO EntityRef WITHIN
+                         (NUM | FLOAT) RequiredUnit AliasOpt WhereClause SEMICOLON
+
+CountStmt          ::= COUNT EntityRef IN EntityRef AS ID WhereClause SEMICOLON
 
 ExtractStmt        ::= EXTRACT EntityRef AliasOpt WhereClause SEMICOLON
 
@@ -287,12 +325,14 @@ Factor             ::= NOT Factor | SimpleCondition | "(" Condition ")"
 
 SimpleCondition    ::= Property RelOp Value
                      | SIMILARITY SimilarityRefOpt RelOp Value
-Property           ::= LENGTH | GC_CONTENT | ID
+Property           ::= LENGTH | GC_CONTENT | COUNT | ID | NAME
 SimilarityRefOpt   ::= TO ID | λ
 RelOp              ::= ">" | "<" | ">=" | "<=" | "="
 Value              ::= (NUM | FLOAT) Unit | (NUM | FLOAT) PERCENT | NUM | FLOAT | STRING
+Probability        ::= NUM | FLOAT
 
 Unit               ::= BP | KB | MB | λ
+RequiredUnit       ::= BP | KB | MB
 Direction          ::= UPSTREAM | DOWNSTREAM
 Entity             ::= GENE | PROMOTER | ENHANCER | EXON | INTRON | UTR | TSS | CDS | REGION
 EntityRef          ::= Entity | ID
@@ -312,7 +352,7 @@ make validate
 
 `make validate` compares motif coordinates, PSSM thresholds and tail
 probabilities, interval subtraction, overlap/nearest selection, overlap counts,
-and normalized local-alignment filtering with independent reference
+constrained homotypic modules, and normalized local-alignment filtering with independent reference
 implementations. If BEDTools, Biopython, or FIMO are installed, compatible
 external checks run as additional optional comparisons.
 
@@ -332,34 +372,23 @@ requirements needed before reporting external benchmark results.
 
 ## Curated Examples Suite (`cql_examples/`)
 
-The repository includes 21 structured `.cql` scripts demonstrating specific language capabilities:
+The repository includes eight `.cql` analyses forming one coherent,
+synthetic anthocyanin-regulation path. Compiler feature coverage belongs in
+the automated tests; these programs are examples of scientific questions.
 
 The regulatory progression and its expected outputs are described in
 [`cql_examples/README.md`](cql_examples/README.md).
 
 | Script | Description | Primary Features |
 | :--- | :--- | :--- |
-| `01_extract_genes.cql` | Structural gene extraction | `EXTRACT`, `WHERE LENGTH` |
-| `02_length_filter.cql` | Multi-condition range filtering | Logical `AND`, bounded intervals |
-| `03_similarity_align.cql` | Paralog discovery via local alignment | Smith-Waterman `SIMILARITY > 70 %` |
-| `04_iupac_motifs.cql` | Degenerate promoter motif search | IUPAC translation engine (`TATAWAW`) |
-| `05_spatial_promoters.cql` | Upstream regulatory element search | `WITHIN 200 BP UPSTREAM FROM` |
-| `06_denovo_orfs.cql` | Unannotated ORF discovery | Regex matching, virtual annotations |
-| `07_pwm_scanning.cql` | Plant MYB matrix scanning | JASPAR PFM, relative log-odds threshold |
-| `08_ctcf_insulators.cql` | Chromatin insulator mapping | `EXCEPT` set subtraction |
-| `09_cpg_islands.cql` | Epigenetic CpG island profiling | `ANALYZE CPG_ISLANDS`, `INTERSECT` |
-| `10_promoter_union.cql` | Bipartite promoter element merger | Multi-track consolidation via `UNION` |
-| `11_strand_search.cql` | Sense vs. antisense motif profiling | `STRAND POSITIVE / NEGATIVE` |
-| `12_gc_content.cql` | Sliding-window GC landscape | `ANALYZE GC_CONTENT WINDOW` |
-| `13_complex_where.cql` | Multi-property conditional queries | Combined `LENGTH` & `SIMILARITY` |
-| `14_integrated_query.cql` | Anthocyanin regulatory evidence map | Promoters, calibrated MYB sites, overlap counts and candidate links |
-| `15_if_else_branching.cql` | Conditional flow execution | `IF / ELSE / ENDIF` |
-| `16_foreach_batch_scan.cql` | Batch processing over matrix lists | `FOREACH / DO / ENDFOR` |
-| `17_explicit_promoters.cql` | TSS-oriented candidate promoters | `DEFINE PROMOTERS`, explicit bounds |
-| `18_statistical_pwm_scan.cql` | Calibrated plant MYB-site selection | `BACKGROUND FROM`, `QVALUE` |
-| `19_regulatory_overlap.cql` | Promoter-supported MYB evidence | Directional `OVERLAPS`, evidence preservation |
-| `20_nearest_gene_candidates.cql` | Proximity-based candidate gene links | `NEAR ... WITHIN`, auditable reference evidence |
-| `21_count_promoter_support.cql` | MYB support summarized per promoter | `COUNT ... IN`, zero retention, `WHERE COUNT` |
+| `01_define_promoters.cql` | Build explicit candidate promoter windows | `DEFINE PROMOTERS`, TSS-relative bounds |
+| `02_score_myb_sites.cql` | Inspect high-scoring plant MYB matches | sourced PWM, relative score threshold |
+| `03_calibrated_myb_sites.cql` | Select statistically supported MYB sites | genomic background, `QVALUE` |
+| `04_promoter_supported_sites.cql` | Retain promoter-overlapping MYB evidence | directional `OVERLAPS` |
+| `05_count_promoter_support.cql` | Summarize site support per promoter | zero-preserving `COUNT`, `WHERE COUNT` |
+| `06_nearest_gene_candidates.cql` | Form proximity-based gene hypotheses | auditable `NEAR ... WITHIN` |
+| `07_enhancer_myb_module.cql` | Detect a constrained homotypic MYB module | spacing, order, orientation, two-member evidence |
+| `08_integrated_anthocyanin_query.cql` | Connect the complete evidence path | promoters, calibrated sites, modules, counts, candidate links |
 
 ---
 
@@ -417,5 +446,6 @@ Current operational components:
 - Parallel multithreaded PSSM matrix scanner.
 - Smith-Waterman pairwise alignment module.
 - Sweep-line interval algebra engine (`INTERSECT`, `UNION`, `EXCEPT`).
+- Evidence-preserving regulatory selection, counting, and motif modules.
 - Control flow execution engine (`IF/ELSE` and `FOREACH`).
 - Desktop GUI workspace (`Cis-QL Studio`).

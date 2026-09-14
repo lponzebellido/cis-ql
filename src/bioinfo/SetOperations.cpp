@@ -1,5 +1,6 @@
 #include "SetOperations.h"
 #include <algorithm>
+#include <limits>
 #include <unordered_map>
 #include <utility>
 
@@ -40,6 +41,8 @@ SetOperations::intersect(std::vector<GenomicRegion> a,
         overlap.spatialRelation = SpatialRelationEvidence();
       if (start != a[i].start || end != a[i].end)
         overlap.countEvidence = CountEvidence();
+      if (start != a[i].start || end != a[i].end)
+        overlap.moduleEvidence = ModuleEvidence();
       result.push_back(std::move(overlap));
     }
 
@@ -76,6 +79,7 @@ std::vector<GenomicRegion> SetOperations::unite(std::vector<GenomicRegion> a,
       last.motifEvidence = MotifEvidence();
       last.spatialRelation = SpatialRelationEvidence();
       last.countEvidence = CountEvidence();
+      last.moduleEvidence = ModuleEvidence();
     } else {
       result.push_back(all[i]);
     }
@@ -117,6 +121,7 @@ std::vector<GenomicRegion> SetOperations::except(std::vector<GenomicRegion> a,
         fragment.motifEvidence = MotifEvidence();
         fragment.spatialRelation = SpatialRelationEvidence();
         fragment.countEvidence = CountEvidence();
+        fragment.moduleEvidence = ModuleEvidence();
         result.push_back(std::move(fragment));
       }
       cursor = std::max(cursor, b[k].end);
@@ -139,6 +144,8 @@ std::vector<GenomicRegion> SetOperations::except(std::vector<GenomicRegion> a,
         fragment.spatialRelation = SpatialRelationEvidence();
       if (fragment.start != region.start || fragment.end != region.end)
         fragment.countEvidence = CountEvidence();
+      if (fragment.start != region.start || fragment.end != region.end)
+        fragment.moduleEvidence = ModuleEvidence();
       result.push_back(std::move(fragment));
     }
   }
@@ -351,5 +358,157 @@ std::vector<GenomicRegion> SetOperations::countOverlaps(
     countedContainer.countEvidence.count = overlapCount;
     result.push_back(std::move(countedContainer));
   }
+  return result;
+}
+
+std::vector<GenomicRegion> SetOperations::defineModules(
+    const std::vector<GenomicRegion> &first,
+    const std::vector<GenomicRegion> &second, size_t minimumSpacing,
+    size_t maximumSpacing, const std::string &orderPolicy,
+    const std::string &orientationPolicy, const std::string &firstSet,
+    const std::string &secondSet) {
+  struct ChromosomeIndex {
+    std::vector<const GenomicRegion *> regions;
+    std::vector<size_t> starts;
+    size_t maximumLength = 0;
+  };
+
+  const auto regionOrder = [](const GenomicRegion &left,
+                              const GenomicRegion &right) {
+    if (left.start != right.start)
+      return left.start < right.start;
+    if (left.end != right.end)
+      return left.end < right.end;
+    if (left.strand != right.strand)
+      return left.strand < right.strand;
+    if (left.name != right.name)
+      return left.name < right.name;
+    return left.type < right.type;
+  };
+  const auto pointerOrder = [&regionOrder](const GenomicRegion *left,
+                                           const GenomicRegion *right) {
+    return regionOrder(*left, *right);
+  };
+
+  std::unordered_map<std::string, ChromosomeIndex> indexes;
+  for (const auto &region : second) {
+    if (region.start >= region.end)
+      continue;
+    ChromosomeIndex &index = indexes[region.chr];
+    index.regions.push_back(&region);
+    index.maximumLength = std::max(index.maximumLength, region.length());
+  }
+  for (auto &entry : indexes) {
+    ChromosomeIndex &index = entry.second;
+    std::sort(index.regions.begin(), index.regions.end(), pointerOrder);
+    for (const auto *region : index.regions)
+      index.starts.push_back(region->start);
+  }
+
+  const auto fillMember = [](ModuleMemberEvidence &member,
+                             const GenomicRegion &region,
+                             const std::string &sourceSet) {
+    member.sourceSet = sourceSet;
+    member.chr = region.chr;
+    member.start = region.start;
+    member.end = region.end;
+    member.strand = region.strand;
+    member.type = region.type;
+    member.name = region.name;
+    member.motifEvidence = region.motifEvidence;
+  };
+
+  const bool sameSet = firstSet == secondSet;
+  std::vector<GenomicRegion> result;
+  for (const auto &firstRegion : first) {
+    if (firstRegion.start >= firstRegion.end)
+      continue;
+    const auto chromosome = indexes.find(firstRegion.chr);
+    if (chromosome == indexes.end())
+      continue;
+    const ChromosomeIndex &index = chromosome->second;
+
+    size_t reach = maximumSpacing;
+    if (reach > std::numeric_limits<size_t>::max() - index.maximumLength)
+      reach = std::numeric_limits<size_t>::max();
+    else
+      reach += index.maximumLength;
+    const size_t lowerStart = firstRegion.start > reach
+                                  ? firstRegion.start - reach
+                                  : 0;
+    const size_t upperStart =
+        firstRegion.end > std::numeric_limits<size_t>::max() - maximumSpacing
+            ? std::numeric_limits<size_t>::max()
+            : firstRegion.end + maximumSpacing;
+    auto candidate = std::lower_bound(index.starts.begin(), index.starts.end(),
+                                      lowerStart);
+    const auto candidateEnd = std::upper_bound(
+        index.starts.begin(), index.starts.end(), upperStart);
+
+    for (; candidate != candidateEnd; ++candidate) {
+      const size_t position = static_cast<size_t>(
+          std::distance(index.starts.begin(), candidate));
+      const GenomicRegion &secondRegion = *index.regions[position];
+
+      if (sameSet) {
+        if (firstRegion.start == secondRegion.start &&
+            firstRegion.end == secondRegion.end)
+          continue;
+        if (!regionOrder(firstRegion, secondRegion))
+          continue;
+      }
+
+      const bool overlaps = firstRegion.overlaps(secondRegion);
+      size_t spacing = 0;
+      if (firstRegion.end < secondRegion.start)
+        spacing = secondRegion.start - firstRegion.end;
+      else if (secondRegion.end < firstRegion.start)
+        spacing = firstRegion.start - secondRegion.end;
+      if (spacing < minimumSpacing || spacing > maximumSpacing)
+        continue;
+
+      const bool firstBeforeSecond = firstRegion.start < secondRegion.start;
+      if (orderPolicy == "AS_WRITTEN" && !firstBeforeSecond)
+        continue;
+
+      std::string observedOrientation = "UNKNOWN";
+      const bool firstStranded = firstRegion.strand == "+" ||
+                                 firstRegion.strand == "-";
+      const bool secondStranded = secondRegion.strand == "+" ||
+                                  secondRegion.strand == "-";
+      if (firstStranded && secondStranded) {
+        observedOrientation = firstRegion.strand == secondRegion.strand
+                                  ? "SAME"
+                                  : "OPPOSITE";
+      }
+      if (orientationPolicy != "ANY" &&
+          observedOrientation != orientationPolicy)
+        continue;
+
+      GenomicRegion module;
+      module.chr = firstRegion.chr;
+      module.start = std::min(firstRegion.start, secondRegion.start);
+      module.end = std::max(firstRegion.end, secondRegion.end);
+      module.strand = ".";
+      module.type = "cis_regulatory_module";
+      module.name = firstRegion.name + "__with__" + secondRegion.name;
+      module.moduleEvidence.present = true;
+      module.moduleEvidence.minimumSpacing = minimumSpacing;
+      module.moduleEvidence.maximumSpacing = maximumSpacing;
+      module.moduleEvidence.observedSpacing = spacing;
+      module.moduleEvidence.orderPolicy = orderPolicy;
+      module.moduleEvidence.observedOrder = overlaps
+          ? "OVERLAPPING"
+          : firstBeforeSecond ? "FIRST_BEFORE_SECOND"
+                              : "SECOND_BEFORE_FIRST";
+      module.moduleEvidence.orientationPolicy = orientationPolicy;
+      module.moduleEvidence.observedOrientation = observedOrientation;
+      fillMember(module.moduleEvidence.first, firstRegion, firstSet);
+      fillMember(module.moduleEvidence.second, secondRegion, secondSet);
+      result.push_back(std::move(module));
+    }
+  }
+
+  std::sort(result.begin(), result.end());
   return result;
 }

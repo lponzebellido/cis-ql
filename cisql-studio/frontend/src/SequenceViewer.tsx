@@ -62,6 +62,24 @@ interface CountEvidence {
   count: number;
 }
 
+interface ModuleMemberEvidence {
+  sourceSet: string;
+  chr: string;
+  start: number;
+  end: number;
+  strand: string;
+  type: string;
+  name: string;
+  motifEvidence?: MotifEvidence;
+}
+
+interface ModuleEvidence {
+  spacing: { minimum: number; maximum: number; observed: number };
+  order: { policy: string; observed: string };
+  orientation: { policy: string; observed: string };
+  members: ModuleMemberEvidence[];
+}
+
 interface GenomicRegion {
   chr: string;
   start: number;
@@ -73,6 +91,7 @@ interface GenomicRegion {
   motifEvidence?: MotifEvidence;
   spatialRelation?: SpatialRelation;
   countEvidence?: CountEvidence;
+  moduleEvidence?: ModuleEvidence;
 }
 
 interface SequenceViewerProps {
@@ -280,8 +299,8 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
                       <span className="seq-result-location">
                         {region.chr}:{region.start.toLocaleString()}-{region.end.toLocaleString()}
                       </span>
-                      <span className={`strand-badge ${region.strand === '+' ? 'forward' : 'reverse'}`}>
-                        {region.strand === '+' ? 'Fwd' : 'Rev'}
+                      <span className={`strand-badge ${region.strand === '+' ? 'forward' : region.strand === '-' ? 'reverse' : ''}`}>
+                        {region.strand === '+' ? 'Fwd' : region.strand === '-' ? 'Rev' : 'N/A'}
                       </span>
                       <span className="seq-result-type">{region.type}</span>
                       <span className="seq-result-len">{(region.end - region.start).toLocaleString()} bp</span>
@@ -317,6 +336,18 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
                               )}
                               {region.countEvidence && (
                                 <span>Overlap count: {region.countEvidence.count.toLocaleString()} from {region.countEvidence.countedSet}</span>
+                              )}
+                              {region.moduleEvidence && (
+                                <>
+                                  <span>Module spacing: {region.moduleEvidence.spacing.observed.toLocaleString()} bp ({region.moduleEvidence.spacing.minimum.toLocaleString()}-{region.moduleEvidence.spacing.maximum.toLocaleString()} bp allowed)</span>
+                                  <span>Order: {region.moduleEvidence.order.observed} ({region.moduleEvidence.order.policy})</span>
+                                  <span>Orientation: {region.moduleEvidence.orientation.observed} ({region.moduleEvidence.orientation.policy})</span>
+                                  {region.moduleEvidence.members.map((member, index) => (
+                                    <span key={`${member.sourceSet}-${member.chr}-${member.start}-${member.end}-${index}`}>
+                                      Member {index + 1}: {member.name} [{member.sourceSet}] {member.chr}:{member.start.toLocaleString()}-{member.end.toLocaleString()} {member.strand}{member.motifEvidence ? ` ${member.motifEvidence.matrixId || member.motifEvidence.matrixAlias}` : ''}
+                                    </span>
+                                  ))}
+                                </>
                               )}
                               {(() => {
                                 const c = ntCounts(region.sequence!);

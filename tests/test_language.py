@@ -102,6 +102,9 @@ def main() -> int:
         (workspace / "mixed_statistics.fasta").write_text(
             ">chrMixed\nAACA\n", encoding="utf-8"
         )
+        (workspace / "module.fasta").write_text(
+            ">chrModule\nAATTAA\n", encoding="utf-8"
+        )
         (workspace / "alternate.gff3").write_text(
             "##gff-version 3\n"
             "chr1\ttest\tgene\t101\t200\t.\t-\t.\tID=alternate\n",
@@ -324,7 +327,18 @@ def main() -> int:
                 "\treference_start\treference_end\treference_strand"
                 "\treference_type\treference_name\tdistance_bp"
                 "\tmaximum_distance_bp\toverlaps"
-                "\tcount_relation\tcounted_set\tcontainer_set\toverlap_count",
+                "\tcount_relation\tcounted_set\tcontainer_set\toverlap_count"
+                "\tmodule_minimum_spacing_bp\tmodule_maximum_spacing_bp"
+                "\tmodule_observed_spacing_bp\tmodule_order_policy"
+                "\tmodule_observed_order\tmodule_orientation_policy"
+                "\tmodule_observed_orientation"
+                "\tfirst_set\tfirst_chr\tfirst_start\tfirst_end"
+                "\tfirst_strand\tfirst_type\tfirst_name\tfirst_matrix_id"
+                "\tfirst_raw_score\tfirst_p_value\tfirst_q_value"
+                "\tsecond_set\tsecond_chr\tsecond_start\tsecond_end"
+                "\tsecond_strand\tsecond_type\tsecond_name"
+                "\tsecond_matrix_id\tsecond_raw_score\tsecond_p_value"
+                "\tsecond_q_value",
                 "region TSV export")
         profile_lines = (workspace / "profile.tsv").read_text(
             encoding="utf-8"
@@ -497,7 +511,7 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()
         first_tsv_site = tsv_rows[1].split("\t")
-        require(len(tsv_rows) == 10 and len(first_tsv_site) == 52 and
+        require(len(tsv_rows) == 10 and len(first_tsv_site) == 81 and
                 first_tsv_site[7:11]
                 == ["matrix", "TEST", "test", "fixture.pwm"] and
                 float(first_tsv_site[11]) > 0 and
@@ -513,7 +527,7 @@ def main() -> int:
                 abs(float(first_tsv_site[31]) - 0.1) < 1e-12 and
                 first_tsv_site[32:34] == ["short_promoter", "promoter"] and
                 first_tsv_site[36] == "0" and
-                first_tsv_site[37:] == [""] * 15,
+                first_tsv_site[37:] == [""] * 44,
                 "motif TSV export retains evidence columns")
 
         data, _ = run_query(
@@ -590,10 +604,10 @@ def main() -> int:
         linked_tsv = (workspace / "linked.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(linked_tsv) == 52 and linked_tsv[37:48] == [
+        require(len(linked_tsv) == 81 and linked_tsv[37:48] == [
                     "NEAR", "GENE", "chr1", "0", "1200", "+", "gene",
                     "short", "0", "0", "true",
-                ] and linked_tsv[48:] == [""] * 4,
+                ] and linked_tsv[48:] == [""] * 33,
                 "TSV export retains typed nearest-reference evidence")
 
         data, _ = run_query(
@@ -637,10 +651,119 @@ def main() -> int:
         count_tsv = (workspace / "counts.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(count_tsv) == 52 and count_tsv[48:] == [
+        require(len(count_tsv) == 81 and count_tsv[48:52] == [
                     "OVERLAPS", "sites", "promoters", "20",
-                ],
+                ] and count_tsv[52:] == [""] * 29,
                 "TSV export retains count provenance")
+
+        data, _ = run_query(
+            workspace,
+            "explicit_motif_module",
+            'LOAD SEQUENCE "module.fasta" AS genome;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix STRAND POSITIVE THRESHOLD 100 % AS sites;\n"
+            "DEFINE MODULE FROM sites WITH sites "
+            "SPACING 2 BP TO 2 BP ORDER ANY ORIENTATION SAME "
+            "AS homotypic_modules;\n"
+            "DEFINE MODULE FROM sites WITH sites "
+            "SPACING 2 BP TO 2 BP ORDER AS_WRITTEN ORIENTATION SAME "
+            "AS ordered_modules;\n"
+            "DEFINE MODULE FROM sites WITH sites "
+            "SPACING 2 BP TO 2 BP ORDER ANY ORIENTATION OPPOSITE "
+            "AS opposite_modules;\n"
+            'EXPORT homotypic_modules TO "modules.gff3" FORMAT GFF3;\n'
+            'EXPORT homotypic_modules TO "modules.tsv" FORMAT TSV;\n',
+        )
+        modules = data["resultSets"]["homotypic_modules"]
+        module = modules[0]
+        evidence = module["moduleEvidence"]
+        require(len(modules) == 1 and
+                (module["start"], module["end"], module["sequence"])
+                == (0, 6, "AATTAA") and
+                evidence["spacing"] == {
+                    "minimum": 2, "maximum": 2, "observed": 2,
+                } and
+                evidence["order"] == {
+                    "policy": "ANY", "observed": "FIRST_BEFORE_SECOND",
+                } and
+                evidence["orientation"] == {
+                    "policy": "SAME", "observed": "SAME",
+                } and
+                [(member["start"], member["end"], member["strand"])
+                 for member in evidence["members"]]
+                == [(0, 2, "+"), (4, 6, "+")] and
+                all(member["sourceSet"] == "sites" and
+                    member["motifEvidence"]["matrixId"] == "TEST"
+                    for member in evidence["members"]),
+                "DEFINE MODULE emits one auditable homotypic pair")
+        require(len(data["resultSets"]["ordered_modules"]) == 1 and
+                data["resultSets"]["ordered_modules"][0]
+                    ["moduleEvidence"]["order"]["policy"] == "AS_WRITTEN" and
+                data["resultSets"]["opposite_modules"] == [],
+                "module order and orientation policies are executable syntax")
+        module_gff = (workspace / "modules.gff3").read_text(
+            encoding="utf-8"
+        ).splitlines()[1]
+        require("ModuleObservedSpacing=2" in module_gff and
+                "ModuleOrderPolicy=ANY" in module_gff and
+                "ModuleOrientationPolicy=SAME" in module_gff and
+                "FirstMatrixID=TEST" in module_gff and
+                "SecondMatrixID=TEST" in module_gff,
+                "GFF3 export retains module constraints and members")
+        module_tsv = (workspace / "modules.tsv").read_text(
+            encoding="utf-8"
+        ).splitlines()[1].split("\t")
+        require(len(module_tsv) == 81 and
+                module_tsv[52:59] == [
+                    "2", "2", "2", "ANY", "FIRST_BEFORE_SECOND",
+                    "SAME", "SAME",
+                ] and
+                module_tsv[59:67] == [
+                    "sites", "chrModule", "0", "2", "+", "motif_hit",
+                    "sites_chrModule_0_plus", "TEST",
+                ] and
+                module_tsv[70:78] == [
+                    "sites", "chrModule", "4", "6", "+", "motif_hit",
+                    "sites_chrModule_4_plus", "TEST",
+                ],
+                "TSV export retains typed module evidence columns")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "module_rejects_reversed_spacing",
+            'LOAD SEQUENCE "module.fasta" AS genome;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix STRAND POSITIVE THRESHOLD 100 % AS sites;\n"
+            "DEFINE MODULE FROM sites WITH sites "
+            "SPACING 3 BP TO 2 BP ORDER ANY ORIENTATION SAME AS invalid;\n",
+            3,
+        )
+        require("minimum spacing cannot exceed" in semantic_error,
+                "module spacing ranges reject reversed bounds")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "module_rejects_fractional_base_pairs",
+            'LOAD SEQUENCE "module.fasta" AS genome;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix STRAND POSITIVE THRESHOLD 100 % AS sites;\n"
+            "DEFINE MODULE FROM sites WITH sites "
+            "SPACING 0.5 BP TO 2 BP ORDER ANY ORIENTATION SAME AS invalid;\n",
+            3,
+        )
+        require("whole numbers of base pairs" in semantic_error,
+                "module spacing rejects sub-base-pair bounds")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "module_rejects_sequence_alias",
+            'LOAD SEQUENCE "module.fasta" AS genome;\n'
+            "DEFINE MODULE FROM genome WITH genome "
+            "SPACING 0 BP TO 2 BP ORDER ANY ORIENTATION ANY AS invalid;\n",
+            3,
+        )
+        require("requires region or motif-hit aliases" in semantic_error,
+                "DEFINE MODULE rejects non-region datasets")
 
         parser_error = run_invalid_query(
             workspace,
@@ -733,33 +856,41 @@ def main() -> int:
                 "NEAR rejects non-finite or overflowing distances")
 
         showcase_source = (
-            ROOT / "cql_examples" / "14_integrated_query.cql"
+            ROOT / "cql_examples" / "08_integrated_anthocyanin_query.cql"
         ).read_text(encoding="utf-8")
         data, _ = run_query(
             workspace, "anthocyanin_regulatory_showcase", showcase_source
         )
-        require(len(data["resultSets"]["supported_myb_sites"]) == 3 and
+        require(len(data["resultSets"]["supported_myb_sites"]) == 4 and
                 [(site["start"], site["strand"])
                  for site in data["resultSets"]["promoter_myb_evidence"]]
                 == [(150, "-"), (630, "+")] and
                 [(site["start"], site["strand"])
                  for site in data["resultSets"]["enhancer_myb_evidence"]]
-                == [(400, "+")] and
+                == [(400, "+"), (420, "+")] and
                 all(site["motifEvidence"]["statistics"]["qValue"] <= 0.01
                     for site in
                     data["resultSets"]["promoter_myb_evidence"]) and
+                len(data["resultSets"]["enhancer_myb_modules"]) == 1 and
+                data["resultSets"]["enhancer_myb_modules"][0]
+                    ["moduleEvidence"]["spacing"]["observed"] == 11 and
+                data["resultSets"]["enhancer_myb_modules"][0]
+                    ["moduleEvidence"]["orientation"]
+                == {"policy": "ANY", "observed": "SAME"} and
+                [member["motifEvidence"]["matrixId"] for member in
+                 data["resultSets"]["enhancer_myb_modules"][0]
+                    ["moduleEvidence"]["members"]]
+                == ["MA0054.1", "MA0054.1"] and
                 len(data["resultSets"]
-                    ["enhancer_nearest_gene_hypotheses"]) == 1 and
-                data["resultSets"]["enhancer_nearest_gene_hypotheses"][0]
-                    ["motifEvidence"]["matrixId"] == "MA0054.1" and
-                data["resultSets"]["enhancer_nearest_gene_hypotheses"][0]
+                    ["module_nearest_gene_hypotheses"]) == 1 and
+                data["resultSets"]["module_nearest_gene_hypotheses"][0]
                     ["spatialRelation"]["reference"]["name"]
                     == "transporter_candidate" and
-                data["resultSets"]["enhancer_nearest_gene_hypotheses"][0]
-                    ["spatialRelation"]["distance"] == 91 and
-                data["resultSets"]["enhancer_nearest_gene_hypotheses"][0]
+                data["resultSets"]["module_nearest_gene_hypotheses"][0]
+                    ["spatialRelation"]["distance"] == 71 and
+                data["resultSets"]["module_nearest_gene_hypotheses"][0]
                     ["spatialRelation"]["maximumDistance"] == 100 and
-                data["resultSets"]["enhancer_nearest_gene_hypotheses"][0]
+                data["resultSets"]["module_nearest_gene_hypotheses"][0]
                     ["spatialRelation"]["overlaps"] is False and
                 [region["countEvidence"]["count"] for region in
                  data["resultSets"]["promoter_myb_counts"]] == [1, 1, 0] and
@@ -767,10 +898,10 @@ def main() -> int:
                  data["resultSets"]["supported_promoter_candidates"]]
                 == ["anthocyanin_enzyme_promoter",
                     "transporter_candidate_promoter"],
-                "integrated example separates regulatory evidence and records a provisional nearest-gene link")
+                "integrated example separates regulatory evidence, defines an auditable module, and records a provisional nearest-gene link")
 
         nearest_example = (
-            ROOT / "cql_examples" / "20_nearest_gene_candidates.cql"
+            ROOT / "cql_examples" / "06_nearest_gene_candidates.cql"
         ).read_text(encoding="utf-8")
         data, _ = run_query(
             workspace, "anthocyanin_nearest_gene_candidates", nearest_example
@@ -792,7 +923,7 @@ def main() -> int:
                 "nearest-gene example exposes two auditable MYB candidates")
 
         count_example = (
-            ROOT / "cql_examples" / "21_count_promoter_support.cql"
+            ROOT / "cql_examples" / "05_count_promoter_support.cql"
         ).read_text(encoding="utf-8")
         data, _ = run_query(
             workspace, "anthocyanin_promoter_support_counts", count_example

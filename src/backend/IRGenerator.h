@@ -52,6 +52,7 @@ enum class IROpCode {
   ANALYZE_GC,
   ANALYZE_CPG,
   DEFINE_PROMOTERS,
+  DEFINE_MODULE,
   IF_BEGIN,
   IF_ELSE,
   IF_END
@@ -64,6 +65,10 @@ struct IRInstruction {
   std::string arg3;
   std::string arg4;
   std::string arg5;
+  std::string arg6;
+  std::string arg7;
+  std::string arg8;
+  std::string arg9;
   std::shared_ptr<IRCondition> condition;
 };
 
@@ -94,6 +99,7 @@ public:
   void visit(UseStmtNode *node) override;
   void visit(ExportStmtNode *node) override;
   void visit(DefinePromotersStmtNode *node) override;
+  void visit(DefineModuleStmtNode *node) override;
   void visit(FindOptNode *node) override;
   void visit(FindStmtNode *node) override;
   void visit(ExtractStmtNode *node) override;

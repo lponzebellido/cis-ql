@@ -137,6 +137,52 @@ void SemanticAnalyzer::visit(DefinePromotersStmtNode *node) {
   }
 }
 
+void SemanticAnalyzer::visit(DefineModuleStmtNode *node) {
+  const auto validateSet = [this](const std::string &name,
+                                  const std::string &role) {
+    if (!symbolTable.lookup(name)) {
+      reportError("Module " + role + " alias '" + name +
+                  "' is not defined.");
+    } else if (!isResultAlias(symbolTable, name)) {
+      reportError("DEFINE MODULE requires region or motif-hit aliases; '" +
+                  name + "' has type " + symbolTable.typeOf(name) + ".");
+    }
+  };
+  validateSet(node->firstSet, "first-member");
+  validateSet(node->secondSet, "second-member");
+
+  const auto toBasePairs = [](const std::string &value,
+                              const std::string &unit) {
+    const long double factor = unit == "MB" ? 1000000.0L
+                               : unit == "KB" ? 1000.0L : 1.0L;
+    return std::strtold(value.c_str(), nullptr) * factor;
+  };
+  const long double minimum =
+      toBasePairs(node->minimumSpacingValue, node->minimumSpacingUnit);
+  const long double maximum =
+      toBasePairs(node->maximumSpacingValue, node->maximumSpacingUnit);
+  const long double coordinateLimit =
+      static_cast<long double>(std::numeric_limits<size_t>::max());
+  if (!std::isfinite(minimum) || !std::isfinite(maximum) || minimum < 0.0 ||
+      maximum < 0.0 || minimum >= coordinateLimit ||
+      maximum >= coordinateLimit) {
+    reportError("Module spacing bounds must be finite, non-negative genomic "
+                "distances within the coordinate range.");
+  } else if (std::floor(minimum) != minimum ||
+             std::floor(maximum) != maximum) {
+    reportError("Module spacing bounds must resolve to whole numbers of base "
+                "pairs.");
+  } else if (minimum > maximum) {
+    reportError("Module minimum spacing cannot exceed its maximum spacing.");
+  }
+
+  if (symbolTable.lookup(node->alias)) {
+    reportError("Alias '" + node->alias + "' is already defined.");
+  } else {
+    symbolTable.insert(node->alias, "RESULT_SET");
+  }
+}
+
 void SemanticAnalyzer::visit(FindStmtNode *node) {
   if (!sequenceLoaded) {
     reportError("FIND requires sequence data. Use: LOAD SEQUENCE "

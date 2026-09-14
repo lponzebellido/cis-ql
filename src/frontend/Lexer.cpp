@@ -20,6 +20,7 @@ void Lexer::initKeywords() {
     keywords["EXPORT"] = TokenType::EXPORT;
     keywords["DEFINE"] = TokenType::DEFINE;
     keywords["MOTIF"] = TokenType::MOTIF;
+    keywords["MODULE"] = TokenType::MODULE;
     keywords["GENE"] = TokenType::GENE;
     keywords["SEQUENCE"] = TokenType::SEQUENCE;
     keywords["ANNOTATION"] = TokenType::ANNOTATION;
@@ -36,6 +37,13 @@ void Lexer::initKeywords() {
     keywords["AT"] = TokenType::AT;
     keywords["TO"] = TokenType::TO;
     keywords["FORMAT"] = TokenType::FORMAT;
+    keywords["SPACING"] = TokenType::SPACING;
+    keywords["ORDER"] = TokenType::ORDER;
+    keywords["ORIENTATION"] = TokenType::ORIENTATION;
+    keywords["ANY"] = TokenType::ANY;
+    keywords["SAME"] = TokenType::SAME;
+    keywords["OPPOSITE"] = TokenType::OPPOSITE;
+    keywords["AS_WRITTEN"] = TokenType::AS_WRITTEN;
     keywords["BED"] = TokenType::BED;
     keywords["GFF3"] = TokenType::GFF3;
     keywords["TSV"] = TokenType::TSV;
@@ -354,6 +362,7 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::EXPORT: return "EXPORT";
         case TokenType::DEFINE: return "DEFINE";
         case TokenType::MOTIF: return "MOTIF";
+        case TokenType::MODULE: return "MODULE";
         case TokenType::GENE: return "GENE";
         case TokenType::SEQUENCE: return "SEQUENCE";
         case TokenType::ANNOTATION: return "ANNOTATION";
@@ -370,6 +379,13 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::AT: return "AT";
         case TokenType::TO: return "TO";
         case TokenType::FORMAT: return "FORMAT";
+        case TokenType::SPACING: return "SPACING";
+        case TokenType::ORDER: return "ORDER";
+        case TokenType::ORIENTATION: return "ORIENTATION";
+        case TokenType::ANY: return "ANY";
+        case TokenType::SAME: return "SAME";
+        case TokenType::OPPOSITE: return "OPPOSITE";
+        case TokenType::AS_WRITTEN: return "AS_WRITTEN";
         case TokenType::BED: return "BED";
         case TokenType::GFF3: return "GFF3";
         case TokenType::TSV: return "TSV";

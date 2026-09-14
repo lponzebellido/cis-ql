@@ -190,6 +190,57 @@ int main() {
               overlapCounts[3].countEvidence.count == 0,
           "COUNT reports half-open overlap counts for every container");
 
+  GenomicRegion moduleSiteA = region(10, 14);
+  moduleSiteA.name = "site_a";
+  moduleSiteA.motifEvidence.present = true;
+  moduleSiteA.motifEvidence.matrixId = "MYB";
+  GenomicRegion moduleSiteB = region(20, 24);
+  moduleSiteB.name = "site_b";
+  moduleSiteB.motifEvidence.present = true;
+  moduleSiteB.motifEvidence.matrixId = "MYB";
+  GenomicRegion moduleSiteC = region(30, 34);
+  moduleSiteC.name = "site_c";
+  moduleSiteC.strand = "-";
+  moduleSiteC.motifEvidence.present = true;
+  moduleSiteC.motifEvidence.matrixId = "MYB";
+  const auto sameOrientationModules = SetOperations::defineModules(
+      {moduleSiteA, moduleSiteB, moduleSiteC},
+      {moduleSiteA, moduleSiteB, moduleSiteC}, 6, 6, "ANY", "SAME",
+      "myb_sites", "myb_sites");
+  require(sameOrientationModules.size() == 1 &&
+              sameOrientationModules[0].start == 10 &&
+              sameOrientationModules[0].end == 24 &&
+              sameOrientationModules[0].moduleEvidence.present &&
+              sameOrientationModules[0].moduleEvidence.observedSpacing == 6 &&
+              sameOrientationModules[0].moduleEvidence.observedOrder ==
+                  "FIRST_BEFORE_SECOND" &&
+              sameOrientationModules[0].moduleEvidence.observedOrientation ==
+                  "SAME" &&
+              sameOrientationModules[0].moduleEvidence.first.motifEvidence
+                      .matrixId == "MYB" &&
+              sameOrientationModules[0].moduleEvidence.second.name ==
+                  "site_b",
+          "motif modules preserve both members and apply spacing and orientation");
+  const auto oppositeOrientationModules = SetOperations::defineModules(
+      {moduleSiteA, moduleSiteB, moduleSiteC},
+      {moduleSiteA, moduleSiteB, moduleSiteC}, 6, 6, "ANY", "OPPOSITE",
+      "myb_sites", "myb_sites");
+  require(oppositeOrientationModules.size() == 1 &&
+              oppositeOrientationModules[0].start == 20 &&
+              oppositeOrientationModules[0].end == 34,
+          "homotypic modules emit one canonical pair and reject self-pairs");
+  require(SetOperations::defineModules(
+              {moduleSiteC}, {moduleSiteA}, 16, 16, "AS_WRITTEN", "ANY",
+              "right_sites", "left_sites").empty(),
+          "AS_WRITTEN requires the first input member to occur first");
+  const auto reverseOrderModules = SetOperations::defineModules(
+      {moduleSiteC}, {moduleSiteA}, 16, 16, "ANY", "ANY", "right_sites",
+      "left_sites");
+  require(reverseOrderModules.size() == 1 &&
+              reverseOrderModules[0].moduleEvidence.observedOrder ==
+                  "SECOND_BEFORE_FIRST",
+          "ANY order records rather than hides reverse input order");
+
   GenomicRegion firstUnion = region(0, 10);
   firstUnion.sequence = "AAAAAAAAAA";
   const auto merged = SetOperations::unite({firstUnion}, {region(5, 15)});

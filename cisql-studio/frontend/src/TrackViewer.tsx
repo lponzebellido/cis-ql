@@ -62,6 +62,24 @@ interface CountEvidence {
   count: number;
 }
 
+interface ModuleMemberEvidence {
+  sourceSet: string;
+  chr: string;
+  start: number;
+  end: number;
+  strand: string;
+  type: string;
+  name: string;
+  motifEvidence?: MotifEvidence;
+}
+
+interface ModuleEvidence {
+  spacing: { minimum: number; maximum: number; observed: number };
+  order: { policy: string; observed: string };
+  orientation: { policy: string; observed: string };
+  members: ModuleMemberEvidence[];
+}
+
 interface GenomicRegion {
   chr: string;
   start: number;
@@ -73,6 +91,7 @@ interface GenomicRegion {
   motifEvidence?: MotifEvidence;
   spatialRelation?: SpatialRelation;
   countEvidence?: CountEvidence;
+  moduleEvidence?: ModuleEvidence;
 }
 
 interface TrackViewerProps {
@@ -110,6 +129,12 @@ function formatBp(bp: number): string {
   if (Math.abs(bp) >= 1e6) return (bp / 1e6).toFixed(2) + ' Mb';
   if (Math.abs(bp) >= 1e3) return (bp / 1e3).toFixed(1) + ' kb';
   return bp.toLocaleString() + ' bp';
+}
+
+function formatStrand(strand: string): string {
+  if (strand === '+') return 'Forward (+)';
+  if (strand === '-') return 'Reverse (-)';
+  return 'Unstranded (.)';
 }
 
 export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = {}, onSelectRegion }) => {
@@ -590,7 +615,7 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
               <strong>{hoveredRegion.name}</strong><br />
               <span className="tt-label">Type:</span> {hoveredRegion.type}<br />
               <span className="tt-label">Pos:</span> {hoveredRegion.chr}:{hoveredRegion.start.toLocaleString()}-{hoveredRegion.end.toLocaleString()}<br />
-              <span className="tt-label">Strand:</span> {hoveredRegion.strand === '+' ? 'Forward (+)' : 'Reverse (-)'}<br />
+              <span className="tt-label">Strand:</span> {formatStrand(hoveredRegion.strand)}<br />
               <span className="tt-label">Length:</span> {(hoveredRegion.end - hoveredRegion.start).toLocaleString()} bp
               {hoveredRegion.motifEvidence && (
                 <>
@@ -618,6 +643,13 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                 <>
                   <br /><span className="tt-label">Overlap count:</span> {hoveredRegion.countEvidence.count.toLocaleString()}
                   <br /><span className="tt-label">Counted set:</span> {hoveredRegion.countEvidence.countedSet}
+                </>
+              )}
+              {hoveredRegion.moduleEvidence && (
+                <>
+                  <br /><span className="tt-label">Module spacing:</span> {formatBp(hoveredRegion.moduleEvidence.spacing.observed)} ({formatBp(hoveredRegion.moduleEvidence.spacing.minimum)}-{formatBp(hoveredRegion.moduleEvidence.spacing.maximum)})
+                  <br /><span className="tt-label">Order / orientation:</span> {hoveredRegion.moduleEvidence.order.observed} / {hoveredRegion.moduleEvidence.orientation.observed}
+                  <br /><span className="tt-label">Members:</span> {hoveredRegion.moduleEvidence.members.map(member => member.name).join(' + ')}
                 </>
               )}
               {hoveredRegion.sequence && (
@@ -662,7 +694,7 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
               </div>
               <div className="detail-field">
                 <span className="detail-label">Strand</span>
-                <span className="detail-value">{selectedRegion.strand === '+' ? 'Forward (+)' : 'Reverse (-)'}</span>
+                <span className="detail-value">{formatStrand(selectedRegion.strand)}</span>
               </div>
               {selectedRegion.motifEvidence && (
                 <>
@@ -725,6 +757,28 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                     {selectedRegion.countEvidence.relation} in {selectedRegion.countEvidence.containerSet}
                   </span>
                 </div>
+              )}
+              {selectedRegion.moduleEvidence && (
+                <>
+                  <div className="detail-field">
+                    <span className="detail-label">Module constraints</span>
+                    <span className="detail-value">
+                      {formatBp(selectedRegion.moduleEvidence.spacing.observed)} spacing (allowed {formatBp(selectedRegion.moduleEvidence.spacing.minimum)}-{formatBp(selectedRegion.moduleEvidence.spacing.maximum)})<br />
+                      order {selectedRegion.moduleEvidence.order.observed} ({selectedRegion.moduleEvidence.order.policy}) · orientation {selectedRegion.moduleEvidence.orientation.observed} ({selectedRegion.moduleEvidence.orientation.policy})
+                    </span>
+                  </div>
+                  <div className="detail-field">
+                    <span className="detail-label">Module members</span>
+                    <span className="detail-value">
+                      {selectedRegion.moduleEvidence.members.map((member, index) => (
+                        <React.Fragment key={`${member.sourceSet}-${member.chr}-${member.start}-${member.end}-${index}`}>
+                          {index > 0 && <br />}
+                          {member.sourceSet}: {member.name} · {member.chr}:{member.start.toLocaleString()}-{member.end.toLocaleString()} · {member.strand}{member.motifEvidence ? ` · ${member.motifEvidence.matrixId || member.motifEvidence.matrixAlias}` : ''}
+                        </React.Fragment>
+                      ))}
+                    </span>
+                  </div>
+                </>
               )}
               {selectedRegion.sequence && (
                 <div className="detail-seq">

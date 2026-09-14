@@ -1,52 +1,61 @@
-# Cis-QL example paths
+# Cis-QL regulatory example path
 
-The examples are intended to be read as small analysis paths, not as a list of
-unrelated syntax fragments. Examples 07, 17, 18, 19, 20, 21, and 14 form the current
-cis-regulatory path:
+These eight programs are a progressive analysis of one synthetic
+anthocyanin-regulatory locus. They teach how evidence moves through the
+language; they are not biological evidence or an exhaustive grammar catalog.
 
-1. `07_pwm_scanning.cql` introduces a plant MYB position-frequency matrix and
-   shows the difference between a relative score cutoff and statistical
-   calibration. Its 90% cutoff retains six strand-specific scores at three
-   loci.
-2. `17_explicit_promoters.cql` constructs three strand-aware promoter windows
-   from explicit TSS-relative boundaries.
-3. `18_statistical_pwm_scan.cql` estimates the nucleotide background and uses
-   `QVALUE <= 0.01`. It retains three calibrated strand-specific sites.
-4. `19_regulatory_overlap.cql` asks which of those sites overlap a candidate
-   promoter. Two sites are retained with their original coordinates and motif
-   evidence.
-5. `20_nearest_gene_candidates.cql` asks which significant sites lie within
-   50 bp of a gene. It retains two sites and records their nearest genes at
-   interval distances of 41 bp and 30 bp.
-6. `21_count_promoter_support.cql` counts significant sites in every candidate
-   promoter, retaining counts `[1, 1, 0]`, and then selects the two promoters
-   with at least one supported MYB site.
-7. `14_integrated_query.cql` is the compact end-to-end demonstration. It
-   separates two promoter-supported MYB sites from one site supported by the
-   annotated candidate enhancer, summarizes site support per promoter, and
-   records the nearest gene to the enhancer-supported site as a deliberately
-   provisional target hypothesis.
+1. `01_define_promoters.cql` derives three strand-aware promoter windows from
+   explicit TSS-relative bounds.
+2. `02_score_myb_sites.cql` scans a sourced plant MYB matrix with a relative
+   score threshold. This helps inspect model scores but is not yet a
+   statistically calibrated selection.
+3. `03_calibrated_myb_sites.cql` estimates the background from the loaded
+   genome and applies `QVALUE <= 0.01`. Four sites remain.
+4. `04_promoter_supported_sites.cql` retains the two significant sites that
+   overlap a candidate promoter without clipping their coordinates or losing
+   PWM evidence.
+5. `05_count_promoter_support.cql` counts promoter-scoped sites in all three
+   candidate promoters, retaining counts `[1, 1, 0]`, then selects the two
+   promoters with support.
+6. `06_nearest_gene_candidates.cql` retains two significant sites within 50 bp
+   of a gene and records candidate links at interval distances of 41 bp and
+   30 bp.
+7. `07_enhancer_myb_module.cql` selects the two genome-calibrated sites inside
+   the annotated candidate enhancer and pairs them as one homotypic module.
+   Their half-open intervals are 400-409 and 420-429, so the observed
+   edge-to-edge spacing is 11 bp. Both have the same observed reference
+   orientation, but the query uses `ORIENTATION ANY` because the fixture gives
+   no biological reason to require that arrangement.
+8. `08_integrated_anthocyanin_query.cql` connects the complete path. It keeps
+   promoter evidence separate, summarizes it per promoter, builds the enhancer
+   module, and records its nearest gene as a deliberately provisional target
+   hypothesis.
 
-The shared `anthocyanin_regulatory_demo` FASTA and GFF3 files are deliberately
-small synthetic fixtures. They contain three annotated genes, one candidate
-enhancer, two promoter-local motif instances, and one enhancer-local instance.
-They demonstrate query semantics and reproducibility; they are not biological
-evidence for a regulatory relationship.
+The shared `anthocyanin_regulatory_demo` FASTA and GFF3 files contain three
+annotated genes, one candidate enhancer, two promoter-local MYB instances, and
+two enhancer-local instances. These deterministic fixtures exercise query
+semantics. They do not assert that this sequence, enhancer, or relationship
+exists in a plant.
 
-`NEAR` expresses genomic proximity only. Its recorded nearest feature is a
-candidate link suitable for downstream prioritization; it is not evidence that
-the feature regulates that gene. Accessibility, binding, expression, chromatin
-contact, or other independent evidence is needed to strengthen that claim.
+The `MA0054.1 myb.Ph3` frequency matrix is the unmodified JASPAR CORE profile
+for *Petunia x hybrida* MYB.Ph3. Applying a related profile to a real
+anthocyanin study still requires a documented TF-family rationale, compatible
+species and assembly data, and ideally independent accessibility or binding
+evidence.
 
-`COUNT sites IN regions` is descriptive overlap aggregation. Zero counts are
-retained so the output can represent unsupported regions and later serve as an
-explicit universe. Raw counts should not be called motif enrichment: promoter
-length, nucleotide composition, accessibility, and the chosen background can
-all affect the expected count.
+Interpret the outputs conservatively:
 
-The `MA0054.1 myb.Ph3` frequency matrix is an official plant MYB profile from
-[JASPAR CORE](https://jaspar.elixir.no/matrix/MA0054.1/) (*Petunia x hybrida*,
-SELEX). The repository stores the unmodified frequency counts shown by JASPAR.
-Using a related plant profile in a real anthocyanin study would still require a
-documented TF-family rationale, compatible species/assembly data, and
-independent accessibility or binding evidence.
+- `NEAR` reports genomic proximity, not regulation. Accessibility, binding,
+  expression, chromatin contact, or other independent evidence is needed to
+  strengthen a candidate link.
+- `COUNT` is descriptive overlap aggregation, not motif enrichment. Region
+  length, nucleotide composition, accessibility, and the chosen statistical
+  background affect expected counts.
+- `DEFINE MODULE` reports pairs satisfying the stated spacing, order, and
+  orientation grammar. A matching pair is not proof of cooperative binding;
+  the constraints need a documented biological or benchmark rationale.
+
+The removed historical examples mixed eukaryotic TF models and promoter
+assumptions with an *E. coli* fixture. Their language constructs remain covered
+by automated tests, but they are intentionally not presented as scientific
+workflows.

@@ -27,13 +27,20 @@ COUNT supported_myb_sites IN candidate_promoters
 EXTRACT promoter_myb_counts AS supported_promoter_candidates
     WHERE COUNT >= 1;
 
-NEAR enhancer_myb_evidence TO GENE WITHIN 100 BP
-    AS enhancer_nearest_gene_hypotheses;
+DEFINE MODULE
+    FROM enhancer_myb_evidence WITH enhancer_myb_evidence
+    SPACING 5 BP TO 30 BP
+    ORDER ANY
+    ORIENTATION ANY
+    AS enhancer_myb_modules;
+
+NEAR enhancer_myb_modules TO GENE WITHIN 100 BP
+    AS module_nearest_gene_hypotheses;
 
 EXPORT promoter_myb_evidence TO "promoter_myb_evidence.tsv" FORMAT TSV;
-EXPORT enhancer_myb_evidence TO "enhancer_myb_evidence.tsv" FORMAT TSV;
+EXPORT enhancer_myb_modules TO "enhancer_myb_modules.tsv" FORMAT TSV;
 EXPORT promoter_myb_counts TO "promoter_myb_counts.tsv" FORMAT TSV;
 EXPORT supported_promoter_candidates
     TO "supported_promoter_candidates.gff3" FORMAT GFF3;
-EXPORT enhancer_nearest_gene_hypotheses
-    TO "enhancer_nearest_gene_hypotheses.tsv" FORMAT TSV;
+EXPORT module_nearest_gene_hypotheses
+    TO "module_nearest_gene_hypotheses.tsv" FORMAT TSV;

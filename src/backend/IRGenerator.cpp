@@ -36,6 +36,7 @@ std::string irOpcodeToString(IROpCode op) {
     case IROpCode::ANALYZE_GC:       return "ANALYZE_GC";
     case IROpCode::ANALYZE_CPG:      return "ANALYZE_CPG";
     case IROpCode::DEFINE_PROMOTERS: return "DEFINE_PROMOTERS";
+    case IROpCode::DEFINE_MODULE:    return "DEFINE_MODULE";
     case IROpCode::IF_BEGIN:         return "IF_BEGIN";
     case IROpCode::IF_ELSE:          return "IF_ELSE";
     case IROpCode::IF_END:           return "IF_END";
@@ -146,6 +147,27 @@ void IRGenerator::visit(DefinePromotersStmtNode *node) {
   print.opcode = IROpCode::PRINT_RESULTS;
   print.arg1 = node->alias;
   print.arg2 = "DEFINE_PROMOTERS";
+  instructions.push_back(print);
+}
+
+void IRGenerator::visit(DefineModuleStmtNode *node) {
+  IRInstruction define;
+  define.opcode = IROpCode::DEFINE_MODULE;
+  define.arg1 = node->firstSet;
+  define.arg2 = node->secondSet;
+  define.arg3 = node->minimumSpacingValue;
+  define.arg4 = node->minimumSpacingUnit;
+  define.arg5 = node->maximumSpacingValue;
+  define.arg6 = node->maximumSpacingUnit;
+  define.arg7 = node->orderPolicy;
+  define.arg8 = node->orientationPolicy;
+  define.arg9 = node->alias;
+  instructions.push_back(define);
+
+  IRInstruction print;
+  print.opcode = IROpCode::PRINT_RESULTS;
+  print.arg1 = node->alias;
+  print.arg2 = "DEFINE_MODULE";
   instructions.push_back(print);
 }
 

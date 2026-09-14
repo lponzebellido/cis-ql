@@ -14,6 +14,7 @@ class LoadStmtNode;
 class UseStmtNode;
 class ExportStmtNode;
 class DefinePromotersStmtNode;
+class DefineModuleStmtNode;
 class FindOptNode;
 class FindStmtNode;
 class ExtractStmtNode;
@@ -35,6 +36,7 @@ public:
   virtual void visit(UseStmtNode* node) = 0;
   virtual void visit(ExportStmtNode* node) = 0;
   virtual void visit(DefinePromotersStmtNode* node) = 0;
+  virtual void visit(DefineModuleStmtNode* node) = 0;
   virtual void visit(FindOptNode* node) = 0;
   virtual void visit(FindStmtNode* node) = 0;
   virtual void visit(ExtractStmtNode* node) = 0;
@@ -138,6 +140,31 @@ public:
                           std::string downUnit, std::string a)
       : source(src), upstreamValue(upValue), upstreamUnit(upUnit),
         downstreamValue(downValue), downstreamUnit(downUnit), alias(a) {}
+  void print(std::string prefix = "", bool isLast = true) const override;
+  void accept(ASTVisitor& visitor) override;
+};
+
+class DefineModuleStmtNode : public StatementNode {
+public:
+  std::string firstSet;
+  std::string secondSet;
+  std::string minimumSpacingValue;
+  std::string minimumSpacingUnit;
+  std::string maximumSpacingValue;
+  std::string maximumSpacingUnit;
+  std::string orderPolicy;
+  std::string orientationPolicy;
+  std::string alias;
+
+  DefineModuleStmtNode(std::string first, std::string second,
+                       std::string minValue, std::string minUnit,
+                       std::string maxValue, std::string maxUnit,
+                       std::string order, std::string orientation,
+                       std::string a)
+      : firstSet(first), secondSet(second),
+        minimumSpacingValue(minValue), minimumSpacingUnit(minUnit),
+        maximumSpacingValue(maxValue), maximumSpacingUnit(maxUnit),
+        orderPolicy(order), orientationPolicy(orientation), alias(a) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;
 };

@@ -76,6 +76,7 @@ private:
   void executeUseDataset(const IRInstruction &instr);
   void executeExport(const IRInstruction &instr);
   void executeDefinePromoters(const IRInstruction &instr);
+  void executeDefineModule(const IRInstruction &instr);
   void executeFindMotif(const IRInstruction &instr);
   void executeFindOptWithin(const IRInstruction &instr);
   void executeFindOptStrand(const IRInstruction &instr);

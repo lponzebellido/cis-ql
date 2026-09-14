@@ -1,6 +1,6 @@
 # Cis-QL v3: regulatory genomics direction
 
-Status: incremental implementation. Parts 1 through 2B3 and Parts 3A-3C are
+Status: incremental implementation. Parts 1 through 2B3 and Parts 3A-3D are
 implemented; later parts are a design contract, not yet accepted syntax.
 
 ## Product definition
@@ -287,11 +287,64 @@ enrichment or stronger regulatory evidence because expected counts vary with
 region length, nucleotide composition, accessibility, motif model, and the
 selected statistical background.
 
+#### Part 3D: constrained two-member cis-regulatory modules
+
+Implemented syntax:
+
+```cql
+DEFINE MODULE
+  FROM myb_sites WITH bhlh_sites
+  SPACING 5 BP TO 30 BP
+  ORDER AS_WRITTEN
+  ORIENTATION OPPOSITE
+  AS myb_bhlh_modules;
+```
+
+Both inputs are named region or motif-hit sets. Members must lie on the same
+chromosome. `SPACING` is the edge-to-edge gap between their zero-based,
+half-open intervals; its explicit lower and upper bounds are inclusive,
+non-negative, finite, unit-qualified, and must resolve to whole base pairs.
+Overlapping and directly adjacent intervals both have gap zero, while
+`observedOrder` distinguishes an overlap from a separated pair.
+
+`ORDER AS_WRITTEN` requires the first-set member to have a lower start
+coordinate than the second-set member. Tied starts do not satisfy that policy.
+`ORDER ANY` accepts either order and
+records `FIRST_BEFORE_SECOND`, `SECOND_BEFORE_FIRST`, or `OVERLAPPING`.
+Ordering is deliberately reference-relative, not gene- or transcript-relative.
+
+`ORIENTATION SAME` and `OPPOSITE` compare the members' reference strands and
+require both to be `+` or `-`. `ORIENTATION ANY` also accepts unstranded members
+and records `UNKNOWN` when their relationship cannot be determined. When the
+same alias appears on both sides, Cis-QL produces one canonical unordered pair,
+does not pair a record with itself, and does not treat opposite-strand records
+at identical coordinates as two independent sites.
+
+Each result spans both members, has type `cis_regulatory_module`, and stores a
+typed `moduleEvidence` object containing the requested constraints, observed
+spacing/order/orientation, source-set names, member coordinates and metadata,
+and each member's PWM evidence when present. JSON retains the nested structure;
+GFF3 and TSV expose the constraints, member identity, matrix ID, score, p-value,
+and q-value, and both Studio viewers inspect the nested result.
+BED carries only the outer span and is intentionally lossy. Spatial and count
+operations can be applied to a module without discarding its member evidence;
+geometric clipping or merging clears evidence whose span is no longer intact.
+
+The candidate search uses chromosome-local, start-sorted indexes and the
+maximum member width to bound the candidate range. Runtime is proportional to
+index construction plus the candidates within the requested spatial reach,
+rather than the Cartesian product for typical motif-width inputs.
+
+This operator evaluates a declared cis grammar. It does not infer spacing
+bounds, establish TF cooperativity, or convert motif co-occurrence into direct
+regulatory evidence. Real analyses must justify the grammar from prior
+evidence, a benchmark, or a documented sensitivity analysis.
+
 Still planned:
 
 - unbounded `CLOSEST`, standalone `DISTANCE`, and richer grouped aggregation;
-- Motif modules with order, orientation, minimum and maximum spacing.
 - Matched backgrounds and enrichment with multiple-testing correction.
+- Modules with more than two members and transcript-relative orientation.
 
 ### Part 4: evidence integration
 

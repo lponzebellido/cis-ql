@@ -23,6 +23,12 @@ public:
       const std::vector<GenomicRegion> &counted,
       const std::vector<GenomicRegion> &containers,
       const std::string &countedSet, const std::string &containerSet);
+  static std::vector<GenomicRegion> defineModules(
+      const std::vector<GenomicRegion> &first,
+      const std::vector<GenomicRegion> &second, size_t minimumSpacing,
+      size_t maximumSpacing, const std::string &orderPolicy,
+      const std::string &orientationPolicy, const std::string &firstSet,
+      const std::string &secondSet);
 };
 
 #endif

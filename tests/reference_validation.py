@@ -138,6 +138,28 @@ def count_overlaps_by_container(
     ]
 
 
+def define_homotypic_modules(
+    sites: list[tuple[str, int, int, str]],
+    minimum_spacing: int,
+    maximum_spacing: int,
+) -> list[tuple[str, int, int, int, str]]:
+    modules = []
+    for first, second in itertools.combinations(sites, 2):
+        if first[0] != second[0]:
+            continue
+        spacing = interval_gap(first[:3], second[:3])
+        if not minimum_spacing <= spacing <= maximum_spacing:
+            continue
+        orientation = "SAME" if first[3] == second[3] else "OPPOSITE"
+        modules.append(
+            (
+                first[0], min(first[1], second[1]),
+                max(first[2], second[2]), spacing, orientation,
+            )
+        )
+    return modules
+
+
 def smith_waterman_similarity(first: str, second: str) -> float:
     previous = [0] * (len(second) + 1)
     best = 0
@@ -374,7 +396,10 @@ def main() -> int:
             workspace,
             "motif_reference",
             'LOAD SEQUENCE "motifs.fasta" AS genome;\n'
-            'FIND MOTIF "ATA" STRAND POSITIVE AS motif_hits;\n',
+            'FIND MOTIF "ATA" STRAND POSITIVE AS motif_hits;\n'
+            "DEFINE MODULE FROM motif_hits WITH motif_hits "
+            "SPACING 1 BP TO 1 BP ORDER ANY ORIENTATION SAME "
+            "AS motif_modules;\n",
         )
         observed_motifs = [
             region["start"]
@@ -385,6 +410,23 @@ def main() -> int:
             "exact motif coordinates differ from independent reference",
         )
         print("[ok] overlapping exact motif coordinates")
+        expected_modules = define_homotypic_modules(
+            [("chr1", start, start + 3, "+")
+             for start in observed_motifs],
+            1,
+            1,
+        )
+        observed_modules = [
+            (
+                region["chr"], region["start"], region["end"],
+                region["moduleEvidence"]["spacing"]["observed"],
+                region["moduleEvidence"]["orientation"]["observed"],
+            )
+            for region in motif_data["resultSets"]["motif_modules"]
+        ]
+        require(observed_modules == expected_modules,
+                "DEFINE MODULE differs from independent pair enumeration")
+        print("[ok] constrained homotypic motif modules")
 
         counts = [[10, 10], [0, 0], [0, 0], [0, 0]]
         (workspace / "aa.pwm").write_text(

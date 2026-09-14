@@ -7,4 +7,4 @@ SCAN myb_matrix
     AS statistically_supported_myb_sites;
 
 EXPORT statistically_supported_myb_sites
-    TO "myb_sites.tsv" FORMAT TSV;
+    TO "statistically_supported_myb_sites.tsv" FORMAT TSV;

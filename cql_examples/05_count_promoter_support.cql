@@ -12,9 +12,9 @@ SCAN myb_matrix
     IN candidate_promoters
     BACKGROUND FROM genome
     QVALUE <= 0.01
-    AS supported_myb_sites;
+    AS promoter_myb_sites;
 
-COUNT supported_myb_sites IN candidate_promoters
+COUNT promoter_myb_sites IN candidate_promoters
     AS promoter_myb_counts;
 
 EXTRACT promoter_myb_counts AS promoters_with_myb_support

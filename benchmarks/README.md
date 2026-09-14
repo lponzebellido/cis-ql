@@ -42,7 +42,8 @@ make validate
 The suite uses separate Python implementations for exact overlapping motif
 coordinates, log-odds PSSM thresholds and tail probabilities, interval
 subtraction, overlap selection, nearest-reference selection, overlap counting,
-and the normalized Smith-Waterman recurrence. If BEDTools, Biopython, or FIMO
+constrained homotypic modules, and the normalized Smith-Waterman recurrence. If
+BEDTools, Biopython, or FIMO
 is installed, compatible external checks are also executed; otherwise they are
 reported as skipped.
 

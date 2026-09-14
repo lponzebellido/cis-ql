@@ -196,6 +196,19 @@ void Interpreter::printRegions(const std::vector<GenomicRegion> &regions,
                 << r.countEvidence.containerSet << ":"
                 << r.countEvidence.count << std::endl;
     }
+    if (r.moduleEvidence.present) {
+      std::cout << "      MODULE spacing:"
+                << r.moduleEvidence.observedSpacing << " BP ("
+                << r.moduleEvidence.minimumSpacing << ".."
+                << r.moduleEvidence.maximumSpacing << ")  order:"
+                << r.moduleEvidence.observedOrder << "  orientation:"
+                << r.moduleEvidence.observedOrientation << std::endl;
+      std::cout << "      members: "
+                << r.moduleEvidence.first.sourceSet << ":"
+                << r.moduleEvidence.first.name << " + "
+                << r.moduleEvidence.second.sourceSet << ":"
+                << r.moduleEvidence.second.name << std::endl;
+    }
     if (!r.sequence.empty()) {
       std::string display = r.sequence;
       if (display.size() > 60) {
@@ -494,6 +507,58 @@ void Interpreter::executeExport(const IRInstruction &instr) {
             << gffAttributeEscape(region.countEvidence.containerSet)
             << ";OverlapCount=" << region.countEvidence.count;
       }
+      if (region.moduleEvidence.present) {
+        const ModuleEvidence &module = region.moduleEvidence;
+        out << ";ModuleMinimumSpacing=" << module.minimumSpacing
+            << ";ModuleMaximumSpacing=" << module.maximumSpacing
+            << ";ModuleObservedSpacing=" << module.observedSpacing
+            << ";ModuleOrderPolicy="
+            << gffAttributeEscape(module.orderPolicy)
+            << ";ModuleObservedOrder="
+            << gffAttributeEscape(module.observedOrder)
+            << ";ModuleOrientationPolicy="
+            << gffAttributeEscape(module.orientationPolicy)
+            << ";ModuleObservedOrientation="
+            << gffAttributeEscape(module.observedOrientation)
+            << ";FirstSet="
+            << gffAttributeEscape(module.first.sourceSet)
+            << ";FirstChr=" << gffAttributeEscape(module.first.chr)
+            << ";FirstStart=" << module.first.start
+            << ";FirstEnd=" << module.first.end
+            << ";FirstStrand="
+            << gffAttributeEscape(module.first.strand)
+            << ";FirstType=" << gffAttributeEscape(module.first.type)
+            << ";FirstName=" << gffAttributeEscape(module.first.name)
+            << ";SecondSet="
+            << gffAttributeEscape(module.second.sourceSet)
+            << ";SecondChr=" << gffAttributeEscape(module.second.chr)
+            << ";SecondStart=" << module.second.start
+            << ";SecondEnd=" << module.second.end
+            << ";SecondStrand="
+            << gffAttributeEscape(module.second.strand)
+            << ";SecondType=" << gffAttributeEscape(module.second.type)
+            << ";SecondName=" << gffAttributeEscape(module.second.name);
+        if (module.first.motifEvidence.present) {
+          out << ";FirstMatrixID="
+              << gffAttributeEscape(module.first.motifEvidence.matrixId)
+              << ";FirstRawScore="
+              << module.first.motifEvidence.rawScore
+              << ";FirstPValue="
+              << module.first.motifEvidence.statistics.pValue
+              << ";FirstQValue="
+              << module.first.motifEvidence.statistics.qValue;
+        }
+        if (module.second.motifEvidence.present) {
+          out << ";SecondMatrixID="
+              << gffAttributeEscape(module.second.motifEvidence.matrixId)
+              << ";SecondRawScore="
+              << module.second.motifEvidence.rawScore
+              << ";SecondPValue="
+              << module.second.motifEvidence.statistics.pValue
+              << ";SecondQValue="
+              << module.second.motifEvidence.statistics.qValue;
+        }
+      }
       out << '\n';
     }
   } else if (format == "TSV") {
@@ -512,7 +577,17 @@ void Interpreter::executeExport(const IRInstruction &instr) {
            "\treference_start\treference_end\treference_strand"
            "\treference_type\treference_name\tdistance_bp"
            "\tmaximum_distance_bp\toverlaps"
-           "\tcount_relation\tcounted_set\tcontainer_set\toverlap_count\n";
+           "\tcount_relation\tcounted_set\tcontainer_set\toverlap_count"
+           "\tmodule_minimum_spacing_bp\tmodule_maximum_spacing_bp"
+           "\tmodule_observed_spacing_bp\tmodule_order_policy"
+           "\tmodule_observed_order\tmodule_orientation_policy"
+           "\tmodule_observed_orientation"
+           "\tfirst_set\tfirst_chr\tfirst_start\tfirst_end\tfirst_strand"
+           "\tfirst_type\tfirst_name\tfirst_matrix_id\tfirst_raw_score"
+           "\tfirst_p_value\tfirst_q_value"
+           "\tsecond_set\tsecond_chr\tsecond_start\tsecond_end"
+           "\tsecond_strand\tsecond_type\tsecond_name\tsecond_matrix_id"
+           "\tsecond_raw_score\tsecond_p_value\tsecond_q_value\n";
     for (const auto &region : regionsIt->second) {
       out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
           << region.end << '\t' << cleanTabularField(region.strand) << '\t'
@@ -591,6 +666,37 @@ void Interpreter::executeExport(const IRInstruction &instr) {
         for (int emptyColumn = 0; emptyColumn < 3; ++emptyColumn)
           out << '\t';
       }
+      out << '\t';
+      if (region.moduleEvidence.present) {
+        const ModuleEvidence &module = region.moduleEvidence;
+        const auto writeMember = [&out](const ModuleMemberEvidence &member) {
+          out << cleanTabularField(member.sourceSet) << '\t'
+              << cleanTabularField(member.chr) << '\t' << member.start << '\t'
+              << member.end << '\t' << cleanTabularField(member.strand) << '\t'
+              << cleanTabularField(member.type) << '\t'
+              << cleanTabularField(member.name) << '\t';
+          if (member.motifEvidence.present) {
+            out << cleanTabularField(member.motifEvidence.matrixId) << '\t'
+                << member.motifEvidence.rawScore << '\t'
+                << member.motifEvidence.statistics.pValue << '\t'
+                << member.motifEvidence.statistics.qValue;
+          } else {
+            out << "\t\t\t";
+          }
+        };
+        out << module.minimumSpacing << '\t' << module.maximumSpacing << '\t'
+            << module.observedSpacing << '\t'
+            << cleanTabularField(module.orderPolicy) << '\t'
+            << cleanTabularField(module.observedOrder) << '\t'
+            << cleanTabularField(module.orientationPolicy) << '\t'
+            << cleanTabularField(module.observedOrientation) << '\t';
+        writeMember(module.first);
+        out << '\t';
+        writeMember(module.second);
+      } else {
+        for (int emptyColumn = 0; emptyColumn < 28; ++emptyColumn)
+          out << '\t';
+      }
       out << '\n';
     }
   }
@@ -659,6 +765,38 @@ void Interpreter::executeDefinePromoters(const IRInstruction &instr) {
     std::cout << "  Defined " << resultSets[alias].size()
               << " explicit promoter interval(s)." << std::endl;
   }
+}
+
+void Interpreter::executeDefineModule(const IRInstruction &instr) {
+  const size_t minimumSpacing =
+      toBasePairs(std::atof(instr.arg3.c_str()), instr.arg4);
+  const size_t maximumSpacing =
+      toBasePairs(std::atof(instr.arg5.c_str()), instr.arg6);
+  std::vector<GenomicRegion> modules = SetOperations::defineModules(
+      resolveEntity(instr.arg1), resolveEntity(instr.arg2), minimumSpacing,
+      maximumSpacing, instr.arg7, instr.arg8, instr.arg1, instr.arg2);
+
+  const auto activeGenome = sequenceChrMaps.find(activeSequenceAlias);
+  if (activeGenome != sequenceChrMaps.end()) {
+    for (auto &module : modules) {
+      const auto chromosome = activeGenome->second.find(module.chr);
+      if (chromosome != activeGenome->second.end() &&
+          module.start < module.end &&
+          module.end <= chromosome->second.sequence.size()) {
+        module.sequence = chromosome->second.sequence.substr(
+            module.start, module.end - module.start);
+      }
+    }
+  }
+
+  if (debugMode) {
+    std::cout << "> DEFINE MODULE FROM " << instr.arg1 << " WITH "
+              << instr.arg2 << " SPACING " << minimumSpacing << " BP TO "
+              << maximumSpacing << " BP ORDER " << instr.arg7
+              << " ORIENTATION " << instr.arg8 << std::endl;
+  }
+  namedRegions[instr.arg9] = modules;
+  resultSets[instr.arg9] = std::move(modules);
 }
 
 void Interpreter::executeFindMotif(const IRInstruction &instr) {
@@ -1968,6 +2106,74 @@ void Interpreter::dumpResultsJSON() const {
             << "          \"count\": " << r.countEvidence.count << "\n"
             << "        }";
       }
+      if (r.moduleEvidence.present) {
+        const ModuleEvidence &module = r.moduleEvidence;
+        const auto writeMember = [this, &out](
+                                     const ModuleMemberEvidence &member) {
+          out << "{\n"
+              << "              \"sourceSet\": \""
+              << jsonEscape(member.sourceSet) << "\",\n"
+              << "              \"chr\": \"" << jsonEscape(member.chr)
+              << "\",\n"
+              << "              \"start\": " << member.start << ",\n"
+              << "              \"end\": " << member.end << ",\n"
+              << "              \"strand\": \""
+              << jsonEscape(member.strand) << "\",\n"
+              << "              \"type\": \"" << jsonEscape(member.type)
+              << "\",\n"
+              << "              \"name\": \"" << jsonEscape(member.name)
+              << "\"";
+          if (member.motifEvidence.present) {
+            out << ",\n              \"motifEvidence\": {\n"
+                << "                \"matrixAlias\": \""
+                << jsonEscape(member.motifEvidence.matrixAlias) << "\",\n"
+                << "                \"matrixId\": \""
+                << jsonEscape(member.motifEvidence.matrixId) << "\",\n"
+                << "                \"matrixName\": \""
+                << jsonEscape(member.motifEvidence.matrixName) << "\",\n"
+                << "                \"matrixSource\": \""
+                << jsonEscape(member.motifEvidence.matrixSource) << "\",\n"
+                << "                \"rawScore\": "
+                << member.motifEvidence.rawScore << ",\n"
+                << "                \"scorePercent\": "
+                << member.motifEvidence.scorePercent << ",\n"
+                << "                \"pValue\": "
+                << member.motifEvidence.statistics.pValue << ",\n"
+                << "                \"qValue\": "
+                << member.motifEvidence.statistics.qValue << "\n"
+                << "              }";
+          }
+          out << "\n            }";
+        };
+        out << ",\n        \"moduleEvidence\": {\n"
+            << "          \"spacing\": {\n"
+            << "            \"minimum\": " << module.minimumSpacing
+            << ",\n"
+            << "            \"maximum\": " << module.maximumSpacing
+            << ",\n"
+            << "            \"observed\": " << module.observedSpacing
+            << "\n"
+            << "          },\n"
+            << "          \"order\": {\n"
+            << "            \"policy\": \""
+            << jsonEscape(module.orderPolicy) << "\",\n"
+            << "            \"observed\": \""
+            << jsonEscape(module.observedOrder) << "\"\n"
+            << "          },\n"
+            << "          \"orientation\": {\n"
+            << "            \"policy\": \""
+            << jsonEscape(module.orientationPolicy) << "\",\n"
+            << "            \"observed\": \""
+            << jsonEscape(module.observedOrientation) << "\"\n"
+            << "          },\n"
+            << "          \"members\": [\n"
+            << "            ";
+        writeMember(module.first);
+        out << ",\n            ";
+        writeMember(module.second);
+        out << "\n          ]\n"
+            << "        }";
+      }
       out << "\n      }";
     }
     out << "\n    ]";
@@ -2116,6 +2322,9 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
       break;
     case IROpCode::DEFINE_PROMOTERS:
       executeDefinePromoters(instr);
+      break;
+    case IROpCode::DEFINE_MODULE:
+      executeDefineModule(instr);
       break;
     case IROpCode::FIND_MOTIF:
       executeFindMotif(instr);

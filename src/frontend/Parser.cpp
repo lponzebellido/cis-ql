@@ -94,8 +94,14 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
     return parseUse();
   if (match(TokenType::EXPORT))
     return parseExport();
-  if (match(TokenType::DEFINE))
-    return parseDefinePromoters();
+  if (match(TokenType::DEFINE)) {
+    if (check(TokenType::PROMOTERS))
+      return parseDefinePromoters();
+    if (check(TokenType::MODULE))
+      return parseDefineModule();
+    reportError(peek(), "Expected 'PROMOTERS' or 'MODULE' after DEFINE.");
+    throw std::runtime_error("Parse error");
+  }
   if (match(TokenType::FIND))
     return parseFind();
   if (match(TokenType::EXTRACT))
@@ -179,6 +185,82 @@ std::unique_ptr<DefinePromotersStmtNode> Parser::parseDefinePromoters() {
   return std::unique_ptr<DefinePromotersStmtNode>(
       new DefinePromotersStmtNode(source, upstreamValue, upstreamUnit,
                                   downstreamValue, downstreamUnit, alias));
+}
+
+std::unique_ptr<DefineModuleStmtNode> Parser::parseDefineModule() {
+  consume(TokenType::MODULE, "Expected 'MODULE' after DEFINE.");
+  consume(TokenType::FROM, "Expected 'FROM' after DEFINE MODULE.");
+
+  if (!match(TokenType::ID)) {
+    reportError(peek(), "Expected a motif-hit alias after FROM.");
+    throw std::runtime_error("Parse error");
+  }
+  const std::string firstSet = previous().lexeme;
+
+  consume(TokenType::WITH, "Expected 'WITH' after the first motif-hit alias.");
+  if (!match(TokenType::ID)) {
+    reportError(peek(), "Expected a second motif-hit alias after WITH.");
+    throw std::runtime_error("Parse error");
+  }
+  const std::string secondSet = previous().lexeme;
+
+  consume(TokenType::SPACING,
+          "Expected 'SPACING' after the module member aliases.");
+  if (!match(TokenType::NUM) && !match(TokenType::FLOAT)) {
+    reportError(peek(), "Expected a minimum module spacing.");
+    throw std::runtime_error("Parse error");
+  }
+  const std::string minimumSpacingValue = previous().lexeme;
+  if (!match(TokenType::BP) && !match(TokenType::KB) &&
+      !match(TokenType::MB)) {
+    reportError(peek(),
+                "Expected BP, KB, or MB after the minimum module spacing.");
+    throw std::runtime_error("Parse error");
+  }
+  const std::string minimumSpacingUnit = previous().lexeme;
+
+  consume(TokenType::TO,
+          "Expected 'TO' between the minimum and maximum module spacing.");
+  if (!match(TokenType::NUM) && !match(TokenType::FLOAT)) {
+    reportError(peek(), "Expected a maximum module spacing.");
+    throw std::runtime_error("Parse error");
+  }
+  const std::string maximumSpacingValue = previous().lexeme;
+  if (!match(TokenType::BP) && !match(TokenType::KB) &&
+      !match(TokenType::MB)) {
+    reportError(peek(),
+                "Expected BP, KB, or MB after the maximum module spacing.");
+    throw std::runtime_error("Parse error");
+  }
+  const std::string maximumSpacingUnit = previous().lexeme;
+
+  consume(TokenType::ORDER, "Expected 'ORDER' after the spacing range.");
+  if (!match(TokenType::ANY) && !match(TokenType::AS_WRITTEN)) {
+    reportError(peek(), "Expected ANY or AS_WRITTEN after ORDER.");
+    throw std::runtime_error("Parse error");
+  }
+  const std::string orderPolicy = previous().lexeme;
+
+  consume(TokenType::ORIENTATION,
+          "Expected 'ORIENTATION' after the order policy.");
+  if (!match(TokenType::ANY) && !match(TokenType::SAME) &&
+      !match(TokenType::OPPOSITE)) {
+    reportError(peek(),
+                "Expected ANY, SAME, or OPPOSITE after ORIENTATION.");
+    throw std::runtime_error("Parse error");
+  }
+  const std::string orientationPolicy = previous().lexeme;
+
+  consume(TokenType::AS, "Expected 'AS' after the orientation policy.");
+  consume(TokenType::ID, "Expected a module result alias after AS.");
+  const std::string alias = previous().lexeme;
+  consume(TokenType::SEMICOLON,
+          "Expected ';' at the end of DEFINE MODULE.");
+
+  return std::unique_ptr<DefineModuleStmtNode>(new DefineModuleStmtNode(
+      firstSet, secondSet, minimumSpacingValue, minimumSpacingUnit,
+      maximumSpacingValue, maximumSpacingUnit, orderPolicy,
+      orientationPolicy, alias));
 }
 
 std::unique_ptr<UseStmtNode> Parser::parseUse() {
