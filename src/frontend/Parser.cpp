@@ -61,6 +61,7 @@ void Parser::synchronize() {
     case TokenType::INTERSECT:
     case TokenType::UNION:
     case TokenType::EXCEPT:
+    case TokenType::OVERLAPS:
       return;
     default:
       break;
@@ -98,7 +99,7 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
   if (match(TokenType::EXTRACT))
     return parseExtract();
   if (match(TokenType::INTERSECT) || match(TokenType::UNION) ||
-      match(TokenType::EXCEPT)) {
+      match(TokenType::EXCEPT) || match(TokenType::OVERLAPS)) {
     current--;
     return parseSetOperation();
   }
@@ -116,8 +117,8 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
   }
 
   reportError(peek(), "Expected start of a statement (LOAD, USE, EXPORT, FIND, "
-                      "EXTRACT, INTERSECT, UNION, EXCEPT, SCAN, ANALYZE, IF, "
-                      "FOREACH, DEFINE)");
+                      "EXTRACT, INTERSECT, UNION, EXCEPT, OVERLAPS, SCAN, "
+                      "ANALYZE, IF, FOREACH, DEFINE)");
   throw std::runtime_error("Parse error");
 }
 
@@ -340,6 +341,8 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
     op = "UNION";
   else if (match(TokenType::EXCEPT))
     op = "EXCEPT";
+  else if (match(TokenType::OVERLAPS))
+    op = "OVERLAPS";
 
   if (match(TokenType::GENE) || match(TokenType::PROMOTER) ||
       match(TokenType::ENHANCER) || match(TokenType::EXON) ||
@@ -348,12 +351,15 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
       match(TokenType::REGION) || match(TokenType::ID)) {
     std::string e1 = previous().lexeme;
 
-    std::string sepError =
-        "Expected 'AND' (for INTERSECT/UNION) or 'FROM' (for EXCEPT).";
-    if (op == "EXCEPT")
+    std::string sepError = "Expected 'AND' (for INTERSECT/UNION), 'FROM' "
+                           "(for EXCEPT), or 'WITH' (for OVERLAPS).";
+    if (op == "EXCEPT") {
       consume(TokenType::FROM, sepError);
-    else
+    } else if (op == "OVERLAPS") {
+      consume(TokenType::WITH, sepError);
+    } else {
       consume(TokenType::AND, sepError);
+    }
 
     if (match(TokenType::GENE) || match(TokenType::PROMOTER) ||
         match(TokenType::ENHANCER) || match(TokenType::EXON) ||

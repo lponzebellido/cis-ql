@@ -1,21 +1,25 @@
-LOAD SEQUENCE "data_examples/ecoli2.fna" AS genome;
-LOAD ANNOTATION "data_examples/genomic.gff" AS annot;
-LOAD MATRIX "matrices/MA0108.1_TBP.pwm" AS tbp;
-LOAD MATRIX "matrices/MA0079.5_SP1.pwm" AS sp1;
+LOAD SEQUENCE "data_examples/anthocyanin_regulatory_demo.fasta" AS genome;
+LOAD ANNOTATION "data_examples/anthocyanin_regulatory_demo.gff3" AS annotation;
+LOAD MATRIX "matrices/MA0054.1_myb.Ph3.pwm" AS myb_matrix;
 
-ANALYZE GC_CONTENT WINDOW 1 KB AS gc_landscape;
-ANALYZE CPG_ISLANDS AS cpg_islands;
+DEFINE PROMOTERS OF GENE
+    FROM TSS
+    UPSTREAM 100 BP
+    DOWNSTREAM 20 BP
+    AS candidate_promoters;
 
-FIND MOTIF "TTGACA" WITHIN 200 BP UPSTREAM FROM CDS AS minus35;
-FIND MOTIF "TATAAT" WITHIN 50 BP UPSTREAM FROM CDS AS minus10;
-FIND MOTIF "AGGAGG" WITHIN 30 BP UPSTREAM FROM CDS AS shine_dalgarno;
+EXTRACT ENHANCER AS candidate_enhancers;
 
-UNION minus35 AND minus10;
+SCAN myb_matrix
+    BACKGROUND FROM genome
+    QVALUE <= 0.01
+    AS supported_myb_sites;
 
-SCAN tbp THRESHOLD 85 % AS tbp_sites;
-SCAN sp1 THRESHOLD 80 % AS sp1_sites;
+OVERLAPS supported_myb_sites WITH candidate_promoters
+    AS promoter_myb_evidence;
 
-EXCEPT tbp_sites FROM CDS;
-EXCEPT sp1_sites FROM CDS;
+OVERLAPS supported_myb_sites WITH candidate_enhancers
+    AS enhancer_myb_evidence;
 
-EXTRACT GENE WHERE LENGTH > 2 KB;
+EXPORT promoter_myb_evidence TO "promoter_myb_evidence.tsv" FORMAT TSV;
+EXPORT enhancer_myb_evidence TO "enhancer_myb_evidence.tsv" FORMAT TSV;

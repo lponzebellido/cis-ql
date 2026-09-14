@@ -68,6 +68,12 @@ def main() -> int:
     require(BINARY.exists(), "Build cisql before running language tests")
     with tempfile.TemporaryDirectory(prefix="cisql-language-tests-") as temp:
         workspace = Path(temp)
+        (workspace / "data_examples").symlink_to(
+            ROOT / "data_examples", target_is_directory=True
+        )
+        (workspace / "matrices").symlink_to(
+            ROOT / "matrices", target_is_directory=True
+        )
         sequence = "A" * 1000 + "C" * 1000 + ("CG" * 1100)
         (workspace / "fixture.fasta").write_text(
             f">chr1\n{sequence}\n", encoding="utf-8"
@@ -503,6 +509,61 @@ def main() -> int:
                 first_tsv_site[32:34] == ["short_promoter", "promoter"] and
                 first_tsv_site[36] == "0",
                 "motif TSV export retains evidence columns")
+
+        data, _ = run_query(
+            workspace,
+            "directional_overlap_semijoin",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            'EXTRACT GENE AS selected WHERE ID = "short";\n'
+            "DEFINE PROMOTERS OF selected FROM TSS "
+            "UPSTREAM 0 BP DOWNSTREAM 10 BP AS promoters;\n"
+            "SCAN matrix STRAND POSITIVE THRESHOLD 100 % AS sites;\n"
+            "OVERLAPS sites WITH promoters AS promoter_sites;\n"
+            "OVERLAPS promoters WITH sites AS supported_promoters;\n",
+        )
+        promoter_sites = data["resultSets"]["promoter_sites"]
+        require(len(promoter_sites) == 10 and
+                [site["start"] for site in promoter_sites]
+                == list(range(10)) and
+                promoter_sites[-1]["end"] == 11 and
+                all(site["motifEvidence"]["matrixId"] == "TEST"
+                    for site in promoter_sites),
+                "OVERLAPS retains complete query intervals and PWM evidence")
+        supported_promoters = data["resultSets"]["supported_promoters"]
+        require(len(supported_promoters) == 1 and
+                supported_promoters[0]["start"] == 0 and
+                supported_promoters[0]["end"] == 10,
+                "OVERLAPS emits a supported query once despite multiple hits")
+
+        parser_error = run_invalid_query(
+            workspace,
+            "overlap_requires_with",
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            "OVERLAPS GENE AND CDS AS invalid;\n",
+            2,
+        )
+        require("'WITH' (for OVERLAPS)" in parser_error,
+                "OVERLAPS requires an explicit directional separator")
+
+        showcase_source = (
+            ROOT / "cql_examples" / "14_integrated_query.cql"
+        ).read_text(encoding="utf-8")
+        data, _ = run_query(
+            workspace, "anthocyanin_regulatory_showcase", showcase_source
+        )
+        require(len(data["resultSets"]["supported_myb_sites"]) == 3 and
+                [(site["start"], site["strand"])
+                 for site in data["resultSets"]["promoter_myb_evidence"]]
+                == [(150, "-"), (630, "+")] and
+                [(site["start"], site["strand"])
+                 for site in data["resultSets"]["enhancer_myb_evidence"]]
+                == [(400, "+")] and
+                all(site["motifEvidence"]["statistics"]["qValue"] <= 0.01
+                    for site in
+                    data["resultSets"]["promoter_myb_evidence"]),
+                "integrated example separates promoter and enhancer MYB evidence")
 
         data, _ = run_query(
             workspace,

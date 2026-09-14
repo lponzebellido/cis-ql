@@ -35,7 +35,7 @@ Cis-QL operates across three primary modes:
 
 - **Native IUPAC Degeneration Engine:** Translates IUPAC nucleotide ambiguity codes (`R`, `Y`, `S`, `W`, `K`, `M`, `B`, `D`, `H`, `V`, `N`) automatically into regular expression search patterns (e.g., `TATAWAW` translates to `TATA[AT]A[AT]`).
 - **Multi-Chromosome Scanning:** Uses `std::async` to scan loaded contigs independently. Performance depends on contig count, input size, and the host implementation.
-- **Sweep-Line Interval Algebra:** Sorts interval inputs and then evaluates geometric `INTERSECT`, `UNION`, and `EXCEPT` operations with a two-pointer sweep. Sorting dominates at $O((N+M)\log(N+M))$; the sweep is linear.
+- **Interval Algebra and Spatial Selection:** Supports geometric `INTERSECT`, `UNION`, and `EXCEPT` operations, plus directional `OVERLAPS` selection that retains complete query records and their evidence.
 - **Pairwise Smith-Waterman Local Alignment:** Computes a normalized local-alignment score in C++. `SIMILARITY TO alias` requires an explicit one-region reference set. The older implicit-reference form remains available for compatibility.
 - **Explicit Dataset Context:** Multiple FASTA and GFF3 datasets can be loaded and selected deterministically with `USE SEQUENCE` and `USE ANNOTATION`.
 - **Standard Result Export:** Named region sets can be written as BED, GFF3, or TSV; GC profiles can be written as TSV.
@@ -92,6 +92,11 @@ LOAD ANNOTATION "data_examples/genomic.gff" AS annot;
 LOAD MATRIX "matrices/MA0108.1_TBP.pwm" AS tbp_matrix;
 ```
 
+The example suite also includes the plant MYB profile `MA0054.1` from
+[JASPAR CORE](https://jaspar.elixir.no/matrix/MA0054.1/). The accompanying
+`anthocyanin_regulatory_demo` FASTA/GFF3 pair is synthetic and exists only to
+make expected regulatory-query results small, deterministic, and inspectable.
+
 When multiple sequence or annotation datasets are loaded, select the active
 context explicitly:
 
@@ -139,7 +144,7 @@ ANALYZE GC_CONTENT WINDOW 1 KB AS gc_profile;
 ANALYZE CPG_ISLANDS AS cpg_islands;
 ```
 
-### 5. Set Operations (`INTERSECT`, `UNION`, `EXCEPT`)
+### 5. Interval Operations (`INTERSECT`, `UNION`, `EXCEPT`, `OVERLAPS`)
 
 Combine or filter interval sets using high-speed interval algebra:
 
@@ -147,7 +152,13 @@ Combine or filter interval sets using high-speed interval algebra:
 INTERSECT sp1_sites AND cpg_islands AS supported_sites;
 UNION minus35_box AND minus10_box AS promoter_boxes;
 EXCEPT ctcf_sites FROM CDS AS noncoding_ctcf_sites;
+OVERLAPS myb_sites WITH candidate_promoters AS promoter_myb_sites;
 ```
+
+`INTERSECT` emits the clipped overlap geometry. `OVERLAPS query WITH reference`
+instead performs a directional semi-join: each query interval is retained once
+if any reference interval overlaps it. This preserves the query coordinates,
+sequence, and motif evidence.
 
 ### 6. Feature Extraction & Filtering (`EXTRACT`, `WHERE`)
 
@@ -297,7 +308,10 @@ requirements needed before reporting external benchmark results.
 
 ## Curated Examples Suite (`cql_examples/`)
 
-The repository includes 18 structured `.cql` scripts demonstrating specific language capabilities:
+The repository includes 19 structured `.cql` scripts demonstrating specific language capabilities:
+
+The regulatory progression and its expected outputs are described in
+[`cql_examples/README.md`](cql_examples/README.md).
 
 | Script | Description | Primary Features |
 | :--- | :--- | :--- |
@@ -307,18 +321,19 @@ The repository includes 18 structured `.cql` scripts demonstrating specific lang
 | `04_iupac_motifs.cql` | Degenerate promoter motif search | IUPAC translation engine (`TATAWAW`) |
 | `05_spatial_promoters.cql` | Upstream regulatory element search | `WITHIN 200 BP UPSTREAM FROM` |
 | `06_denovo_orfs.cql` | Unannotated ORF discovery | Regex matching, virtual annotations |
-| `07_pwm_scanning.cql` | JASPAR matrix scanning | Log-odds PSSM scoring (`THRESHOLD 80 %`) |
+| `07_pwm_scanning.cql` | Plant MYB matrix scanning | JASPAR PFM, relative log-odds threshold |
 | `08_ctcf_insulators.cql` | Chromatin insulator mapping | `EXCEPT` set subtraction |
 | `09_cpg_islands.cql` | Epigenetic CpG island profiling | `ANALYZE CPG_ISLANDS`, `INTERSECT` |
 | `10_promoter_union.cql` | Bipartite promoter element merger | Multi-track consolidation via `UNION` |
 | `11_strand_search.cql` | Sense vs. antisense motif profiling | `STRAND POSITIVE / NEGATIVE` |
 | `12_gc_content.cql` | Sliding-window GC landscape | `ANALYZE GC_CONTENT WINDOW` |
 | `13_complex_where.cql` | Multi-property conditional queries | Combined `LENGTH` & `SIMILARITY` |
-| `14_integrated_query.cql` | Master genome-wide regulatory map | Complete multi-track pipeline |
+| `14_integrated_query.cql` | Anthocyanin regulatory evidence map | Promoters, calibrated MYB sites, regulatory overlap |
 | `15_if_else_branching.cql` | Conditional flow execution | `IF / ELSE / ENDIF` |
 | `16_foreach_batch_scan.cql` | Batch processing over matrix lists | `FOREACH / DO / ENDFOR` |
-| `17_explicit_promoters.cql` | TSS-oriented promoter construction | `DEFINE PROMOTERS`, explicit bounds |
-| `18_statistical_pwm_scan.cql` | Calibrated motif-site selection | `BACKGROUND FROM`, `PVALUE` |
+| `17_explicit_promoters.cql` | TSS-oriented candidate promoters | `DEFINE PROMOTERS`, explicit bounds |
+| `18_statistical_pwm_scan.cql` | Calibrated plant MYB-site selection | `BACKGROUND FROM`, `QVALUE` |
+| `19_regulatory_overlap.cql` | Promoter-supported MYB evidence | Directional `OVERLAPS`, evidence preservation |
 
 ---
 

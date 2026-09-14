@@ -1,9 +1,10 @@
-LOAD SEQUENCE "data_examples/ecoli.fasta" AS genome;
-LOAD MATRIX "matrices/MA0108.1_TBP.pwm" AS tbp_matrix;
+LOAD SEQUENCE "data_examples/anthocyanin_regulatory_demo.fasta" AS genome;
+LOAD MATRIX "matrices/MA0054.1_myb.Ph3.pwm" AS myb_matrix;
 
-SCAN tbp_matrix STRAND POSITIVE
+SCAN myb_matrix
     BACKGROUND FROM genome
-    PVALUE <= 1e-4
-    AS candidate_tbp_sites;
+    QVALUE <= 0.01
+    AS statistically_supported_myb_sites;
 
-EXTRACT candidate_tbp_sites;
+EXPORT statistically_supported_myb_sites
+    TO "myb_sites.tsv" FORMAT TSV;

@@ -109,6 +109,20 @@ int main() {
               multipleDifference[2].end == 15,
           "subtraction handles multiple overlapping intervals");
 
+  GenomicRegion supportedSite = region(0, 10);
+  supportedSite.sequence = "AAAAAAAAAA";
+  supportedSite.motifEvidence.present = true;
+  supportedSite.motifEvidence.matrixId = "TEST";
+  const auto supportedSites = SetOperations::selectOverlapping(
+      {supportedSite, region(20, 30), region(5, 10, "chr2")},
+      {region(3, 6), region(4, 8), region(10, 20)});
+  require(supportedSites.size() == 1 &&
+              supportedSites[0].start == 0 && supportedSites[0].end == 10 &&
+              supportedSites[0].sequence == "AAAAAAAAAA" &&
+              supportedSites[0].motifEvidence.present &&
+              supportedSites[0].motifEvidence.matrixId == "TEST",
+          "overlap semi-join preserves each supported query interval once");
+
   GenomicRegion firstUnion = region(0, 10);
   firstUnion.sequence = "AAAAAAAAAA";
   const auto merged = SetOperations::unite({firstUnion}, {region(5, 15)});

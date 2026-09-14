@@ -31,6 +31,7 @@ void Lexer::initKeywords() {
     keywords["UPSTREAM"] = TokenType::UPSTREAM;
     keywords["DOWNSTREAM"] = TokenType::DOWNSTREAM;
     keywords["WITHIN"] = TokenType::WITHIN;
+    keywords["WITH"] = TokenType::WITH;
     keywords["FROM"] = TokenType::FROM;
     keywords["AT"] = TokenType::AT;
     keywords["TO"] = TokenType::TO;
@@ -363,6 +364,7 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::UPSTREAM: return "UPSTREAM";
         case TokenType::DOWNSTREAM: return "DOWNSTREAM";
         case TokenType::WITHIN: return "WITHIN";
+        case TokenType::WITH: return "WITH";
         case TokenType::FROM: return "FROM";
         case TokenType::AT: return "AT";
         case TokenType::TO: return "TO";

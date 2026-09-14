@@ -21,6 +21,7 @@ std::string irOpcodeToString(IROpCode op) {
     case IROpCode::SET_INTERSECT:    return "SET_INTERSECT";
     case IROpCode::SET_UNION:        return "SET_UNION";
     case IROpCode::SET_EXCEPT:       return "SET_EXCEPT";
+    case IROpCode::SET_OVERLAPS:     return "SET_OVERLAPS";
     case IROpCode::PRINT_RESULTS:    return "PRINT_RESULTS";
     case IROpCode::LOAD_MATRIX:      return "LOAD_MATRIX";
     case IROpCode::SCAN_EXEC:        return "SCAN_EXEC";
@@ -228,7 +229,8 @@ void IRGenerator::visit(SetOpStmtNode* node) {
   IRInstruction setInstr;
   if (node->op == "INTERSECT") setInstr.opcode = IROpCode::SET_INTERSECT;
   else if (node->op == "UNION") setInstr.opcode = IROpCode::SET_UNION;
-  else setInstr.opcode = IROpCode::SET_EXCEPT;
+  else if (node->op == "EXCEPT") setInstr.opcode = IROpCode::SET_EXCEPT;
+  else setInstr.opcode = IROpCode::SET_OVERLAPS;
 
   setInstr.arg1 = node->entity1;
   setInstr.arg2 = node->entity2;

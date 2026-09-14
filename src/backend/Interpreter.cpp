@@ -1246,11 +1246,17 @@ void Interpreter::executeSetOp(const IRInstruction &instr) {
       std::cout << "> UNION " << entity1 << " AND " << entity2 << std::endl;
     }
     result = SetOperations::unite(regions1, regions2);
-  } else {
+  } else if (instr.opcode == IROpCode::SET_EXCEPT) {
     if (debugMode) {
       std::cout << "> EXCEPT " << entity1 << " FROM " << entity2 << std::endl;
     }
     result = SetOperations::except(regions1, regions2);
+  } else {
+    if (debugMode) {
+      std::cout << "> OVERLAPS " << entity1 << " WITH " << entity2
+                << std::endl;
+    }
+    result = SetOperations::selectOverlapping(regions1, regions2);
   }
 
   resultSets[resultId] = result;
@@ -1979,6 +1985,7 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
     case IROpCode::SET_INTERSECT:
     case IROpCode::SET_UNION:
     case IROpCode::SET_EXCEPT:
+    case IROpCode::SET_OVERLAPS:
       executeSetOp(instr);
       break;
     case IROpCode::PRINT_RESULTS:

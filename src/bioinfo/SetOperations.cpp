@@ -1,5 +1,7 @@
 #include "SetOperations.h"
 #include <algorithm>
+#include <unordered_map>
+#include <utility>
 
 std::vector<GenomicRegion>
 SetOperations::intersect(std::vector<GenomicRegion> a,
@@ -126,6 +128,52 @@ std::vector<GenomicRegion> SetOperations::except(std::vector<GenomicRegion> a,
       if (fragment.start != region.start || fragment.end != region.end)
         fragment.motifEvidence = MotifEvidence();
       result.push_back(std::move(fragment));
+    }
+  }
+  return result;
+}
+
+std::vector<GenomicRegion> SetOperations::selectOverlapping(
+    const std::vector<GenomicRegion> &query,
+    const std::vector<GenomicRegion> &reference) {
+  struct ChromosomeIndex {
+    std::vector<size_t> starts;
+    std::vector<size_t> maximumEnds;
+  };
+
+  typedef std::pair<size_t, size_t> Interval;
+  std::unordered_map<std::string, std::vector<Interval>> byChromosome;
+  for (const auto &region : reference)
+    byChromosome[region.chr].push_back(
+        std::make_pair(region.start, region.end));
+
+  std::unordered_map<std::string, ChromosomeIndex> indexes;
+  for (auto &entry : byChromosome) {
+    std::sort(entry.second.begin(), entry.second.end());
+    ChromosomeIndex &index = indexes[entry.first];
+    size_t maximumEnd = 0;
+    for (const auto &interval : entry.second) {
+      index.starts.push_back(interval.first);
+      maximumEnd = std::max(maximumEnd, interval.second);
+      index.maximumEnds.push_back(maximumEnd);
+    }
+  }
+
+  std::vector<GenomicRegion> result;
+  for (const auto &region : query) {
+    if (region.start >= region.end)
+      continue;
+    const auto chromosome = indexes.find(region.chr);
+    if (chromosome == indexes.end())
+      continue;
+    const ChromosomeIndex &index = chromosome->second;
+    const auto firstTooLate =
+        std::lower_bound(index.starts.begin(), index.starts.end(), region.end);
+    const size_t candidateCount = static_cast<size_t>(
+        std::distance(index.starts.begin(), firstTooLate));
+    if (candidateCount > 0 &&
+        index.maximumEnds[candidateCount - 1] > region.start) {
+      result.push_back(region);
     }
   }
   return result;

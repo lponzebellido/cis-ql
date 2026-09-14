@@ -1,6 +1,6 @@
 # Cis-QL v3: regulatory genomics direction
 
-Status: incremental implementation. Part 1, Part 2A, and Part 2B1 are
+Status: incremental implementation. Parts 1 through 2B3 and Part 3A are
 implemented; later parts are a design contract, not yet accepted syntax.
 
 ## Product definition
@@ -199,7 +199,30 @@ Still planned:
 
 ### Part 3: regulatory interval algebra
 
-- `OVERLAPS`, `NEAR`, `CLOSEST`, `DISTANCE`, `COUNT`, and grouped aggregation.
+#### Part 3A: directional overlap selection
+
+Implemented syntax:
+
+```cql
+OVERLAPS significant_myb_sites WITH proximal_promoters
+  AS promoter_supported_myb_sites;
+```
+
+This is an interval semi-join rather than a geometric intersection. It emits
+each interval from the left/query set at most once when any interval in the
+right/reference set overlaps it. The query interval is not clipped, so its
+coordinates, sequence, and motif evidence remain auditable. Intervals use the
+same zero-based, half-open contract as the rest of the engine; touching
+boundaries do not overlap. `INTERSECT` remains available when overlap segments
+themselves are the intended result.
+
+The reference side is indexed per chromosome by sorted starts and prefix
+maximum ends. After index construction, each query is evaluated in logarithmic
+time without enumerating every overlapping pair.
+
+Still planned:
+
+- `NEAR`, `CLOSEST`, `DISTANCE`, `COUNT`, and grouped aggregation;
 - Motif modules with order, orientation, minimum and maximum spacing.
 - Matched backgrounds and enrichment with multiple-testing correction.
 

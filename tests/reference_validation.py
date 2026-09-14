@@ -70,6 +70,22 @@ def subtract_intervals(
     return result
 
 
+def select_overlapping_intervals(
+    query: list[tuple[str, int, int]],
+    reference: list[tuple[str, int, int]],
+) -> list[tuple[str, int, int]]:
+    return [
+        interval
+        for interval in query
+        if any(
+            interval[0] == candidate[0]
+            and interval[1] < candidate[2]
+            and interval[2] > candidate[1]
+            for candidate in reference
+        )
+    ]
+
+
 def smith_waterman_similarity(first: str, second: str) -> float:
     previous = [0] * (len(second) + 1)
     best = 0
@@ -194,7 +210,38 @@ def validate_optional_bedtools(workspace: Path) -> str:
         cisql_coordinates == bedtools_coordinates,
         "Cis-QL interval subtraction differs from bedtools subtract",
     )
-    return "bedtools subtract coordinates agree"
+
+    (workspace / "overlap_a.bed").write_text(
+        "chr1\t0\t10\tgene\t0\t+\n"
+        "chr1\t10\t15\ttouching_gene\t0\t+\n",
+        encoding="utf-8",
+    )
+    (workspace / "overlap_b.bed").write_text(
+        "chr1\t3\t6\tenhancer_a\t0\t+\n"
+        "chr1\t8\t10\tenhancer_b\t0\t+\n",
+        encoding="utf-8",
+    )
+    completed = subprocess.run(
+        [bedtools, "intersect", "-a", "overlap_a.bed", "-b",
+         "overlap_b.bed", "-u"],
+        cwd=workspace,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    bedtools_supported = [
+        tuple(map(int, line.split("\t")[1:3]))
+        for line in completed.stdout.splitlines()
+    ]
+    cisql_supported = [
+        tuple(map(int, line.split("\t")[1:3]))
+        for line in (workspace / "supported.bed")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    require(cisql_supported == bedtools_supported,
+            "Cis-QL OVERLAPS differs from bedtools intersect -u")
+    return "bedtools subtract and overlap-selection coordinates agree"
 
 
 def validate_optional_biopython() -> str:
@@ -323,17 +370,24 @@ def main() -> int:
         (workspace / "intervals.gff3").write_text(
             "##gff-version 3\n"
             "chr1\tref\tgene\t1\t10\t.\t+\t.\tID=gene\n"
-            "chr1\tref\texon\t4\t6\t.\t+\t.\tID=exon\n",
+            "chr1\tref\tgene\t11\t15\t.\t+\t.\tID=touching_gene\n"
+            "chr1\tref\texon\t4\t6\t.\t+\t.\tID=exon\n"
+            "chr1\tref\tenhancer\t4\t6\t.\t+\t.\tID=enhancer_a\n"
+            "chr1\tref\tenhancer\t9\t10\t.\t+\t.\tID=enhancer_b\n",
             encoding="utf-8",
         )
         interval_data = run_query(
             workspace,
             "interval_reference",
             'LOAD ANNOTATION "intervals.gff3" AS annot;\n'
-            "EXTRACT GENE AS genes;\n"
+            'EXTRACT GENE AS genes WHERE ID = "gene";\n'
+            "EXTRACT GENE AS all_genes;\n"
             "EXTRACT EXON AS exons;\n"
+            "EXTRACT ENHANCER AS enhancers;\n"
             "EXCEPT genes FROM exons AS difference;\n"
-            'EXPORT difference TO "difference.bed" FORMAT BED;\n',
+            "OVERLAPS all_genes WITH enhancers AS supported;\n"
+            'EXPORT difference TO "difference.bed" FORMAT BED;\n'
+            'EXPORT supported TO "supported.bed" FORMAT BED;\n',
         )
         observed_intervals = [
             (region["start"], region["end"])
@@ -344,6 +398,17 @@ def main() -> int:
             "EXCEPT differs from independent geometric subtraction",
         )
         print("[ok] geometric interval subtraction")
+        observed_supported = [
+            (region["chr"], region["start"], region["end"])
+            for region in interval_data["resultSets"]["supported"]
+        ]
+        expected_supported = select_overlapping_intervals(
+            [("chr1", 0, 10), ("chr1", 10, 15)],
+            [("chr1", 3, 6), ("chr1", 8, 10)],
+        )
+        require(observed_supported == expected_supported,
+                "OVERLAPS differs from independent interval semi-join")
+        print("[ok] directional overlap selection")
 
         (workspace / "similarity.fasta").write_text(
             ">chr1\nACGTNNACGA\n", encoding="utf-8"

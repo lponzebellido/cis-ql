@@ -1,10 +1,10 @@
-LOAD SEQUENCE "data_examples/ecoli2.fna" AS genome;
-LOAD ANNOTATION "data_examples/genomic.gff" AS annotation;
+LOAD SEQUENCE "data_examples/anthocyanin_regulatory_demo.fasta" AS genome;
+LOAD ANNOTATION "data_examples/anthocyanin_regulatory_demo.gff3" AS annotation;
 
 DEFINE PROMOTERS OF GENE
   FROM TSS
-  UPSTREAM 200 BP
-  DOWNSTREAM 25 BP
-  AS explicit_promoters;
+    UPSTREAM 100 BP
+    DOWNSTREAM 20 BP
+    AS explicit_promoters;
 
-EXTRACT explicit_promoters;
+EXPORT explicit_promoters TO "explicit_promoters.bed" FORMAT BED;

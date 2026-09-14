@@ -1,11 +1,14 @@
 export const cqlLanguageDef = {
   keywords: [
-    'LOAD', 'SEQUENCE', 'ANNOTATION', 'MATRIX', 'AS', 'FIND', 'MOTIF',
-    'WITHIN', 'FROM', 'GENE', 'PROMOTER', 'ENHANCER', 'EXON', 'INTRON',
+    'LOAD', 'USE', 'EXPORT', 'DEFINE', 'SEQUENCE', 'ANNOTATION', 'MATRIX',
+    'AS', 'OF', 'PROMOTERS', 'FIND', 'MOTIF',
+    'WITHIN', 'WITH', 'FROM', 'TO', 'GENE', 'PROMOTER', 'ENHANCER', 'EXON', 'INTRON',
     'UTR', 'TSS', 'CDS', 'REGION', 'STRAND', 'POSITIVE', 'NEGATIVE',
-    'CHR', 'EXTRACT', 'WHERE', 'INTERSECT', 'UNION', 'EXCEPT', 'AND', 'OR', 'NOT',
+    'CHR', 'EXTRACT', 'WHERE', 'INTERSECT', 'UNION', 'EXCEPT', 'OVERLAPS',
+    'AND', 'OR', 'NOT',
     'LENGTH', 'SIMILARITY', 'GC_CONTENT', 'CPG_ISLANDS', 'BP', 'KB', 'MB',
-    'UPSTREAM', 'DOWNSTREAM', 'SCAN', 'THRESHOLD', 'ANALYZE', 'WINDOW',
+    'UPSTREAM', 'DOWNSTREAM', 'SCAN', 'THRESHOLD', 'PVALUE', 'QVALUE',
+    'BACKGROUND', 'UNIFORM', 'ANALYZE', 'WINDOW', 'FORMAT', 'BED', 'GFF3', 'TSV',
     'IF', 'THEN', 'ELSE', 'ENDIF', 'FOREACH', 'IN', 'DO', 'ENDFOR'
   ],
 
@@ -29,7 +32,8 @@ export const cqlLanguageDef = {
       [/@symbols/, { cases: { '@operators': 'operator',
                               '@default'  : '' } } ],
 
-      [/\d*\.\d+([eE][\-+]?\d+)?/, 'number.float'],
+      [/\d+(\.\d*)?[eE][\-+]?\d+/, 'number.float'],
+      [/\d*\.\d+/, 'number.float'],
       [/0[xX][0-9a-fA-F]+/, 'number.hex'],
       [/\d+/, 'number'],
 
