@@ -1485,10 +1485,8 @@ void Interpreter::executeSetOp(const IRInstruction &instr) {
     }
     result = SetOperations::selectOverlapping(regions1, regions2);
   } else {
-    const long double factor = instr.arg5 == "MB" ? 1000000.0L
-                               : instr.arg5 == "KB" ? 1000.0L : 1.0L;
-    const size_t maximumDistance = static_cast<size_t>(
-        std::strtold(instr.arg4.c_str(), nullptr) * factor);
+    const size_t maximumDistance = toBasePairs(
+        std::strtod(instr.arg4.c_str(), nullptr), instr.arg5);
     if (debugMode) {
       std::cout << "> NEAR " << entity1 << " TO " << entity2
                 << " WITHIN " << instr.arg4 << " " << instr.arg5
