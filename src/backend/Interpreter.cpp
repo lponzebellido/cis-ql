@@ -147,7 +147,9 @@ void Interpreter::printMotifMatches(const std::vector<MotifMatch> &matches,
     if (m.evidence.present) {
       std::cout << "  matrix:" << m.evidence.matrixId
                 << "  score:" << m.evidence.rawScore
-                << "  relative:" << m.evidence.scorePercent << "%";
+                << "  relative:" << m.evidence.scorePercent << "%"
+                << "  p:" << m.evidence.statistics.pValue
+                << "  q:" << m.evidence.statistics.qValue;
     }
     if (m.evidence.hasSourceRegion)
       std::cout << "  source:" << m.evidence.sourceRegionName
@@ -399,6 +401,24 @@ void Interpreter::executeExport(const IRInstruction &instr) {
             << ";MatrixSource="
             << gffAttributeEscape(region.motifEvidence.matrixSource)
             << ";ScorePercent=" << region.motifEvidence.scorePercent
+            << ";PValue=" << region.motifEvidence.statistics.pValue
+            << ";QValue=" << region.motifEvidence.statistics.qValue
+            << ";TestedPositions="
+            << region.motifEvidence.statistics.testedPositions
+            << ";PValueMethod="
+            << gffAttributeEscape(
+                   region.motifEvidence.statistics.pValueMethod)
+            << ";MultipleTestingMethod="
+            << gffAttributeEscape(
+                   region.motifEvidence.statistics.multipleTestingMethod)
+            << ";ScaledScore="
+            << region.motifEvidence.statistics.scaledScore
+            << ";ScoreRange="
+            << region.motifEvidence.statistics.scoreRange
+            << ";ScoreScale="
+            << region.motifEvidence.statistics.scoreScale
+            << ";ScoreOffset="
+            << region.motifEvidence.statistics.scoreOffset
             << ";BackgroundMode="
             << gffAttributeEscape(region.motifEvidence.background.mode)
             << ";BackgroundSource="
@@ -432,7 +452,10 @@ void Interpreter::executeExport(const IRInstruction &instr) {
   } else if (format == "TSV") {
     out << "chromosome\tstart\tend\tstrand\ttype\tname\tlength"
            "\tmatrix_alias\tmatrix_id\tmatrix_name\tmatrix_source"
-           "\traw_score\tscore_percent\tbackground_mode\tbackground_source"
+           "\traw_score\tscore_percent\tp_value\tq_value\ttested_positions"
+           "\tp_value_method\tmultiple_testing_method\tscaled_score"
+           "\tscore_range\tscore_scale\tscore_offset"
+           "\tbackground_mode\tbackground_source"
            "\tbackground_a\tbackground_c\tbackground_g\tbackground_t"
            "\tbackground_estimation_pseudocount\tbackground_observed_bases"
            "\tbackground_strand_policy\tmotif_pseudocount"
@@ -451,6 +474,18 @@ void Interpreter::executeExport(const IRInstruction &instr) {
             << cleanTabularField(region.motifEvidence.matrixSource) << '\t'
             << region.motifEvidence.rawScore << '\t'
             << region.motifEvidence.scorePercent << '\t'
+            << region.motifEvidence.statistics.pValue << '\t'
+            << region.motifEvidence.statistics.qValue << '\t'
+            << region.motifEvidence.statistics.testedPositions << '\t'
+            << cleanTabularField(
+                   region.motifEvidence.statistics.pValueMethod)
+            << '\t'
+            << cleanTabularField(
+                   region.motifEvidence.statistics.multipleTestingMethod)
+            << '\t' << region.motifEvidence.statistics.scaledScore << '\t'
+            << region.motifEvidence.statistics.scoreRange << '\t'
+            << region.motifEvidence.statistics.scoreScale << '\t'
+            << region.motifEvidence.statistics.scoreOffset << '\t'
             << cleanTabularField(region.motifEvidence.background.mode) << '\t'
             << cleanTabularField(region.motifEvidence.background.source)
             << '\t' << region.motifEvidence.background.a << '\t'
@@ -474,7 +509,7 @@ void Interpreter::executeExport(const IRInstruction &instr) {
           out << "\t\t\t\t";
         }
       } else {
-        for (int emptyColumn = 0; emptyColumn < 20; ++emptyColumn)
+        for (int emptyColumn = 0; emptyColumn < 29; ++emptyColumn)
           out << '\t';
       }
       out << '\n';
@@ -1403,13 +1438,14 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
     return;
   }
 
-  std::vector<MotifMatch> matches;
+  PWMScanResult scanResult;
+  scanResult.testedScoreCounts.assign(pssm.pValueByScaledScore.size(), 0);
   size_t scannedUnits = 0;
   if (target.empty()) {
     const auto &targetDataset = sequenceDatasets.count(activeSequenceAlias)
                                     ? sequenceDatasets[activeSequenceAlias]
                                     : sequenceDatasets.begin()->second;
-    std::vector<std::future<std::vector<MotifMatch>>> futures;
+    std::vector<std::future<PWMScanResult>> futures;
     for (const auto &seqRec : targetDataset) {
       const FastaRecord *record = &seqRec;
       const std::string chrId = seqRec.sequenceId;
@@ -1419,14 +1455,13 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
       futures.push_back(std::async(
           std::launch::async,
           [record, matrix, threshold, chrId, searchPos, searchNeg]() {
-            return PWMScanner::scan(record->sequence, *matrix, threshold,
-                                    chrId, searchPos, searchNeg);
+            return PWMScanner::scanWithStatistics(
+                record->sequence, *matrix, threshold, chrId,
+                searchPos, searchNeg);
           }));
     }
     for (auto &future : futures) {
-      auto chromosomeMatches = future.get();
-      matches.insert(matches.end(), chromosomeMatches.begin(),
-                     chromosomeMatches.end());
+      PWMScanner::mergeScanResults(scanResult, future.get());
     }
     scannedUnits = targetDataset.size();
   } else {
@@ -1457,10 +1492,10 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
 
       const std::string sequence = chromosome->second.sequence.substr(
           source.start, source.end - source.start);
-      auto regionMatches = PWMScanner::scan(
-          sequence, pssm, currentScan.threshold, source.chr, searchPos,
-          searchNeg);
-      for (auto &match : regionMatches) {
+      PWMScanResult regionResult = PWMScanner::scanWithStatistics(
+          sequence, pssm, currentScan.threshold, source.chr,
+          searchPos, searchNeg);
+      for (auto &match : regionResult.matches) {
         const size_t localPosition = match.position;
         match.position = source.start + localPosition;
         match.evidence.hasSourceRegion = true;
@@ -1473,11 +1508,12 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
                 ? source.end - (match.position + match.matchLength)
                 : localPosition;
       }
-      matches.insert(matches.end(), regionMatches.begin(),
-                     regionMatches.end());
+      PWMScanner::mergeScanResults(scanResult, std::move(regionResult));
     }
   }
 
+  PWMScanner::applyBenjaminiHochberg(scanResult, pssm);
+  std::vector<MotifMatch> matches = std::move(scanResult.matches);
   for (auto &match : matches)
     match.evidence.matrixAlias = matrixAlias;
 
@@ -1504,6 +1540,10 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
               << currentScan.threshold << "% threshold across "
               << scannedUnits
               << (target.empty() ? " chromosome(s)." : " source region(s).")
+              << std::endl;
+    std::cout << "  Statistical universe: " << scanResult.testedPositions
+              << " valid position-strand test(s); p-values by zero-order "
+                 "dynamic programming, q-values by Benjamini-Hochberg."
               << std::endl;
   }
 
@@ -1663,6 +1703,29 @@ void Interpreter::dumpResultsJSON() const {
             << r.motifEvidence.scorePercent << ",\n"
             << "          \"motifPseudocount\": "
             << r.motifEvidence.motifPseudocount << ",\n"
+            << "          \"statistics\": {\n"
+            << "            \"pValue\": "
+            << r.motifEvidence.statistics.pValue << ",\n"
+            << "            \"qValue\": "
+            << r.motifEvidence.statistics.qValue << ",\n"
+            << "            \"testedPositions\": "
+            << r.motifEvidence.statistics.testedPositions << ",\n"
+            << "            \"pValueMethod\": \""
+            << jsonEscape(r.motifEvidence.statistics.pValueMethod)
+            << "\",\n"
+            << "            \"multipleTestingMethod\": \""
+            << jsonEscape(
+                   r.motifEvidence.statistics.multipleTestingMethod)
+            << "\",\n"
+            << "            \"scaledScore\": "
+            << r.motifEvidence.statistics.scaledScore << ",\n"
+            << "            \"scoreRange\": "
+            << r.motifEvidence.statistics.scoreRange << ",\n"
+            << "            \"scoreScale\": "
+            << r.motifEvidence.statistics.scoreScale << ",\n"
+            << "            \"scoreOffset\": "
+            << r.motifEvidence.statistics.scoreOffset << "\n"
+            << "          },\n"
             << "          \"background\": {\n"
             << "            \"mode\": \""
             << jsonEscape(r.motifEvidence.background.mode) << "\",\n"

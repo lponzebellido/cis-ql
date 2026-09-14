@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import itertools
 import math
 import os
 import shutil
@@ -128,6 +129,39 @@ def pssm_percent_scores(
     return percentages
 
 
+def exact_pssm_tail_probability(
+    counts: list[list[float]], word: str,
+    backgrounds: list[float] | None = None,
+) -> float:
+    background = backgrounds or [0.25] * 4
+    length = len(counts[0])
+    require(len(word) == length, "reference word width differs from PWM")
+    scores = [[0.0] * length for _ in range(4)]
+    for position in range(length):
+        total = sum(row[position] for row in counts)
+        for base in range(4):
+            frequency = (
+                counts[base][position] + 0.1 * background[base]
+            ) / (total + 0.1)
+            scores[base][position] = math.log2(
+                frequency / background[base]
+            )
+
+    nucleotide = {"A": 0, "C": 1, "G": 2, "T": 3}
+    target = sum(
+        scores[nucleotide[base]][position]
+        for position, base in enumerate(word.upper())
+    )
+    tail = 0.0
+    for candidate in itertools.product(range(4), repeat=length):
+        score = sum(scores[base][position]
+                    for position, base in enumerate(candidate))
+        if score >= target - 1e-12:
+            probability = math.prod(background[base] for base in candidate)
+            tail += probability
+    return tail
+
+
 def validate_optional_bedtools(workspace: Path) -> str:
     bedtools = shutil.which("bedtools")
     if not bedtools:
@@ -183,6 +217,52 @@ def validate_optional_biopython() -> str:
     return "Biopython local-alignment score agrees"
 
 
+def validate_optional_fimo(workspace: Path, cisql_pvalue: float) -> str:
+    fimo = shutil.which("fimo")
+    if not fimo:
+        return "FIMO not installed (optional p-value comparison skipped)"
+
+    meme_motif = workspace / "aa.meme"
+    meme_motif.write_text(
+        "MEME version 4\n\n"
+        "ALPHABET= ACGT\n\n"
+        "strands: +\n\n"
+        "Background letter frequencies\n"
+        "A 0.25 C 0.25 G 0.25 T 0.25\n\n"
+        "MOTIF AA exact_AA\n"
+        "letter-probability matrix: alength= 4 w= 2 nsites= 10 E= 0\n"
+        "1 0 0 0\n"
+        "1 0 0 0\n",
+        encoding="utf-8",
+    )
+    completed = subprocess.run(
+        [fimo, "--text", "--norc", "--bgfile", "--uniform--",
+         "--thresh", "1", str(meme_motif),
+         str(workspace / "motifs.fasta")],
+        cwd=workspace,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    require(
+        completed.returncode == 0,
+        f"FIMO comparison failed\nstdout:\n{completed.stdout}\n"
+        f"stderr:\n{completed.stderr}",
+    )
+    rows = [line.split("\t") for line in completed.stdout.splitlines()
+            if line and not line.startswith("#")]
+    require(len(rows) > 1, "FIMO comparison returned no motif sites")
+    header = rows[0]
+    pvalue_column = header.index("p-value")
+    start_column = header.index("start")
+    best = [float(row[pvalue_column]) for row in rows[1:]
+            if int(row[start_column]) in (7, 8)]
+    require(best, "FIMO comparison did not return the expected AA sites")
+    require(all(abs(value - cisql_pvalue) < 1e-9 for value in best),
+            "Cis-QL PWM p-value differs from FIMO")
+    return "FIMO AA p-values agree"
+
+
 def main() -> int:
     require(BINARY.exists(), "Build cisql before running reference validation")
     with tempfile.TemporaryDirectory(prefix="cisql-reference-") as temp:
@@ -232,6 +312,13 @@ def main() -> int:
         require(observed_pwm == expected_pwm,
                 "PWM coordinates differ from independent log-odds reference")
         print("[ok] PWM/PSSM threshold coordinates")
+        cisql_pvalue = pwm_data["resultSets"]["pwm_hits"][0][
+            "motifEvidence"
+        ]["statistics"]["pValue"]
+        exact_pvalue = exact_pssm_tail_probability(counts, "AA")
+        require(abs(cisql_pvalue - exact_pvalue) < 1e-12,
+                "PWM p-value differs from exhaustive null enumeration")
+        print("[ok] PWM p-value against exhaustive null distribution")
 
         (workspace / "intervals.gff3").write_text(
             "##gff-version 3\n"
@@ -287,6 +374,7 @@ def main() -> int:
 
         print(f"[optional] {validate_optional_bedtools(workspace)}")
         print(f"[optional] {validate_optional_biopython()}")
+        print(f"[optional] {validate_optional_fimo(workspace, cisql_pvalue)}")
 
     print("All independent reference validations passed.")
     return 0

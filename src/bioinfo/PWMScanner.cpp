@@ -3,7 +3,89 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <sstream>
+
+namespace {
+
+const int FIMO_SCORE_RANGE = 1000;
+
+bool buildScoreDistribution(PSSM &pssm) {
+  double smallest = 1e300;
+  double largest = -1e300;
+  for (int nucleotide = 0; nucleotide < 4; ++nucleotide) {
+    for (int position = 0; position < pssm.length; ++position) {
+      const double score = pssm.scores[nucleotide][position];
+      if (!std::isfinite(score))
+        return false;
+      smallest = std::min(smallest, score);
+      largest = std::max(largest, score);
+    }
+  }
+
+  if (largest == smallest)
+    smallest = largest - 1.0;
+  pssm.scoreRange = FIMO_SCORE_RANGE;
+  pssm.scoreOffset = std::floor(smallest);
+  pssm.scoreScale = std::floor(
+      static_cast<double>(pssm.scoreRange) /
+      (largest - pssm.scoreOffset));
+  if (!std::isfinite(pssm.scoreScale) || pssm.scoreScale <= 0.0)
+    return false;
+
+  pssm.scaledScores.assign(4, std::vector<int>(pssm.length, 0));
+  for (int nucleotide = 0; nucleotide < 4; ++nucleotide) {
+    for (int position = 0; position < pssm.length; ++position) {
+      const double scaled =
+          (pssm.scores[nucleotide][position] - pssm.scoreOffset) *
+          pssm.scoreScale;
+      const int rounded = static_cast<int>(std::floor(scaled + 0.5));
+      if (rounded < 0 || rounded > pssm.scoreRange)
+        return false;
+      pssm.scaledScores[nucleotide][position] = rounded;
+    }
+  }
+
+  const size_t distributionSize =
+      static_cast<size_t>(pssm.length * pssm.scoreRange + 1);
+  std::vector<double> probability(distributionSize, 0.0);
+  std::vector<double> updated(distributionSize, 0.0);
+  probability[0] = 1.0;
+  size_t reachableMaximum = 0;
+  const double background[4] = {
+      pssm.background.a, pssm.background.c,
+      pssm.background.g, pssm.background.t};
+
+  for (int position = 0; position < pssm.length; ++position) {
+    std::fill(updated.begin(), updated.end(), 0.0);
+    size_t columnMaximum = 0;
+    for (int nucleotide = 0; nucleotide < 4; ++nucleotide) {
+      columnMaximum = std::max(
+          columnMaximum,
+          static_cast<size_t>(pssm.scaledScores[nucleotide][position]));
+      const size_t shift = static_cast<size_t>(
+          pssm.scaledScores[nucleotide][position]);
+      for (size_t score = 0; score <= reachableMaximum; ++score) {
+        if (probability[score] != 0.0) {
+          updated[score + shift] +=
+              probability[score] * background[nucleotide];
+        }
+      }
+    }
+    reachableMaximum += columnMaximum;
+    probability.swap(updated);
+  }
+
+  pssm.pValueByScaledScore.assign(distributionSize, 0.0);
+  double tailProbability = 0.0;
+  for (size_t score = distributionSize; score-- > 0;) {
+    tailProbability = std::min(1.0, tailProbability + probability[score]);
+    pssm.pValueByScaledScore[score] = tailProbability;
+  }
+  return true;
+}
+
+} // namespace
 
 static int nucToIndex(char c) {
   switch (c) {
@@ -148,6 +230,9 @@ PSSM PWMScanner::computePSSM(const PWMatrix &pwm,
   pssm.length = pwm.length;
   pssm.background = background;
   pssm.motifPseudocount = motifPseudocount;
+  pssm.scoreRange = FIMO_SCORE_RANGE;
+  pssm.scoreScale = 0.0;
+  pssm.scoreOffset = 0.0;
   const double backgroundSum =
       background.a + background.c + background.g + background.t;
   if (pwm.length <= 0 || pwm.counts.size() != 4 || background.a <= 0.0 ||
@@ -198,6 +283,11 @@ PSSM PWMScanner::computePSSM(const PWMatrix &pwm,
       const double adjustedCount =
           pwm.counts[i][j] + motifPseudocount * bg[i];
       const double freq = adjustedCount / (colTotal + motifPseudocount);
+      if (freq <= 0.0 || !std::isfinite(freq)) {
+        pssm.length = 0;
+        pssm.scores.clear();
+        return pssm;
+      }
       pssm.scores[i][j] = std::log2(freq / bg[i]);
 
       if (pssm.scores[i][j] > colMax)
@@ -207,6 +297,13 @@ PSSM PWMScanner::computePSSM(const PWMatrix &pwm,
     }
     pssm.maxScore += colMax;
     pssm.minScore += colMin;
+  }
+
+  if (!buildScoreDistribution(pssm)) {
+    pssm.length = 0;
+    pssm.scores.clear();
+    pssm.scaledScores.clear();
+    pssm.pValueByScaledScore.clear();
   }
 
   return pssm;
@@ -220,22 +317,24 @@ double PWMScanner::scoreToPercent(double score, const PSSM &pssm) {
   return std::max(0.0, std::min(100.0, pct));
 }
 
-std::vector<MotifMatch> PWMScanner::scanStrand(const std::string &sequence,
-                                               const PSSM &pssm,
-                                               double minRawScore,
-                                               const std::string &strand) {
+PWMScanResult PWMScanner::scanStrand(const std::string &sequence,
+                                     const PSSM &pssm,
+                                     double minRawScore,
+                                     const std::string &strand) {
 
-  std::vector<MotifMatch> matches;
+  PWMScanResult result;
+  result.testedScoreCounts.assign(pssm.pValueByScaledScore.size(), 0);
   int seqLen = (int)sequence.size();
   int motifLen = pssm.length;
 
   if (seqLen < motifLen)
-    return matches;
+    return result;
 
   size_t contextSize = 20;
 
   for (int pos = 0; pos <= seqLen - motifLen; pos++) {
     double score = 0.0;
+    int scaledScore = 0;
     bool valid = true;
 
     for (int j = 0; j < motifLen; j++) {
@@ -245,9 +344,16 @@ std::vector<MotifMatch> PWMScanner::scanStrand(const std::string &sequence,
         break;
       }
       score += pssm.scores[idx][j];
+      scaledScore += pssm.scaledScores[idx][j];
     }
 
-    if (valid && score >= minRawScore) {
+    if (!valid)
+      continue;
+
+    ++result.testedPositions;
+    ++result.testedScoreCounts[static_cast<size_t>(scaledScore)];
+
+    if (score >= minRawScore) {
       MotifMatch m;
       m.position = (size_t)pos;
       m.matchLength = (size_t)motifLen;
@@ -260,25 +366,32 @@ std::vector<MotifMatch> PWMScanner::scanStrand(const std::string &sequence,
       m.evidence.scorePercent = scoreToPercent(score, pssm);
       m.evidence.background = pssm.background;
       m.evidence.motifPseudocount = pssm.motifPseudocount;
+      m.evidence.statistics.pValue =
+          pssm.pValueByScaledScore[static_cast<size_t>(scaledScore)];
+      m.evidence.statistics.scaledScore = scaledScore;
+      m.evidence.statistics.scoreRange = pssm.scoreRange;
+      m.evidence.statistics.scoreScale = pssm.scoreScale;
+      m.evidence.statistics.scoreOffset = pssm.scoreOffset;
 
       size_t ctxStart =
           (m.position > contextSize) ? m.position - contextSize : 0;
       size_t ctxEnd =
           std::min(m.position + m.matchLength + contextSize, sequence.size());
       m.context = sequence.substr(ctxStart, ctxEnd - ctxStart);
-      matches.push_back(m);
+      result.matches.push_back(m);
     }
   }
 
-  return matches;
+  return result;
 }
 
-std::vector<MotifMatch>
-PWMScanner::scan(const std::string &sequence, const PSSM &pssm,
-                 double thresholdPercent, const std::string &chrId,
-                 bool searchPositive, bool searchNegative) {
+PWMScanResult PWMScanner::scanWithStatistics(
+    const std::string &sequence, const PSSM &pssm,
+    double thresholdPercent, const std::string &chrId,
+    bool searchPositive, bool searchNegative) {
 
-  std::vector<MotifMatch> allMatches;
+  PWMScanResult result;
+  result.testedScoreCounts.assign(pssm.pValueByScaledScore.size(), 0);
 
   double minRawScore = pssm.minScore;
   if (thresholdPercent >= 100.0) {
@@ -290,15 +403,14 @@ PWMScanner::scan(const std::string &sequence, const PSSM &pssm,
   }
 
   if (searchPositive) {
-    auto posMatches = scanStrand(sequence, pssm, minRawScore, "+");
-    allMatches.insert(allMatches.end(), posMatches.begin(), posMatches.end());
+    mergeScanResults(result, scanStrand(sequence, pssm, minRawScore, "+"));
   }
 
   if (searchNegative) {
     std::string rcSeq = MotifFinder::reverseComplement(sequence);
-    auto negMatches = scanStrand(rcSeq, pssm, minRawScore, "-");
+    PWMScanResult negative = scanStrand(rcSeq, pssm, minRawScore, "-");
 
-    for (auto &m : negMatches) {
+    for (auto &m : negative.matches) {
       m.position = sequence.size() - m.position - m.matchLength;
 
       size_t ctxStart = (m.position > 20) ? m.position - 20 : 0;
@@ -306,16 +418,80 @@ PWMScanner::scan(const std::string &sequence, const PSSM &pssm,
           std::min(m.position + m.matchLength + 20, sequence.size());
       m.context = sequence.substr(ctxStart, ctxEnd - ctxStart);
     }
-    allMatches.insert(allMatches.end(), negMatches.begin(), negMatches.end());
+    mergeScanResults(result, std::move(negative));
   }
 
-  std::sort(allMatches.begin(), allMatches.end(),
+  std::sort(result.matches.begin(), result.matches.end(),
             [](const MotifMatch &a, const MotifMatch &b) {
               return a.position < b.position;
             });
 
-  for (auto &match : allMatches)
+  for (auto &match : result.matches)
     match.chr = chrId;
 
-  return allMatches;
+  return result;
+}
+
+void PWMScanner::mergeScanResults(PWMScanResult &destination,
+                                  PWMScanResult source) {
+  if (destination.testedScoreCounts.empty()) {
+    destination.testedScoreCounts.assign(source.testedScoreCounts.size(), 0);
+  }
+  if (destination.testedScoreCounts.size() !=
+      source.testedScoreCounts.size()) {
+    return;
+  }
+  for (size_t score = 0; score < source.testedScoreCounts.size(); ++score)
+    destination.testedScoreCounts[score] += source.testedScoreCounts[score];
+  destination.testedPositions += source.testedPositions;
+  destination.matches.insert(
+      destination.matches.end(),
+      std::make_move_iterator(source.matches.begin()),
+      std::make_move_iterator(source.matches.end()));
+}
+
+void PWMScanner::applyBenjaminiHochberg(PWMScanResult &result,
+                                        const PSSM &pssm) {
+  if (result.testedPositions == 0 ||
+      result.testedScoreCounts.size() != pssm.pValueByScaledScore.size()) {
+    return;
+  }
+
+  std::vector<double> adjustedByScore(result.testedScoreCounts.size(), 1.0);
+  size_t rank = 0;
+  for (size_t score = result.testedScoreCounts.size(); score-- > 0;) {
+    const size_t tiedTests = result.testedScoreCounts[score];
+    if (tiedTests == 0)
+      continue;
+    rank += tiedTests;
+    adjustedByScore[score] = std::min(
+        1.0, pssm.pValueByScaledScore[score] *
+                 static_cast<double>(result.testedPositions) /
+                 static_cast<double>(rank));
+  }
+
+  double runningMinimum = 1.0;
+  for (size_t score = 0; score < adjustedByScore.size(); ++score) {
+    if (result.testedScoreCounts[score] == 0)
+      continue;
+    runningMinimum = std::min(runningMinimum, adjustedByScore[score]);
+    adjustedByScore[score] = runningMinimum;
+  }
+
+  for (auto &match : result.matches) {
+    MotifStatisticalEvidence &statistics = match.evidence.statistics;
+    statistics.qValue =
+        adjustedByScore[static_cast<size_t>(statistics.scaledScore)];
+    statistics.testedPositions = result.testedPositions;
+  }
+}
+
+std::vector<MotifMatch>
+PWMScanner::scan(const std::string &sequence, const PSSM &pssm,
+                 double thresholdPercent, const std::string &chrId,
+                 bool searchPositive, bool searchNegative) {
+  PWMScanResult result = scanWithStatistics(
+      sequence, pssm, thresholdPercent, chrId, searchPositive, searchNegative);
+  applyBenjaminiHochberg(result, pssm);
+  return std::move(result.matches);
 }

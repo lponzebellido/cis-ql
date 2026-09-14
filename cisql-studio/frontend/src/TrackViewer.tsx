@@ -8,6 +8,17 @@ interface MotifEvidence {
   rawScore: number;
   scorePercent: number;
   motifPseudocount: number;
+  statistics?: {
+    pValue: number;
+    qValue: number;
+    testedPositions: number;
+    pValueMethod: string;
+    multipleTestingMethod: string;
+    scaledScore: number;
+    scoreRange: number;
+    scoreScale: number;
+    scoreOffset: number;
+  };
   background?: {
     mode: string;
     source: string;
@@ -560,6 +571,9 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                 <>
                   <br /><span className="tt-label">Matrix:</span> {hoveredRegion.motifEvidence.matrixId || hoveredRegion.motifEvidence.matrixAlias}
                   <br /><span className="tt-label">Score:</span> {hoveredRegion.motifEvidence.rawScore.toFixed(3)} ({hoveredRegion.motifEvidence.scorePercent.toFixed(1)}%)
+                  {hoveredRegion.motifEvidence.statistics && (
+                    <><br /><span className="tt-label">Significance:</span> p={hoveredRegion.motifEvidence.statistics.pValue.toExponential(2)}, q={hoveredRegion.motifEvidence.statistics.qValue.toExponential(2)}</>
+                  )}
                   {hoveredRegion.motifEvidence.background && (
                     <><br /><span className="tt-label">Background:</span> {hoveredRegion.motifEvidence.background.mode} ({hoveredRegion.motifEvidence.background.source})</>
                   )}
@@ -622,6 +636,15 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                     <span className="detail-label">PWM score</span>
                     <span className="detail-value">{selectedRegion.motifEvidence.rawScore.toFixed(3)} / {selectedRegion.motifEvidence.scorePercent.toFixed(1)}%</span>
                   </div>
+                  {selectedRegion.motifEvidence.statistics && (
+                    <div className="detail-field">
+                      <span className="detail-label">Statistical evidence</span>
+                      <span className="detail-value">
+                        p {selectedRegion.motifEvidence.statistics.pValue.toExponential(4)} · q {selectedRegion.motifEvidence.statistics.qValue.toExponential(4)}<br />
+                        {selectedRegion.motifEvidence.statistics.testedPositions.toLocaleString()} tested position-strands · {selectedRegion.motifEvidence.statistics.multipleTestingMethod}
+                      </span>
+                    </div>
+                  )}
                   {selectedRegion.motifEvidence.background && (
                     <div className="detail-field">
                       <span className="detail-label">Background</span>

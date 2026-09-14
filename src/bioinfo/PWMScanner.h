@@ -28,6 +28,17 @@ struct PSSM {
   double minScore;  
   BackgroundModel background;
   double motifPseudocount;
+  std::vector<std::vector<int>> scaledScores;
+  std::vector<double> pValueByScaledScore;
+  int scoreRange;
+  double scoreScale;
+  double scoreOffset;
+};
+
+struct PWMScanResult {
+  std::vector<MotifMatch> matches;
+  std::vector<size_t> testedScoreCounts;
+  size_t testedPositions = 0;
 };
 
 class PWMScanner {
@@ -50,15 +61,25 @@ public:
                                        bool searchPositive = true,
                                        bool searchNegative = true);
 
+  static PWMScanResult scanWithStatistics(
+      const std::string &sequence, const PSSM &pssm,
+      double thresholdPercent, const std::string &chrId,
+      bool searchPositive = true, bool searchNegative = true);
+
+  static void mergeScanResults(PWMScanResult &destination,
+                               PWMScanResult source);
+  static void applyBenjaminiHochberg(PWMScanResult &result,
+                                     const PSSM &pssm);
+
   
   static double scoreToPercent(double score, const PSSM& pssm);
 
 private:
   
-  static std::vector<MotifMatch> scanStrand(const std::string& sequence,
-                                             const PSSM& pssm,
-                                             double minRawScore,
-                                             const std::string& strand);
+  static PWMScanResult scanStrand(const std::string& sequence,
+                                  const PSSM& pssm,
+                                  double minRawScore,
+                                  const std::string& strand);
 };
 
 #endif

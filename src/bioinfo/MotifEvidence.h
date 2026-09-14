@@ -5,6 +5,18 @@
 #include <cstddef>
 #include <string>
 
+struct MotifStatisticalEvidence {
+  double pValue = 1.0;
+  double qValue = 1.0;
+  size_t testedPositions = 0;
+  std::string pValueMethod = "zero_order_dynamic_programming";
+  std::string multipleTestingMethod = "benjamini_hochberg";
+  int scaledScore = 0;
+  int scoreRange = 1000;
+  double scoreScale = 0.0;
+  double scoreOffset = 0.0;
+};
+
 struct MotifEvidence {
   bool present = false;
   std::string matrixAlias;
@@ -15,6 +27,7 @@ struct MotifEvidence {
   double scorePercent = 0.0;
   BackgroundModel background;
   double motifPseudocount = 0.1;
+  MotifStatisticalEvidence statistics;
 
   bool hasSourceRegion = false;
   std::string sourceRegionName;

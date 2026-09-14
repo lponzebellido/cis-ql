@@ -246,6 +246,32 @@ int main() {
               std::abs(pwmHits[0].evidence.scorePercent - 100.0) < 1e-9,
           "PWM matches retain matrix provenance and scores");
 
+  require(pssm.scoreRange == 1000 && pssm.scoreScale > 0.0 &&
+              pssm.pValueByScaledScore.size() == 2001,
+          "PSSM builds a FIMO-range dynamic-programming score table");
+  PWMScanResult positiveStatistics = PWMScanner::scanWithStatistics(
+      "AAAA", pssm, 90.0, "chrPWM", true, false);
+  PWMScanner::applyBenjaminiHochberg(positiveStatistics, pssm);
+  require(positiveStatistics.testedPositions == 3 &&
+              positiveStatistics.matches.size() == 3 &&
+              std::abs(positiveStatistics.matches[0]
+                           .evidence.statistics.pValue - 0.0625) < 1e-12 &&
+              std::abs(positiveStatistics.matches[0]
+                           .evidence.statistics.qValue - 0.0625) < 1e-12,
+          "PWM p-values match the exact AA null and tied BH correction");
+  PWMScanResult twoStrandStatistics = PWMScanner::scanWithStatistics(
+      "AAAA", pssm, 90.0, "chrPWM", true, true);
+  PWMScanner::applyBenjaminiHochberg(twoStrandStatistics, pssm);
+  require(twoStrandStatistics.testedPositions == 6 &&
+              twoStrandStatistics.matches.size() == 3 &&
+              std::abs(twoStrandStatistics.matches[0]
+                           .evidence.statistics.qValue - 0.125) < 1e-12,
+          "BH correction covers every selected position-strand test");
+  PWMScanResult ambiguousStatistics = PWMScanner::scanWithStatistics(
+      "AANA", pssm, 0.0, "chrPWM", true, false);
+  require(ambiguousStatistics.testedPositions == 1,
+          "ambiguous PWM windows are excluded from the statistical universe");
+
   GenomicRegion scoredHit = region(0, 10);
   scoredHit.motifEvidence.present = true;
   scoredHit.motifEvidence.matrixId = "TEST";

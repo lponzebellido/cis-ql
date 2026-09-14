@@ -8,6 +8,17 @@ interface MotifEvidence {
   rawScore: number;
   scorePercent: number;
   motifPseudocount: number;
+  statistics?: {
+    pValue: number;
+    qValue: number;
+    testedPositions: number;
+    pValueMethod: string;
+    multipleTestingMethod: string;
+    scaledScore: number;
+    scoreRange: number;
+    scoreScale: number;
+    scoreOffset: number;
+  };
   background?: {
     mode: string;
     source: string;
@@ -262,6 +273,9 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
                                 <>
                                   <span>Matrix: {region.motifEvidence.matrixId || region.motifEvidence.matrixAlias}</span>
                                   <span>PWM score: {region.motifEvidence.rawScore.toFixed(3)} ({region.motifEvidence.scorePercent.toFixed(1)}%)</span>
+                                  {region.motifEvidence.statistics && (
+                                    <span>Significance: p={region.motifEvidence.statistics.pValue.toExponential(3)}, q={region.motifEvidence.statistics.qValue.toExponential(3)} across {region.motifEvidence.statistics.testedPositions.toLocaleString()} tests</span>
+                                  )}
                                   {region.motifEvidence.background && (
                                     <span>Background: {region.motifEvidence.background.mode} ({region.motifEvidence.background.source}, {region.motifEvidence.background.strandPolicy})</span>
                                   )}

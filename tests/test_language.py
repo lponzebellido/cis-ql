@@ -299,7 +299,10 @@ def main() -> int:
                 ).splitlines()[0]
                 == "chromosome\tstart\tend\tstrand\ttype\tname\tlength"
                 "\tmatrix_alias\tmatrix_id\tmatrix_name\tmatrix_source"
-                "\traw_score\tscore_percent\tbackground_mode\tbackground_source"
+                "\traw_score\tscore_percent\tp_value\tq_value\ttested_positions"
+                "\tp_value_method\tmultiple_testing_method\tscaled_score"
+                "\tscore_range\tscore_scale\tscore_offset"
+                "\tbackground_mode\tbackground_source"
                 "\tbackground_a\tbackground_c\tbackground_g\tbackground_t"
                 "\tbackground_estimation_pseudocount\tbackground_observed_bases"
                 "\tbackground_strand_policy\tmotif_pseudocount"
@@ -427,6 +430,18 @@ def main() -> int:
                     site["motifEvidence"]["matrixId"] == "TEST" and
                     site["motifEvidence"]["matrixName"] == "test" and
                     site["motifEvidence"]["scorePercent"] == 100 and
+                    abs(site["motifEvidence"]["statistics"]["pValue"]
+                        - 0.0625) < 1e-12 and
+                    abs(site["motifEvidence"]["statistics"]["qValue"]
+                        - 0.0625) < 1e-12 and
+                    site["motifEvidence"]["statistics"]["testedPositions"]
+                    == 9 and
+                    site["motifEvidence"]["statistics"]["pValueMethod"]
+                    == "zero_order_dynamic_programming" and
+                    site["motifEvidence"]["statistics"]
+                    ["multipleTestingMethod"] == "benjamini_hochberg" and
+                    site["motifEvidence"]["statistics"]["scoreRange"]
+                    == 1000 and
                     site["motifEvidence"]["background"]["mode"]
                     == "uniform" and
                     site["motifEvidence"]["background"]["source"]
@@ -451,6 +466,11 @@ def main() -> int:
                 "MatrixSource=fixture.pwm" in gff_rows[1] and
                 "BackgroundMode=uniform" in gff_rows[1] and
                 "BackgroundSource=default" in gff_rows[1] and
+                "PValue=0.0625" in gff_rows[1] and
+                "QValue=0.0625" in gff_rows[1] and
+                "TestedPositions=9" in gff_rows[1] and
+                "PValueMethod=zero_order_dynamic_programming" in gff_rows[1] and
+                "MultipleTestingMethod=benjamini_hochberg" in gff_rows[1] and
                 "MotifPseudocount=0.1" in gff_rows[1] and
                 "SourceRegion=short_promoter" in gff_rows[1] and
                 "SourceRegionType=promoter" in gff_rows[1] and
@@ -460,15 +480,22 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()
         first_tsv_site = tsv_rows[1].split("\t")
-        require(len(tsv_rows) == 10 and len(first_tsv_site) == 28 and
+        require(len(tsv_rows) == 10 and len(first_tsv_site) == 37 and
                 first_tsv_site[7:11]
                 == ["matrix", "TEST", "test", "fixture.pwm"] and
                 float(first_tsv_site[11]) > 0 and
-                first_tsv_site[12:15] == ["100", "uniform", "default"] and
-                first_tsv_site[21] == "forward" and
-                abs(float(first_tsv_site[22]) - 0.1) < 1e-12 and
-                first_tsv_site[23:25] == ["short_promoter", "promoter"] and
-                first_tsv_site[27] == "0",
+                first_tsv_site[12] == "100" and
+                abs(float(first_tsv_site[13]) - 0.0625) < 1e-12 and
+                abs(float(first_tsv_site[14]) - 0.0625) < 1e-12 and
+                first_tsv_site[15:18]
+                == ["9", "zero_order_dynamic_programming",
+                    "benjamini_hochberg"] and
+                first_tsv_site[19] == "1000" and
+                first_tsv_site[22:24] == ["uniform", "default"] and
+                first_tsv_site[30] == "forward" and
+                abs(float(first_tsv_site[31]) - 0.1) < 1e-12 and
+                first_tsv_site[32:34] == ["short_promoter", "promoter"] and
+                first_tsv_site[36] == "0",
                 "motif TSV export retains evidence columns")
 
         data, _ = run_query(
