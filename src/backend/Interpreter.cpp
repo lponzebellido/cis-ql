@@ -4,11 +4,11 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <set>
 #include <thread>
-#include <fstream>
 
 namespace {
 
@@ -22,14 +22,12 @@ bool conditionUsesOnly(const std::shared_ptr<IRCondition> &condition,
          conditionUsesOnly(condition->right, properties);
 }
 
-void collectSimilarityReferences(
-    const std::shared_ptr<IRCondition> &condition,
-    std::set<std::string> &references) {
+void collectSimilarityReferences(const std::shared_ptr<IRCondition> &condition,
+                                 std::set<std::string> &references) {
   if (!condition)
     return;
   if (condition->kind == IRCondition::Kind::SIMPLE) {
-    if (condition->property == "SIMILARITY" &&
-        !condition->reference.empty()) {
+    if (condition->property == "SIMILARITY" && !condition->reference.empty()) {
       references.insert(condition->reference);
     }
     return;
@@ -64,8 +62,7 @@ std::string gffAttributeEscape(const std::string &value) {
 
 bool isSafeRelativeExportPath(const std::string &path) {
   if (path.empty() || path.front() == '/' || path.front() == '\\' ||
-      (path.size() > 1 &&
-       std::isalpha(static_cast<unsigned char>(path[0])) &&
+      (path.size() > 1 && std::isalpha(static_cast<unsigned char>(path[0])) &&
        path[1] == ':')) {
     return false;
   }
@@ -84,8 +81,7 @@ bool isSafeRelativeExportPath(const std::string &path) {
   return true;
 }
 
-}
-
+} // namespace
 
 std::string Interpreter::stripQuotes(const std::string &s) const {
   if (s.size() >= 2 && s.front() == '"' && s.back() == '"') {
@@ -99,13 +95,27 @@ std::string Interpreter::jsonEscape(const std::string &s) const {
   escaped.reserve(s.size());
   for (const unsigned char c : s) {
     switch (c) {
-    case '"': escaped += "\\\""; break;
-    case '\\': escaped += "\\\\"; break;
-    case '\b': escaped += "\\b"; break;
-    case '\f': escaped += "\\f"; break;
-    case '\n': escaped += "\\n"; break;
-    case '\r': escaped += "\\r"; break;
-    case '\t': escaped += "\\t"; break;
+    case '"':
+      escaped += "\\\"";
+      break;
+    case '\\':
+      escaped += "\\\\";
+      break;
+    case '\b':
+      escaped += "\\b";
+      break;
+    case '\f':
+      escaped += "\\f";
+      break;
+    case '\n':
+      escaped += "\\n";
+      break;
+    case '\r':
+      escaped += "\\r";
+      break;
+    case '\t':
+      escaped += "\\t";
+      break;
     default:
       if (c >= 0x20)
         escaped += static_cast<char>(c);
@@ -126,9 +136,6 @@ size_t Interpreter::toBasePairs(double value, const std::string &unit) {
     factor = 1000.0;
   else if (unit == "MB")
     factor = 1000000.0;
-  // Semantic analysis guarantees integral distances. Rounding here keeps
-  // the runtime conversion consistent across libstdc++ and libc++ when a
-  // decimal unit conversion lands a few ulps below its mathematical value.
   return static_cast<size_t>(std::round(value * factor));
 }
 
@@ -189,26 +196,25 @@ void Interpreter::printRegions(const std::vector<GenomicRegion> &regions,
                 << r.spatialRelation.referenceName << " at "
                 << r.spatialRelation.referenceChr << ":"
                 << r.spatialRelation.referenceStart << ".."
-                << r.spatialRelation.referenceEnd << "  distance:"
-                << r.spatialRelation.distance << " BP  overlaps:"
-                << (r.spatialRelation.overlaps ? "true" : "false")
-                << std::endl;
+                << r.spatialRelation.referenceEnd
+                << "  distance:" << r.spatialRelation.distance
+                << " BP  overlaps:"
+                << (r.spatialRelation.overlaps ? "true" : "false") << std::endl;
     }
     if (r.countEvidence.present) {
       std::cout << "      COUNT " << r.countEvidence.countedSet << " "
                 << r.countEvidence.relation << " "
-                << r.countEvidence.containerSet << ":"
-                << r.countEvidence.count << std::endl;
+                << r.countEvidence.containerSet << ":" << r.countEvidence.count
+                << std::endl;
     }
     if (r.moduleEvidence.present) {
-      std::cout << "      MODULE spacing:"
-                << r.moduleEvidence.observedSpacing << " BP ("
-                << r.moduleEvidence.minimumSpacing << ".."
-                << r.moduleEvidence.maximumSpacing << ")  order:"
-                << r.moduleEvidence.observedOrder << "  orientation:"
-                << r.moduleEvidence.observedOrientation << std::endl;
-      std::cout << "      members: "
-                << r.moduleEvidence.first.sourceSet << ":"
+      std::cout << "      MODULE spacing:" << r.moduleEvidence.observedSpacing
+                << " BP (" << r.moduleEvidence.minimumSpacing << ".."
+                << r.moduleEvidence.maximumSpacing
+                << ")  order:" << r.moduleEvidence.observedOrder
+                << "  orientation:" << r.moduleEvidence.observedOrientation
+                << std::endl;
+      std::cout << "      members: " << r.moduleEvidence.first.sourceSet << ":"
                 << r.moduleEvidence.first.name << " + "
                 << r.moduleEvidence.second.sourceSet << ":"
                 << r.moduleEvidence.second.name << std::endl;
@@ -235,9 +241,8 @@ Interpreter::resolveEntity(const std::string &entity) {
   return GFFReader::filterByType(annotations->second, entity);
 }
 
-GenomicRegion
-Interpreter::motifMatchToRegion(const MotifMatch &match,
-                                const std::string &alias) const {
+GenomicRegion Interpreter::motifMatchToRegion(const MotifMatch &match,
+                                              const std::string &alias) const {
   GenomicRegion region;
   region.chr = match.chr;
   if (region.chr.empty()) {
@@ -249,8 +254,7 @@ Interpreter::motifMatchToRegion(const MotifMatch &match,
   region.end = match.position + match.matchLength;
   region.strand = match.strand;
   region.type = match.evidence.present ? "motif_hit" : alias;
-  region.name = alias + "_" + region.chr + "_" +
-                std::to_string(match.position);
+  region.name = alias + "_" + region.chr + "_" + std::to_string(match.position);
   if (match.evidence.present)
     region.name += match.strand == "-" ? "_minus" : "_plus";
   if (match.evidence.hasSourceRegion &&
@@ -292,9 +296,11 @@ void Interpreter::executeLoadSeq(const IRInstruction &instr) {
   activeSequenceAlias = alias;
   if (debugMode) {
     size_t totalBP = 0;
-    for (const auto &rec : records) totalBP += rec.sequence.size();
-    std::cout << "  Loaded " << records.size() << " sequence(s) / chromosome(s), total "
-              << totalBP << " base pairs from " << filename << std::endl;
+    for (const auto &rec : records)
+      totalBP += rec.sequence.size();
+    std::cout << "  Loaded " << records.size()
+              << " sequence(s) / chromosome(s), total " << totalBP
+              << " base pairs from " << filename << std::endl;
   }
 }
 
@@ -371,8 +377,8 @@ void Interpreter::executeExport(const IRInstruction &instr) {
     reportRuntimeError("GC profiles can currently be exported only as TSV.");
     return;
   }
-  if (regionsIt != resultSets.end() && format != "BED" &&
-      format != "GFF3" && format != "TSV") {
+  if (regionsIt != resultSets.end() && format != "BED" && format != "GFF3" &&
+      format != "TSV") {
     reportRuntimeError("Unsupported export format '" + format + "'.");
     return;
   }
@@ -403,8 +409,8 @@ void Interpreter::executeExport(const IRInstruction &instr) {
         bedScore = std::max(0, std::min(1000, bedScore));
       }
       out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
-          << region.end << '\t' << name << '\t' << bedScore << '\t'
-          << strand << '\n';
+          << region.end << '\t' << name << '\t' << bedScore << '\t' << strand
+          << '\n';
     }
   } else if (format == "GFF3") {
     out << "##gff-version 3\n";
@@ -413,23 +419,22 @@ void Interpreter::executeExport(const IRInstruction &instr) {
       const std::string type = region.type.empty() ? "region" : region.type;
       const std::string strand =
           (region.strand == "+" || region.strand == "-") ? region.strand : ".";
-      const std::string name =
-          region.name.empty() ? alias + "_" + std::to_string(generatedId++)
-                              : region.name;
-      const std::string score = region.motifEvidence.present
-                                    ? std::to_string(
-                                          region.motifEvidence.rawScore)
-                                    : ".";
+      const std::string name = region.name.empty()
+                                   ? alias + "_" + std::to_string(generatedId++)
+                                   : region.name;
+      const std::string score =
+          region.motifEvidence.present
+              ? std::to_string(region.motifEvidence.rawScore)
+              : ".";
       out << cleanTabularField(region.chr) << "\tCis-QL\t"
           << cleanTabularField(type) << '\t' << (region.start + 1) << '\t'
-          << region.end << '\t' << score << '\t' << strand << "\t.\tID="
-          << gffAttributeEscape(name) << ";Name="
-          << gffAttributeEscape(name);
+          << region.end << '\t' << score << '\t' << strand
+          << "\t.\tID=" << gffAttributeEscape(name)
+          << ";Name=" << gffAttributeEscape(name);
       if (region.motifEvidence.present) {
         out << ";MatrixAlias="
             << gffAttributeEscape(region.motifEvidence.matrixAlias)
-            << ";MatrixID="
-            << gffAttributeEscape(region.motifEvidence.matrixId)
+            << ";MatrixID=" << gffAttributeEscape(region.motifEvidence.matrixId)
             << ";MatrixName="
             << gffAttributeEscape(region.motifEvidence.matrixName)
             << ";MatrixSource="
@@ -440,19 +445,14 @@ void Interpreter::executeExport(const IRInstruction &instr) {
             << ";TestedPositions="
             << region.motifEvidence.statistics.testedPositions
             << ";PValueMethod="
-            << gffAttributeEscape(
-                   region.motifEvidence.statistics.pValueMethod)
+            << gffAttributeEscape(region.motifEvidence.statistics.pValueMethod)
             << ";MultipleTestingMethod="
             << gffAttributeEscape(
                    region.motifEvidence.statistics.multipleTestingMethod)
-            << ";ScaledScore="
-            << region.motifEvidence.statistics.scaledScore
-            << ";ScoreRange="
-            << region.motifEvidence.statistics.scoreRange
-            << ";ScoreScale="
-            << region.motifEvidence.statistics.scoreScale
-            << ";ScoreOffset="
-            << region.motifEvidence.statistics.scoreOffset
+            << ";ScaledScore=" << region.motifEvidence.statistics.scaledScore
+            << ";ScoreRange=" << region.motifEvidence.statistics.scoreRange
+            << ";ScoreScale=" << region.motifEvidence.statistics.scoreScale
+            << ";ScoreOffset=" << region.motifEvidence.statistics.scoreOffset
             << ";BackgroundMode="
             << gffAttributeEscape(region.motifEvidence.background.mode)
             << ";BackgroundSource="
@@ -466,19 +466,14 @@ void Interpreter::executeExport(const IRInstruction &instr) {
             << ";BackgroundObservedBases="
             << region.motifEvidence.background.observedBases
             << ";BackgroundStrandPolicy="
-            << gffAttributeEscape(
-                   region.motifEvidence.background.strandPolicy)
-            << ";MotifPseudocount="
-            << region.motifEvidence.motifPseudocount;
+            << gffAttributeEscape(region.motifEvidence.background.strandPolicy)
+            << ";MotifPseudocount=" << region.motifEvidence.motifPseudocount;
         if (region.motifEvidence.hasSourceRegion) {
           out << ";SourceRegion="
-              << gffAttributeEscape(
-                     region.motifEvidence.sourceRegionName)
+              << gffAttributeEscape(region.motifEvidence.sourceRegionName)
               << ";SourceRegionType="
-              << gffAttributeEscape(
-                     region.motifEvidence.sourceRegionType)
-              << ";RelativeStart="
-              << region.motifEvidence.relativeStart;
+              << gffAttributeEscape(region.motifEvidence.sourceRegionType)
+              << ";RelativeStart=" << region.motifEvidence.relativeStart;
         }
       }
       if (region.spatialRelation.present) {
@@ -497,8 +492,7 @@ void Interpreter::executeExport(const IRInstruction &instr) {
             << ";ReferenceName="
             << gffAttributeEscape(region.spatialRelation.referenceName)
             << ";Distance=" << region.spatialRelation.distance
-            << ";MaximumDistance="
-            << region.spatialRelation.maximumDistance
+            << ";MaximumDistance=" << region.spatialRelation.maximumDistance
             << ";Overlaps="
             << (region.spatialRelation.overlaps ? "true" : "false");
       }
@@ -516,47 +510,39 @@ void Interpreter::executeExport(const IRInstruction &instr) {
         out << ";ModuleMinimumSpacing=" << module.minimumSpacing
             << ";ModuleMaximumSpacing=" << module.maximumSpacing
             << ";ModuleObservedSpacing=" << module.observedSpacing
-            << ";ModuleOrderPolicy="
-            << gffAttributeEscape(module.orderPolicy)
+            << ";ModuleOrderPolicy=" << gffAttributeEscape(module.orderPolicy)
             << ";ModuleObservedOrder="
             << gffAttributeEscape(module.observedOrder)
             << ";ModuleOrientationPolicy="
             << gffAttributeEscape(module.orientationPolicy)
             << ";ModuleObservedOrientation="
             << gffAttributeEscape(module.observedOrientation)
-            << ";FirstSet="
-            << gffAttributeEscape(module.first.sourceSet)
+            << ";FirstSet=" << gffAttributeEscape(module.first.sourceSet)
             << ";FirstChr=" << gffAttributeEscape(module.first.chr)
             << ";FirstStart=" << module.first.start
             << ";FirstEnd=" << module.first.end
-            << ";FirstStrand="
-            << gffAttributeEscape(module.first.strand)
+            << ";FirstStrand=" << gffAttributeEscape(module.first.strand)
             << ";FirstType=" << gffAttributeEscape(module.first.type)
             << ";FirstName=" << gffAttributeEscape(module.first.name)
-            << ";SecondSet="
-            << gffAttributeEscape(module.second.sourceSet)
+            << ";SecondSet=" << gffAttributeEscape(module.second.sourceSet)
             << ";SecondChr=" << gffAttributeEscape(module.second.chr)
             << ";SecondStart=" << module.second.start
             << ";SecondEnd=" << module.second.end
-            << ";SecondStrand="
-            << gffAttributeEscape(module.second.strand)
+            << ";SecondStrand=" << gffAttributeEscape(module.second.strand)
             << ";SecondType=" << gffAttributeEscape(module.second.type)
             << ";SecondName=" << gffAttributeEscape(module.second.name);
         if (module.first.motifEvidence.present) {
           out << ";FirstMatrixID="
               << gffAttributeEscape(module.first.motifEvidence.matrixId)
-              << ";FirstRawScore="
-              << module.first.motifEvidence.rawScore
-              << ";FirstPValue="
-              << module.first.motifEvidence.statistics.pValue
+              << ";FirstRawScore=" << module.first.motifEvidence.rawScore
+              << ";FirstPValue=" << module.first.motifEvidence.statistics.pValue
               << ";FirstQValue="
               << module.first.motifEvidence.statistics.qValue;
         }
         if (module.second.motifEvidence.present) {
           out << ";SecondMatrixID="
               << gffAttributeEscape(module.second.motifEvidence.matrixId)
-              << ";SecondRawScore="
-              << module.second.motifEvidence.rawScore
+              << ";SecondRawScore=" << module.second.motifEvidence.rawScore
               << ";SecondPValue="
               << module.second.motifEvidence.statistics.pValue
               << ";SecondQValue="
@@ -596,8 +582,7 @@ void Interpreter::executeExport(const IRInstruction &instr) {
       out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
           << region.end << '\t' << cleanTabularField(region.strand) << '\t'
           << cleanTabularField(region.type) << '\t'
-          << cleanTabularField(region.name) << '\t' << region.length()
-          << '\t';
+          << cleanTabularField(region.name) << '\t' << region.length() << '\t';
       if (region.motifEvidence.present) {
         out << cleanTabularField(region.motifEvidence.matrixAlias) << '\t'
             << cleanTabularField(region.motifEvidence.matrixId) << '\t'
@@ -608,8 +593,7 @@ void Interpreter::executeExport(const IRInstruction &instr) {
             << region.motifEvidence.statistics.pValue << '\t'
             << region.motifEvidence.statistics.qValue << '\t'
             << region.motifEvidence.statistics.testedPositions << '\t'
-            << cleanTabularField(
-                   region.motifEvidence.statistics.pValueMethod)
+            << cleanTabularField(region.motifEvidence.statistics.pValueMethod)
             << '\t'
             << cleanTabularField(
                    region.motifEvidence.statistics.multipleTestingMethod)
@@ -618,21 +602,19 @@ void Interpreter::executeExport(const IRInstruction &instr) {
             << region.motifEvidence.statistics.scoreScale << '\t'
             << region.motifEvidence.statistics.scoreOffset << '\t'
             << cleanTabularField(region.motifEvidence.background.mode) << '\t'
-            << cleanTabularField(region.motifEvidence.background.source)
-            << '\t' << region.motifEvidence.background.a << '\t'
+            << cleanTabularField(region.motifEvidence.background.source) << '\t'
+            << region.motifEvidence.background.a << '\t'
             << region.motifEvidence.background.c << '\t'
             << region.motifEvidence.background.g << '\t'
             << region.motifEvidence.background.t << '\t'
             << region.motifEvidence.background.estimationPseudocount << '\t'
             << region.motifEvidence.background.observedBases << '\t'
-            << cleanTabularField(
-                   region.motifEvidence.background.strandPolicy)
+            << cleanTabularField(region.motifEvidence.background.strandPolicy)
             << '\t' << region.motifEvidence.motifPseudocount << '\t';
         if (region.motifEvidence.hasSourceRegion) {
-          out << cleanTabularField(
-                     region.motifEvidence.sourceRegionName)
-              << '\t' << cleanTabularField(
-                             region.motifEvidence.sourceRegionType)
+          out << cleanTabularField(region.motifEvidence.sourceRegionName)
+              << '\t'
+              << cleanTabularField(region.motifEvidence.sourceRegionType)
               << '\t' << region.motifEvidence.sourceRegionStart << '\t'
               << region.motifEvidence.sourceRegionEnd << '\t'
               << region.motifEvidence.relativeStart;
@@ -710,8 +692,8 @@ void Interpreter::executeExport(const IRInstruction &instr) {
     return;
   }
   if (debugMode) {
-    std::cout << "> EXPORT " << alias << " TO \"" << filename
-              << "\" FORMAT " << format << std::endl;
+    std::cout << "> EXPORT " << alias << " TO \"" << filename << "\" FORMAT "
+              << format << std::endl;
   }
 }
 
@@ -721,11 +703,9 @@ void Interpreter::executeDefinePromoters(const IRInstruction &instr) {
 
   auto parseDistance = [this](const std::string &value) {
     const size_t separator = value.find(' ');
-    const double number =
-        std::atof(value.substr(0, separator).c_str());
-    const std::string unit = separator == std::string::npos
-                                 ? "BP"
-                                 : value.substr(separator + 1);
+    const double number = std::atof(value.substr(0, separator).c_str());
+    const std::string unit =
+        separator == std::string::npos ? "BP" : value.substr(separator + 1);
     return toBasePairs(number, unit);
   };
 
@@ -744,9 +724,8 @@ void Interpreter::executeDefinePromoters(const IRInstruction &instr) {
   const std::vector<GenomicRegion> sources = resolveEntity(source);
   std::vector<GenomicRegion> promoters;
   std::string error;
-  if (!RegulatoryRegions::buildPromoters(sources, chromosomeLengths,
-                                         upstream, downstream, promoters,
-                                         error)) {
+  if (!RegulatoryRegions::buildPromoters(sources, chromosomeLengths, upstream,
+                                         downstream, promoters, error)) {
     reportRuntimeError(error);
     return;
   }
@@ -762,9 +741,8 @@ void Interpreter::executeDefinePromoters(const IRInstruction &instr) {
   namedRegions[alias] = promoters;
   resultSets[alias] = std::move(promoters);
   if (debugMode) {
-    std::cout << "> DEFINE PROMOTERS OF " << source
-              << " FROM TSS UPSTREAM " << instr.arg2
-              << " DOWNSTREAM " << instr.arg3 << " AS " << alias
+    std::cout << "> DEFINE PROMOTERS OF " << source << " FROM TSS UPSTREAM "
+              << instr.arg2 << " DOWNSTREAM " << instr.arg3 << " AS " << alias
               << std::endl;
     std::cout << "  Defined " << resultSets[alias].size()
               << " explicit promoter interval(s)." << std::endl;
@@ -794,10 +772,10 @@ void Interpreter::executeDefineModule(const IRInstruction &instr) {
   }
 
   if (debugMode) {
-    std::cout << "> DEFINE MODULE FROM " << instr.arg1 << " WITH "
-              << instr.arg2 << " SPACING " << minimumSpacing << " BP TO "
-              << maximumSpacing << " BP ORDER " << instr.arg7
-              << " ORIENTATION " << instr.arg8 << std::endl;
+    std::cout << "> DEFINE MODULE FROM " << instr.arg1 << " WITH " << instr.arg2
+              << " SPACING " << minimumSpacing << " BP TO " << maximumSpacing
+              << " BP ORDER " << instr.arg7 << " ORIENTATION " << instr.arg8
+              << std::endl;
   }
   namedRegions[instr.arg9] = modules;
   resultSets[instr.arg9] = std::move(modules);
@@ -900,7 +878,8 @@ void Interpreter::executeFindExec(const IRInstruction &instr) {
                            "' is not present in the active FASTA dataset.");
         continue;
       }
-      if (seqData.empty()) continue;
+      if (seqData.empty())
+        continue;
 
       size_t windowStart, windowEnd;
       std::string effectiveStrand = target.strand.empty() ? "+" : target.strand;
@@ -921,22 +900,23 @@ void Interpreter::executeFindExec(const IRInstruction &instr) {
           windowEnd = target.start;
         }
       }
-      auto windowMatches =
-          MotifFinder::findInWindow(seqData, currentFind.pattern,
-                                    windowStart, windowEnd, target.chr);
+      auto windowMatches = MotifFinder::findInWindow(
+          seqData, currentFind.pattern, windowStart, windowEnd, target.chr);
       matches.insert(matches.end(), windowMatches.begin(), windowMatches.end());
     }
   } else {
     std::vector<std::future<std::vector<MotifMatch>>> futures;
     for (const auto &seqRec : targetDataset) {
-      if (!currentFind.chrFilter.empty() && seqRec.sequenceId != currentFind.chrFilter)
+      if (!currentFind.chrFilter.empty() &&
+          seqRec.sequenceId != currentFind.chrFilter)
         continue;
 
       const FastaRecord *record = &seqRec;
       std::string chrId = seqRec.sequenceId;
       std::string pat = currentFind.pattern;
 
-      futures.push_back(std::async(std::launch::async, [record, pat, chrId, searchNeg]() {
+      futures.push_back(std::async(std::launch::async, [record, pat, chrId,
+                                                        searchNeg]() {
         return MotifFinder::findAll(record->sequence, pat, chrId, searchNeg);
       }));
     }
@@ -950,13 +930,15 @@ void Interpreter::executeFindExec(const IRInstruction &instr) {
   if (currentFind.strandFilter == "NEGATIVE") {
     std::vector<MotifMatch> filtered;
     for (const auto &m : matches) {
-      if (m.strand == "-") filtered.push_back(m);
+      if (m.strand == "-")
+        filtered.push_back(m);
     }
     matches = filtered;
   } else if (currentFind.strandFilter == "POSITIVE") {
     std::vector<MotifMatch> filtered;
     for (const auto &m : matches) {
-      if (m.strand == "+") filtered.push_back(m);
+      if (m.strand == "+")
+        filtered.push_back(m);
     }
     matches = filtered;
   }
@@ -1142,26 +1124,33 @@ bool Interpreter::compareValues(double left, const std::string &op,
       rightValue *= 1000000.0;
   }
 
-  if (op == ">") return left > rightValue;
-  if (op == ">=") return left >= rightValue;
-  if (op == "<") return left < rightValue;
-  if (op == "<=") return left <= rightValue;
-  if (op == "=" || op == "==") return std::abs(left - rightValue) < 1e-9;
-  if (op == "!=") return std::abs(left - rightValue) >= 1e-9;
+  if (op == ">")
+    return left > rightValue;
+  if (op == ">=")
+    return left >= rightValue;
+  if (op == "<")
+    return left < rightValue;
+  if (op == "<=")
+    return left <= rightValue;
+  if (op == "=" || op == "==")
+    return std::abs(left - rightValue) < 1e-9;
+  if (op == "!=")
+    return std::abs(left - rightValue) >= 1e-9;
   return false;
 }
 
 bool Interpreter::evaluateRegionCondition(
-    const std::shared_ptr<IRCondition> &condition,
-    const GenomicRegion &region,
+    const std::shared_ptr<IRCondition> &condition, const GenomicRegion &region,
     const std::string &referenceSequence) const {
   if (!condition)
     return true;
   if (condition->kind == IRCondition::Kind::AND)
-    return evaluateRegionCondition(condition->left, region, referenceSequence) &&
+    return evaluateRegionCondition(condition->left, region,
+                                   referenceSequence) &&
            evaluateRegionCondition(condition->right, region, referenceSequence);
   if (condition->kind == IRCondition::Kind::OR)
-    return evaluateRegionCondition(condition->left, region, referenceSequence) ||
+    return evaluateRegionCondition(condition->left, region,
+                                   referenceSequence) ||
            evaluateRegionCondition(condition->right, region, referenceSequence);
   if (condition->kind == IRCondition::Kind::NOT)
     return !evaluateRegionCondition(condition->left, region, referenceSequence);
@@ -1255,13 +1244,12 @@ bool Interpreter::evaluateMotifCondition(
       return false;
     const auto sequence = dataset->second.find(match.chr);
     if (sequence == dataset->second.end() || match.matchLength == 0 ||
-        match.position + match.matchLength >
-            sequence->second.sequence.size()) {
+        match.position + match.matchLength > sequence->second.sequence.size()) {
       return false;
     }
     size_t gc = 0;
-    for (size_t i = match.position;
-         i < match.position + match.matchLength; ++i) {
+    for (size_t i = match.position; i < match.position + match.matchLength;
+         ++i) {
       const char c = static_cast<char>(std::toupper(
           static_cast<unsigned char>(sequence->second.sequence[i])));
       if (c == 'G' || c == 'C')
@@ -1294,8 +1282,7 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
   const std::string &resultId = instr.arg1;
   if (gcResults.count(resultId)) {
     if (!conditionUsesOnly(instr.condition, {"GC_CONTENT"})) {
-      reportRuntimeError(
-          "GC profiles can only be filtered by GC_CONTENT.");
+      reportRuntimeError("GC profiles can only be filtered by GC_CONTENT.");
       return;
     }
     auto &windows = gcResults[resultId];
@@ -1308,8 +1295,7 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
   } else if (resultSets.count(resultId)) {
     if (!conditionUsesOnly(
             instr.condition,
-            {"LENGTH", "SIMILARITY", "GC_CONTENT", "COUNT", "ID",
-             "NAME"})) {
+            {"LENGTH", "SIMILARITY", "GC_CONTENT", "COUNT", "ID", "NAME"})) {
       reportRuntimeError("Unsupported condition for a genomic region set.");
       return;
     }
@@ -1331,10 +1317,9 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
         return;
       }
       if (referenceSet->second.size() != 1) {
-        reportRuntimeError(
-            "Similarity reference alias '" + referenceAlias +
-            "' must contain exactly one region; found " +
-            std::to_string(referenceSet->second.size()) + ".");
+        reportRuntimeError("Similarity reference alias '" + referenceAlias +
+                           "' must contain exactly one region; found " +
+                           std::to_string(referenceSet->second.size()) + ".");
         return;
       }
       GenomicRegion reference = referenceSet->second.front();
@@ -1384,9 +1369,9 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
     const bool parallel =
         conditionContainsSimilarity(instr.condition) && regions.size() > 1;
     if (parallel) {
-      const size_t workerCount = std::min(
-          regions.size(),
-          std::max<size_t>(1, std::thread::hardware_concurrency()));
+      const size_t workerCount =
+          std::min(regions.size(),
+                   std::max<size_t>(1, std::thread::hardware_concurrency()));
       std::atomic<size_t> next(0);
       std::vector<std::thread> workers;
       workers.reserve(workerCount);
@@ -1396,11 +1381,11 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
             const size_t index = next.fetch_add(1);
             if (index >= regions.size())
               break;
-            keep[index] = evaluateRegionCondition(
-                              instr.condition, regions[index],
-                              referenceSequence)
-                              ? 1
-                              : 0;
+            keep[index] =
+                evaluateRegionCondition(instr.condition, regions[index],
+                                        referenceSequence)
+                    ? 1
+                    : 0;
           }
         });
       }
@@ -1408,11 +1393,10 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
         worker.join();
     } else {
       for (size_t index = 0; index < regions.size(); ++index) {
-        keep[index] =
-            evaluateRegionCondition(instr.condition, regions[index],
-                                    referenceSequence)
-                ? 1
-                : 0;
+        keep[index] = evaluateRegionCondition(instr.condition, regions[index],
+                                              referenceSequence)
+                          ? 1
+                          : 0;
       }
     }
     for (size_t index = 0; index < regions.size(); ++index) {
@@ -1480,20 +1464,18 @@ void Interpreter::executeSetOp(const IRInstruction &instr) {
     result = SetOperations::except(regions1, regions2);
   } else if (instr.opcode == IROpCode::SET_OVERLAPS) {
     if (debugMode) {
-      std::cout << "> OVERLAPS " << entity1 << " WITH " << entity2
-                << std::endl;
+      std::cout << "> OVERLAPS " << entity1 << " WITH " << entity2 << std::endl;
     }
     result = SetOperations::selectOverlapping(regions1, regions2);
   } else {
-    const size_t maximumDistance = toBasePairs(
-        std::strtod(instr.arg4.c_str(), nullptr), instr.arg5);
+    const size_t maximumDistance =
+        toBasePairs(std::strtod(instr.arg4.c_str(), nullptr), instr.arg5);
     if (debugMode) {
-      std::cout << "> NEAR " << entity1 << " TO " << entity2
-                << " WITHIN " << instr.arg4 << " " << instr.arg5
-                << std::endl;
+      std::cout << "> NEAR " << entity1 << " TO " << entity2 << " WITHIN "
+                << instr.arg4 << " " << instr.arg5 << std::endl;
     }
-    result = SetOperations::selectNear(regions1, regions2, maximumDistance,
-                                       entity2);
+    result =
+        SetOperations::selectNear(regions1, regions2, maximumDistance, entity2);
   }
 
   resultSets[resultId] = result;
@@ -1576,9 +1558,8 @@ void Interpreter::executeLoadMatrix(const IRInstruction &instr) {
 
   if (debugMode) {
     std::cout << "  Loaded PWM \"" << pssm.name << "\" (" << pssm.length
-              << " positions, default-uniform score range: "
-              << pssm.minScore << " to " << pssm.maxScore << ")"
-              << std::endl;
+              << " positions, default-uniform score range: " << pssm.minScore
+              << " to " << pssm.maxScore << ")" << std::endl;
   }
 }
 
@@ -1588,7 +1569,7 @@ void Interpreter::executeScanOptStrand(const IRInstruction &instr) {
 
 void Interpreter::executeScanOptThreshold(const IRInstruction &instr) {
   std::string valueStr = instr.arg1;
-  
+
   size_t spacePos = valueStr.find(' ');
   if (spacePos != std::string::npos) {
     currentScan.threshold = std::atof(valueStr.substr(0, spacePos).c_str());
@@ -1614,8 +1595,7 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
   std::string target = instr.arg3;
 
   const bool hasRelativeThreshold = currentScan.threshold >= 0.0;
-  const bool hasSignificanceThreshold =
-      !currentScan.significanceMetric.empty();
+  const bool hasSignificanceThreshold = !currentScan.significanceMetric.empty();
   if (currentScan.threshold < 0.0) {
     currentScan.threshold = hasSignificanceThreshold ? 0.0 : 75.0;
   }
@@ -1656,9 +1636,8 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
   bool searchPos = (currentScan.strandFilter != "NEGATIVE");
   bool searchNeg = (currentScan.strandFilter != "POSITIVE");
   const std::string backgroundStrandPolicy =
-      searchPos && searchNeg
-          ? "symmetric"
-          : (searchNeg ? "reverse_complement" : "forward");
+      searchPos && searchNeg ? "symmetric"
+                             : (searchNeg ? "reverse_complement" : "forward");
 
   BackgroundModel background;
   if (currentScan.backgroundMode.empty()) {
@@ -1688,7 +1667,8 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
         const auto chromosome = chromosomeMap->second.find(region.chr);
         if (chromosome == chromosomeMap->second.end()) {
           reportRuntimeError("Background source sequence identifier '" +
-                             region.chr + "' is not present in the active "
+                             region.chr +
+                             "' is not present in the active "
                              "FASTA dataset.");
           currentScan = ScanContext();
           return;
@@ -1696,8 +1676,7 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
         if (region.start > region.end ||
             region.end > chromosome->second.sequence.size()) {
           reportRuntimeError("Background source region '" + region.name +
-                             "' lies outside chromosome '" + region.chr +
-                             "'.");
+                             "' lies outside chromosome '" + region.chr + "'.");
           currentScan = ScanContext();
           return;
         }
@@ -1707,9 +1686,9 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
     }
 
     std::string backgroundError;
-    if (!backgroundAccumulator.build(
-            currentScan.backgroundSource, backgroundStrandPolicy,
-            background, backgroundError)) {
+    if (!backgroundAccumulator.build(currentScan.backgroundSource,
+                                     backgroundStrandPolicy, background,
+                                     backgroundError)) {
       reportRuntimeError(backgroundError);
       currentScan = ScanContext();
       return;
@@ -1719,8 +1698,8 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
   const PSSM pssm =
       PWMScanner::computePSSM(loadedMatrices[matrixAlias], background);
   if (pssm.length == 0) {
-    reportRuntimeError("Could not construct a PSSM for matrix '" +
-                       matrixAlias + "' with the selected background.");
+    reportRuntimeError("Could not construct a PSSM for matrix '" + matrixAlias +
+                       "' with the selected background.");
     currentScan = ScanContext();
     return;
   }
@@ -1743,12 +1722,11 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
       const PSSM *matrix = &pssm;
 
       futures.push_back(std::async(
-          std::launch::async,
-          [record, matrix, threshold, maximumPValue, chrId,
-           searchPos, searchNeg]() {
-            return PWMScanner::scanWithStatistics(
-                record->sequence, *matrix, threshold, chrId,
-                searchPos, searchNeg, maximumPValue);
+          std::launch::async, [record, matrix, threshold, maximumPValue, chrId,
+                               searchPos, searchNeg]() {
+            return PWMScanner::scanWithStatistics(record->sequence, *matrix,
+                                                  threshold, chrId, searchPos,
+                                                  searchNeg, maximumPValue);
           }));
     }
     for (auto &future : futures) {
@@ -1784,8 +1762,8 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
       const std::string sequence = chromosome->second.sequence.substr(
           source.start, source.end - source.start);
       PWMScanResult regionResult = PWMScanner::scanWithStatistics(
-          sequence, pssm, currentScan.threshold, source.chr,
-          searchPos, searchNeg, maximumRetainedPValue);
+          sequence, pssm, currentScan.threshold, source.chr, searchPos,
+          searchNeg, maximumRetainedPValue);
       for (auto &match : regionResult.matches) {
         const size_t localPosition = match.position;
         match.position = source.start + localPosition;
@@ -1812,9 +1790,9 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
         std::remove_if(
             scanResult.matches.begin(), scanResult.matches.end(),
             [metric, comparison, threshold](const MotifMatch &match) {
-              const double value =
-                  metric == "QVALUE" ? match.evidence.statistics.qValue
-                                     : match.evidence.statistics.pValue;
+              const double value = metric == "QVALUE"
+                                       ? match.evidence.statistics.qValue
+                                       : match.evidence.statistics.pValue;
               return comparison == "<" ? !(value < threshold)
                                        : !(value <= threshold);
             }),
@@ -1839,12 +1817,12 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
   motifResults[resultId] = matches;
 
   if (debugMode) {
-    std::cout << "  Background " << background.mode << " [A="
-              << background.a << ", C=" << background.c << ", G="
-              << background.g << ", T=" << background.t << "] from "
-              << background.source << std::endl;
-    std::cout << "  PWM scan retained " << matches.size()
-              << " site(s) across " << scannedUnits
+    std::cout << "  Background " << background.mode << " [A=" << background.a
+              << ", C=" << background.c << ", G=" << background.g
+              << ", T=" << background.t << "] from " << background.source
+              << std::endl;
+    std::cout << "  PWM scan retained " << matches.size() << " site(s) across "
+              << scannedUnits
               << (target.empty() ? " chromosome(s)." : " source region(s).")
               << std::endl;
     std::cout << "  Statistical universe: " << scanResult.testedPositions
@@ -1907,23 +1885,24 @@ void Interpreter::executeResultAlias(const IRInstruction &instr) {
 void Interpreter::executeAnalyzeGC(const IRInstruction &instr) {
   std::string windowSizeStr = instr.arg1;
   std::string resultId = instr.arg2;
-  
+
   size_t windowSize = 100;
   if (!windowSizeStr.empty()) {
     size_t spacePos = windowSizeStr.find(' ');
     if (spacePos != std::string::npos) {
-      windowSize = toBasePairs(
-          std::stod(windowSizeStr.substr(0, spacePos)),
-          windowSizeStr.substr(spacePos + 1));
+      windowSize = toBasePairs(std::stod(windowSizeStr.substr(0, spacePos)),
+                               windowSizeStr.substr(spacePos + 1));
     } else {
       windowSize = toBasePairs(std::stod(windowSizeStr), "BP");
     }
   }
 
-  const auto &targetDataset = sequenceDatasets.count(activeSequenceAlias)
-                                  ? sequenceDatasets[activeSequenceAlias]
-                                  : (sequenceDatasets.empty() ? std::vector<FastaRecord>{} : sequenceDatasets.begin()->second);
-      
+  const auto &targetDataset =
+      sequenceDatasets.count(activeSequenceAlias)
+          ? sequenceDatasets[activeSequenceAlias]
+          : (sequenceDatasets.empty() ? std::vector<FastaRecord>{}
+                                      : sequenceDatasets.begin()->second);
+
   std::vector<GCWindow> allWindows;
   for (const auto &seqRec : targetDataset) {
     auto windows =
@@ -1934,36 +1913,41 @@ void Interpreter::executeAnalyzeGC(const IRInstruction &instr) {
   }
 
   gcResults[resultId] = allWindows;
-  
+
   if (debugMode) {
-    std::cout << "  Computed GC profile with " << allWindows.size() << " windows for \"" << resultId << "\"" << std::endl;
+    std::cout << "  Computed GC profile with " << allWindows.size()
+              << " windows for \"" << resultId << "\"" << std::endl;
   }
 }
 
 void Interpreter::executeAnalyzeCpG(const IRInstruction &instr) {
   std::string resultId = instr.arg2;
-  
-  const auto &targetDataset = sequenceDatasets.count(activeSequenceAlias)
-                                  ? sequenceDatasets[activeSequenceAlias]
-                                  : (sequenceDatasets.empty() ? std::vector<FastaRecord>{} : sequenceDatasets.begin()->second);
-      
+
+  const auto &targetDataset =
+      sequenceDatasets.count(activeSequenceAlias)
+          ? sequenceDatasets[activeSequenceAlias]
+          : (sequenceDatasets.empty() ? std::vector<FastaRecord>{}
+                                      : sequenceDatasets.begin()->second);
+
   std::vector<GenomicRegion> allIslands;
   for (const auto &seqRec : targetDataset) {
-    auto islands = GCAnalyzer::findCpGIslands(seqRec.sequence, seqRec.sequenceId);
+    auto islands =
+        GCAnalyzer::findCpGIslands(seqRec.sequence, seqRec.sequenceId);
     allIslands.insert(allIslands.end(), islands.begin(), islands.end());
   }
 
   resultSets[resultId] = allIslands;
-  
+
   if (debugMode) {
-    std::cout << "  Found " << allIslands.size() << " CpG islands for \"" << resultId << "\"" << std::endl;
+    std::cout << "  Found " << allIslands.size() << " CpG islands for \""
+              << resultId << "\"" << std::endl;
   }
 }
 
-
 void Interpreter::dumpResultsJSON() const {
   std::ofstream out(".cisql_results.json");
-  if (!out.is_open()) return;
+  if (!out.is_open())
+    return;
   out << std::setprecision(17);
 
   out << "{\n"
@@ -1977,13 +1961,15 @@ void Interpreter::dumpResultsJSON() const {
       << "  \"resultSets\": {\n";
   bool firstSet = true;
   for (const auto &pair : resultSets) {
-    if (!firstSet) out << ",\n";
+    if (!firstSet)
+      out << ",\n";
     firstSet = false;
     out << "    \"" << jsonEscape(pair.first) << "\": [\n";
-    
+
     bool firstRegion = true;
     for (const auto &r : pair.second) {
-      if (!firstRegion) out << ",\n";
+      if (!firstRegion)
+        out << ",\n";
       firstRegion = false;
       out << "      {\n"
           << "        \"chr\": \"" << jsonEscape(r.chr) << "\",\n"
@@ -2003,25 +1989,22 @@ void Interpreter::dumpResultsJSON() const {
             << jsonEscape(r.motifEvidence.matrixName) << "\",\n"
             << "          \"matrixSource\": \""
             << jsonEscape(r.motifEvidence.matrixSource) << "\",\n"
-            << "          \"rawScore\": "
-            << r.motifEvidence.rawScore << ",\n"
-            << "          \"scorePercent\": "
-            << r.motifEvidence.scorePercent << ",\n"
+            << "          \"rawScore\": " << r.motifEvidence.rawScore << ",\n"
+            << "          \"scorePercent\": " << r.motifEvidence.scorePercent
+            << ",\n"
             << "          \"motifPseudocount\": "
             << r.motifEvidence.motifPseudocount << ",\n"
             << "          \"statistics\": {\n"
-            << "            \"pValue\": "
-            << r.motifEvidence.statistics.pValue << ",\n"
-            << "            \"qValue\": "
-            << r.motifEvidence.statistics.qValue << ",\n"
+            << "            \"pValue\": " << r.motifEvidence.statistics.pValue
+            << ",\n"
+            << "            \"qValue\": " << r.motifEvidence.statistics.qValue
+            << ",\n"
             << "            \"testedPositions\": "
             << r.motifEvidence.statistics.testedPositions << ",\n"
             << "            \"pValueMethod\": \""
-            << jsonEscape(r.motifEvidence.statistics.pValueMethod)
-            << "\",\n"
+            << jsonEscape(r.motifEvidence.statistics.pValueMethod) << "\",\n"
             << "            \"multipleTestingMethod\": \""
-            << jsonEscape(
-                   r.motifEvidence.statistics.multipleTestingMethod)
+            << jsonEscape(r.motifEvidence.statistics.multipleTestingMethod)
             << "\",\n"
             << "            \"scaledScore\": "
             << r.motifEvidence.statistics.scaledScore << ",\n"
@@ -2037,14 +2020,10 @@ void Interpreter::dumpResultsJSON() const {
             << jsonEscape(r.motifEvidence.background.mode) << "\",\n"
             << "            \"source\": \""
             << jsonEscape(r.motifEvidence.background.source) << "\",\n"
-            << "            \"A\": " << r.motifEvidence.background.a
-            << ",\n"
-            << "            \"C\": " << r.motifEvidence.background.c
-            << ",\n"
-            << "            \"G\": " << r.motifEvidence.background.g
-            << ",\n"
-            << "            \"T\": " << r.motifEvidence.background.t
-            << ",\n"
+            << "            \"A\": " << r.motifEvidence.background.a << ",\n"
+            << "            \"C\": " << r.motifEvidence.background.c << ",\n"
+            << "            \"G\": " << r.motifEvidence.background.g << ",\n"
+            << "            \"T\": " << r.motifEvidence.background.t << ",\n"
             << "            \"estimationPseudocount\": "
             << r.motifEvidence.background.estimationPseudocount << ",\n"
             << "            \"observedBases\": "
@@ -2059,10 +2038,10 @@ void Interpreter::dumpResultsJSON() const {
               << jsonEscape(r.motifEvidence.sourceRegionName) << "\",\n"
               << "            \"type\": \""
               << jsonEscape(r.motifEvidence.sourceRegionType) << "\",\n"
-              << "            \"start\": "
-              << r.motifEvidence.sourceRegionStart << ",\n"
-              << "            \"end\": "
-              << r.motifEvidence.sourceRegionEnd << ",\n"
+              << "            \"start\": " << r.motifEvidence.sourceRegionStart
+              << ",\n"
+              << "            \"end\": " << r.motifEvidence.sourceRegionEnd
+              << ",\n"
               << "            \"relativeStart\": "
               << r.motifEvidence.relativeStart << "\n"
               << "          }";
@@ -2078,10 +2057,10 @@ void Interpreter::dumpResultsJSON() const {
             << "          \"reference\": {\n"
             << "            \"chr\": \""
             << jsonEscape(r.spatialRelation.referenceChr) << "\",\n"
-            << "            \"start\": "
-            << r.spatialRelation.referenceStart << ",\n"
-            << "            \"end\": "
-            << r.spatialRelation.referenceEnd << ",\n"
+            << "            \"start\": " << r.spatialRelation.referenceStart
+            << ",\n"
+            << "            \"end\": " << r.spatialRelation.referenceEnd
+            << ",\n"
             << "            \"strand\": \""
             << jsonEscape(r.spatialRelation.referenceStrand) << "\",\n"
             << "            \"type\": \""
@@ -2089,8 +2068,7 @@ void Interpreter::dumpResultsJSON() const {
             << "            \"name\": \""
             << jsonEscape(r.spatialRelation.referenceName) << "\"\n"
             << "          },\n"
-            << "          \"distance\": "
-            << r.spatialRelation.distance << ",\n"
+            << "          \"distance\": " << r.spatialRelation.distance << ",\n"
             << "          \"maximumDistance\": "
             << r.spatialRelation.maximumDistance << ",\n"
             << "          \"overlaps\": "
@@ -2110,8 +2088,8 @@ void Interpreter::dumpResultsJSON() const {
       }
       if (r.moduleEvidence.present) {
         const ModuleEvidence &module = r.moduleEvidence;
-        const auto writeMember = [this, &out](
-                                     const ModuleMemberEvidence &member) {
+        const auto writeMember = [this,
+                                  &out](const ModuleMemberEvidence &member) {
           out << "{\n"
               << "              \"sourceSet\": \""
               << jsonEscape(member.sourceSet) << "\",\n"
@@ -2119,8 +2097,8 @@ void Interpreter::dumpResultsJSON() const {
               << "\",\n"
               << "              \"start\": " << member.start << ",\n"
               << "              \"end\": " << member.end << ",\n"
-              << "              \"strand\": \""
-              << jsonEscape(member.strand) << "\",\n"
+              << "              \"strand\": \"" << jsonEscape(member.strand)
+              << "\",\n"
               << "              \"type\": \"" << jsonEscape(member.type)
               << "\",\n"
               << "              \"name\": \"" << jsonEscape(member.name)
@@ -2149,16 +2127,13 @@ void Interpreter::dumpResultsJSON() const {
         };
         out << ",\n        \"moduleEvidence\": {\n"
             << "          \"spacing\": {\n"
-            << "            \"minimum\": " << module.minimumSpacing
-            << ",\n"
-            << "            \"maximum\": " << module.maximumSpacing
-            << ",\n"
-            << "            \"observed\": " << module.observedSpacing
-            << "\n"
+            << "            \"minimum\": " << module.minimumSpacing << ",\n"
+            << "            \"maximum\": " << module.maximumSpacing << ",\n"
+            << "            \"observed\": " << module.observedSpacing << "\n"
             << "          },\n"
             << "          \"order\": {\n"
-            << "            \"policy\": \""
-            << jsonEscape(module.orderPolicy) << "\",\n"
+            << "            \"policy\": \"" << jsonEscape(module.orderPolicy)
+            << "\",\n"
             << "            \"observed\": \""
             << jsonEscape(module.observedOrder) << "\"\n"
             << "          },\n"
@@ -2186,23 +2161,25 @@ void Interpreter::dumpResultsJSON() const {
     out << ",\n  \"gcProfiles\": {\n";
     bool firstProfile = true;
     for (const auto &pair : gcResults) {
-      if (!firstProfile) out << ",\n";
+      if (!firstProfile)
+        out << ",\n";
       firstProfile = false;
       out << "    \"" << jsonEscape(pair.first) << "\": [\n";
-      
+
       bool firstWindow = true;
       for (const auto &w : pair.second) {
-        if (!firstWindow) out << ",\n";
+        if (!firstWindow)
+          out << ",\n";
         firstWindow = false;
         out << "      {\"chr\": \"" << jsonEscape(w.chr)
-            << "\", \"pos\": " << w.position << ", \"gc\": "
-            << w.gcPercent << "}";
+            << "\", \"pos\": " << w.position << ", \"gc\": " << w.gcPercent
+            << "}";
       }
       out << "\n    ]";
     }
     out << "\n  }";
   }
-  
+
   out << "\n}\n";
 }
 
@@ -2229,7 +2206,8 @@ bool Interpreter::evaluateGlobalCondition(
       for (const auto &rec : active->second) {
         totalBases += rec.sequence.length();
         for (char c : rec.sequence) {
-          if (c == 'G' || c == 'C' || c == 'g' || c == 'c') gcBases++;
+          if (c == 'G' || c == 'C' || c == 'g' || c == 'c')
+            gcBases++;
         }
       }
     }
@@ -2267,8 +2245,7 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
 
     if (instr.opcode == IROpCode::IF_BEGIN) {
       if (!conditionUsesOnly(instr.condition, {"GC_CONTENT"})) {
-        reportRuntimeError(
-            "IF conditions currently support GC_CONTENT only.");
+        reportRuntimeError("IF conditions currently support GC_CONTENT only.");
       }
       bool cond = evaluateGlobalCondition(instr.condition);
       if (debugMode) {
@@ -2279,10 +2256,12 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
         int depth = 1;
         while (i + 1 < program.size()) {
           i++;
-          if (program[i].opcode == IROpCode::IF_BEGIN) depth++;
+          if (program[i].opcode == IROpCode::IF_BEGIN)
+            depth++;
           else if (program[i].opcode == IROpCode::IF_END) {
             depth--;
-            if (depth == 0) break;
+            if (depth == 0)
+              break;
           } else if (program[i].opcode == IROpCode::IF_ELSE && depth == 1) {
             break;
           }
@@ -2295,10 +2274,12 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
       int depth = 1;
       while (i + 1 < program.size()) {
         i++;
-        if (program[i].opcode == IROpCode::IF_BEGIN) depth++;
+        if (program[i].opcode == IROpCode::IF_BEGIN)
+          depth++;
         else if (program[i].opcode == IROpCode::IF_END) {
           depth--;
-          if (depth == 0) break;
+          if (depth == 0)
+            break;
         }
       }
       continue;
@@ -2406,7 +2387,6 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
     }
   }
 
-  
   if (!runtimeError)
     dumpResultsJSON();
 }
