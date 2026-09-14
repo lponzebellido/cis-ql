@@ -5,7 +5,7 @@ export const cqlLanguageDef = {
     'WITHIN', 'WITH', 'FROM', 'TO', 'GENE', 'PROMOTER', 'ENHANCER', 'EXON', 'INTRON',
     'UTR', 'TSS', 'CDS', 'REGION', 'STRAND', 'POSITIVE', 'NEGATIVE',
     'CHR', 'EXTRACT', 'WHERE', 'INTERSECT', 'UNION', 'EXCEPT', 'OVERLAPS', 'NEAR',
-    'AND', 'OR', 'NOT',
+    'AND', 'OR', 'NOT', 'COUNT',
     'LENGTH', 'SIMILARITY', 'GC_CONTENT', 'CPG_ISLANDS', 'BP', 'KB', 'MB',
     'UPSTREAM', 'DOWNSTREAM', 'SCAN', 'THRESHOLD', 'PVALUE', 'QVALUE',
     'BACKGROUND', 'UNIFORM', 'ANALYZE', 'WINDOW', 'FORMAT', 'BED', 'GFF3', 'TSV',

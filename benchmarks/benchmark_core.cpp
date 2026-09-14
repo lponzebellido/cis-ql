@@ -128,6 +128,17 @@ int main() {
     const double seconds = medianElapsed(
         [&] { count = SetOperations::intersect(first, second).size(); });
     printResult("interval_intersect", size, seconds, count, "regions");
+
+    size_t totalOverlaps = 0;
+    const double countSeconds = medianElapsed([&] {
+      totalOverlaps = 0;
+      const auto counts = SetOperations::countOverlaps(
+          first, second, "first", "second");
+      for (const auto &container : counts)
+        totalOverlaps += container.countEvidence.count;
+    });
+    printResult("interval_count_overlaps", size, countSeconds,
+                totalOverlaps, "overlaps");
   }
   return 0;
 }

@@ -168,6 +168,28 @@ int main() {
               {nearQuery}, {rightReference}, 4, "GENE").empty(),
           "NEAR applies its inclusive maximum-distance boundary");
 
+  GenomicRegion countContainer = region(0, 10);
+  countContainer.name = "promoter_a";
+  countContainer.sequence = "AAAAAAAAAA";
+  const auto overlapCounts = SetOperations::countOverlaps(
+      {region(0, 5), region(5, 10), region(10, 15),
+       region(3, 7, "chr2")},
+      {countContainer, region(10, 20), region(0, 10, "chr2"),
+       region(30, 40)},
+      "sites", "promoters");
+  require(overlapCounts.size() == 4 &&
+              overlapCounts[0].name == "promoter_a" &&
+              overlapCounts[0].sequence == "AAAAAAAAAA" &&
+              overlapCounts[0].countEvidence.present &&
+              overlapCounts[0].countEvidence.relation == "OVERLAPS" &&
+              overlapCounts[0].countEvidence.countedSet == "sites" &&
+              overlapCounts[0].countEvidence.containerSet == "promoters" &&
+              overlapCounts[0].countEvidence.count == 2 &&
+              overlapCounts[1].countEvidence.count == 1 &&
+              overlapCounts[2].countEvidence.count == 1 &&
+              overlapCounts[3].countEvidence.count == 0,
+          "COUNT reports half-open overlap counts for every container");
+
   GenomicRegion firstUnion = region(0, 10);
   firstUnion.sequence = "AAAAAAAAAA";
   const auto merged = SetOperations::unite({firstUnion}, {region(5, 15)});
@@ -335,11 +357,13 @@ int main() {
   scoredHit.motifEvidence.present = true;
   scoredHit.motifEvidence.matrixId = "TEST";
   scoredHit.spatialRelation.present = true;
+  scoredHit.countEvidence.present = true;
   const auto croppedHit =
       SetOperations::intersect({scoredHit}, {region(5, 15)});
   require(croppedHit.size() == 1 &&
               !croppedHit[0].motifEvidence.present &&
-              !croppedHit[0].spatialRelation.present,
+              !croppedHit[0].spatialRelation.present &&
+              !croppedHit[0].countEvidence.present,
           "interval operations discard evidence when hit geometry changes");
   PWMatrix invalidMatrix = matrix;
   invalidMatrix.counts[3].pop_back();

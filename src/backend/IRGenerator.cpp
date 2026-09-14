@@ -23,6 +23,7 @@ std::string irOpcodeToString(IROpCode op) {
     case IROpCode::SET_EXCEPT:       return "SET_EXCEPT";
     case IROpCode::SET_OVERLAPS:     return "SET_OVERLAPS";
     case IROpCode::SET_NEAR:         return "SET_NEAR";
+    case IROpCode::COUNT_OVERLAPS:   return "COUNT_OVERLAPS";
     case IROpCode::PRINT_RESULTS:    return "PRINT_RESULTS";
     case IROpCode::LOAD_MATRIX:      return "LOAD_MATRIX";
     case IROpCode::SCAN_EXEC:        return "SCAN_EXEC";
@@ -254,6 +255,32 @@ void IRGenerator::visit(SetOpStmtNode* node) {
   printInstr.arg1 = node->alias.empty() ? currentTemp : node->alias;
   printInstr.arg2 = "SET_OP";
   instructions.push_back(printInstr);
+}
+
+void IRGenerator::visit(CountStmtNode *node) {
+  currentTemp = newTemp("Count_" + node->countedEntity + "_in_" +
+                        node->containerEntity);
+
+  IRInstruction count;
+  count.opcode = IROpCode::COUNT_OVERLAPS;
+  count.arg1 = node->countedEntity;
+  count.arg2 = node->containerEntity;
+  count.arg3 = currentTemp;
+  instructions.push_back(count);
+
+  emitFilter(node->whereClause.get(), currentTemp);
+
+  IRInstruction alias;
+  alias.opcode = IROpCode::RESULT_ALIAS;
+  alias.arg1 = currentTemp;
+  alias.arg2 = node->alias;
+  instructions.push_back(alias);
+
+  IRInstruction print;
+  print.opcode = IROpCode::PRINT_RESULTS;
+  print.arg1 = node->alias;
+  print.arg2 = "COUNT";
+  instructions.push_back(print);
 }
 
 void IRGenerator::visit(SimpleConditionNode* node) {

@@ -323,7 +323,8 @@ def main() -> int:
                 "\tspatial_relation\treference_set\treference_chr"
                 "\treference_start\treference_end\treference_strand"
                 "\treference_type\treference_name\tdistance_bp"
-                "\tmaximum_distance_bp\toverlaps",
+                "\tmaximum_distance_bp\toverlaps"
+                "\tcount_relation\tcounted_set\tcontainer_set\toverlap_count",
                 "region TSV export")
         profile_lines = (workspace / "profile.tsv").read_text(
             encoding="utf-8"
@@ -496,7 +497,7 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()
         first_tsv_site = tsv_rows[1].split("\t")
-        require(len(tsv_rows) == 10 and len(first_tsv_site) == 48 and
+        require(len(tsv_rows) == 10 and len(first_tsv_site) == 52 and
                 first_tsv_site[7:11]
                 == ["matrix", "TEST", "test", "fixture.pwm"] and
                 float(first_tsv_site[11]) > 0 and
@@ -512,7 +513,7 @@ def main() -> int:
                 abs(float(first_tsv_site[31]) - 0.1) < 1e-12 and
                 first_tsv_site[32:34] == ["short_promoter", "promoter"] and
                 first_tsv_site[36] == "0" and
-                first_tsv_site[37:] == [""] * 11,
+                first_tsv_site[37:] == [""] * 15,
                 "motif TSV export retains evidence columns")
 
         data, _ = run_query(
@@ -589,11 +590,88 @@ def main() -> int:
         linked_tsv = (workspace / "linked.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(linked_tsv) == 48 and linked_tsv[37:] == [
+        require(len(linked_tsv) == 52 and linked_tsv[37:48] == [
                     "NEAR", "GENE", "chr1", "0", "1200", "+", "gene",
                     "short", "0", "0", "true",
-                ],
+                ] and linked_tsv[48:] == [""] * 4,
                 "TSV export retains typed nearest-reference evidence")
+
+        data, _ = run_query(
+            workspace,
+            "count_overlapping_motif_support",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "DEFINE PROMOTERS OF GENE FROM TSS "
+            "UPSTREAM 100 BP DOWNSTREAM 20 BP AS promoters;\n"
+            "SCAN matrix STRAND POSITIVE THRESHOLD 100 % AS sites;\n"
+            "COUNT sites IN promoters AS promoter_counts;\n"
+            "COUNT sites IN promoters AS supported_promoters "
+            "WHERE COUNT >= 1;\n"
+            'EXPORT promoter_counts TO "counts.gff3" FORMAT GFF3;\n'
+            'EXPORT promoter_counts TO "counts.tsv" FORMAT TSV;\n',
+        )
+        promoter_counts = data["resultSets"]["promoter_counts"]
+        require([region["countEvidence"]["count"]
+                 for region in promoter_counts] == [20, 0, 0] and
+                promoter_counts[0]["countEvidence"] == {
+                    "relation": "OVERLAPS",
+                    "countedSet": "sites",
+                    "containerSet": "promoters",
+                    "count": 20,
+                } and
+                len(data["resultSets"]["supported_promoters"]) == 1 and
+                data["resultSets"]["supported_promoters"][0]["name"]
+                == "short_promoter" and
+                data["resultSets"]["supported_promoters"][0]
+                    ["countEvidence"]["count"] == 20,
+                "COUNT preserves zeroes and filters promoters by motif support")
+        count_gff = (workspace / "counts.gff3").read_text(
+            encoding="utf-8"
+        ).splitlines()[1]
+        require("CountRelation=OVERLAPS" in count_gff and
+                "CountedSet=sites" in count_gff and
+                "ContainerSet=promoters" in count_gff and
+                "OverlapCount=20" in count_gff,
+                "GFF3 export retains count provenance")
+        count_tsv = (workspace / "counts.tsv").read_text(
+            encoding="utf-8"
+        ).splitlines()[1].split("\t")
+        require(len(count_tsv) == 52 and count_tsv[48:] == [
+                    "OVERLAPS", "sites", "promoters", "20",
+                ],
+                "TSV export retains count provenance")
+
+        parser_error = run_invalid_query(
+            workspace,
+            "count_requires_in",
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            "COUNT GENE WITH PROMOTER AS invalid;\n",
+            2,
+        )
+        require("Expected 'IN'" in parser_error,
+                "COUNT requires an explicit container relation")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "count_filter_requires_whole_number",
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            "COUNT GENE IN GENE AS invalid WHERE COUNT >= 0.5;\n",
+            3,
+        )
+        require("finite, non-negative whole number" in semantic_error,
+                "COUNT filters reject fractional thresholds")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "count_rejects_dataset_alias",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            "COUNT genome IN GENE AS invalid;\n",
+            3,
+        )
+        require("requires region or motif-hit sets" in semantic_error,
+                "COUNT rejects non-region aliases")
 
         (workspace / "distance_units.gff3").write_text(
             "##gff-version 3\n"
@@ -682,7 +760,13 @@ def main() -> int:
                 data["resultSets"]["enhancer_nearest_gene_hypotheses"][0]
                     ["spatialRelation"]["maximumDistance"] == 100 and
                 data["resultSets"]["enhancer_nearest_gene_hypotheses"][0]
-                    ["spatialRelation"]["overlaps"] is False,
+                    ["spatialRelation"]["overlaps"] is False and
+                [region["countEvidence"]["count"] for region in
+                 data["resultSets"]["promoter_myb_counts"]] == [1, 1, 0] and
+                [region["name"] for region in
+                 data["resultSets"]["supported_promoter_candidates"]]
+                == ["anthocyanin_enzyme_promoter",
+                    "transporter_candidate_promoter"],
                 "integrated example separates regulatory evidence and records a provisional nearest-gene link")
 
         nearest_example = (
@@ -706,6 +790,22 @@ def main() -> int:
                 all(site["motifEvidence"]["matrixId"] == "MA0054.1"
                     for site in proximal),
                 "nearest-gene example exposes two auditable MYB candidates")
+
+        count_example = (
+            ROOT / "cql_examples" / "21_count_promoter_support.cql"
+        ).read_text(encoding="utf-8")
+        data, _ = run_query(
+            workspace, "anthocyanin_promoter_support_counts", count_example
+        )
+        require([region["countEvidence"]["count"] for region in
+                 data["resultSets"]["promoter_myb_counts"]] == [1, 1, 0] and
+                [region["name"] for region in
+                 data["resultSets"]["promoters_with_myb_support"]]
+                == ["anthocyanin_enzyme_promoter",
+                    "transporter_candidate_promoter"] and
+                all(region["countEvidence"]["count"] == 1 for region in
+                    data["resultSets"]["promoters_with_myb_support"]),
+                "promoter-count example retains zeroes and supported promoters")
 
         data, _ = run_query(
             workspace,

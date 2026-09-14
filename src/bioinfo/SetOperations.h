@@ -19,6 +19,10 @@ public:
       const std::vector<GenomicRegion> &query,
       const std::vector<GenomicRegion> &reference,
       size_t maximumDistance, const std::string &referenceSet);
+  static std::vector<GenomicRegion> countOverlaps(
+      const std::vector<GenomicRegion> &counted,
+      const std::vector<GenomicRegion> &containers,
+      const std::string &countedSet, const std::string &containerSet);
 };
 
 #endif

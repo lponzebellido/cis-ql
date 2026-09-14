@@ -39,6 +39,7 @@ enum class IROpCode {
   SET_EXCEPT,
   SET_OVERLAPS,
   SET_NEAR,
+  COUNT_OVERLAPS,
   PRINT_RESULTS,
   LOAD_MATRIX,
   SCAN_EXEC,
@@ -97,6 +98,7 @@ public:
   void visit(FindStmtNode *node) override;
   void visit(ExtractStmtNode *node) override;
   void visit(SetOpStmtNode *node) override;
+  void visit(CountStmtNode *node) override;
   void visit(ScanStmtNode *node) override;
   void visit(AnalyzeStmtNode *node) override;
   void visit(IfStmtNode *node) override;

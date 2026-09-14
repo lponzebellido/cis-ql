@@ -18,6 +18,7 @@ class FindOptNode;
 class FindStmtNode;
 class ExtractStmtNode;
 class SetOpStmtNode;
+class CountStmtNode;
 class ScanStmtNode;
 class AnalyzeStmtNode;
 class IfStmtNode;
@@ -38,6 +39,7 @@ public:
   virtual void visit(FindStmtNode* node) = 0;
   virtual void visit(ExtractStmtNode* node) = 0;
   virtual void visit(SetOpStmtNode* node) = 0;
+  virtual void visit(CountStmtNode* node) = 0;
   virtual void visit(ScanStmtNode* node) = 0;
   virtual void visit(AnalyzeStmtNode* node) = 0;
   virtual void visit(IfStmtNode* node) = 0;
@@ -190,6 +192,20 @@ public:
                 std::unique_ptr<ConditionNode> w)
       : op(o), entity1(e1), entity2(e2), distanceValue(dv), distanceUnit(du),
         alias(a), whereClause(std::move(w)) {}
+  void print(std::string prefix = "", bool isLast = true) const override;
+  void accept(ASTVisitor& visitor) override;
+};
+
+class CountStmtNode : public StatementNode {
+public:
+  std::string countedEntity;
+  std::string containerEntity;
+  std::string alias;
+  std::unique_ptr<ConditionNode> whereClause;
+  CountStmtNode(std::string counted, std::string containers, std::string a,
+                std::unique_ptr<ConditionNode> w)
+      : countedEntity(counted), containerEntity(containers), alias(a),
+        whereClause(std::move(w)) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;
 };

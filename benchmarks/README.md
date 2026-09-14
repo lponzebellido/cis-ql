@@ -18,7 +18,8 @@ median:
 - CpG-island scanning;
 - PWM/PSSM scanning;
 - Smith-Waterman alignment;
-- interval intersection.
+- interval intersection; and
+- overlap counting per container.
 
 `benchmark` executes representative complete `.cql` programs three times and
 reports machine metadata, median, minimum, maximum, individual wall-clock
@@ -39,16 +40,11 @@ make validate
 ```
 
 The suite uses separate Python implementations for exact overlapping motif
-coordinates, log-odds PSSM thresholds, geometric interval subtraction, and the
-normalized Smith-Waterman recurrence. If `bedtools` or Biopython is installed,
-the compatible external checks are also executed; otherwise they are reported
-as skipped.
-
-FIMO and Cis-QL do not currently expose the same threshold statistic: FIMO
-reports p-values and q-values, whereas Cis-QL uses a percentage of the
-matrix-specific attainable log-odds range. A fair FIMO comparison therefore
-requires a predeclared threshold-mapping protocol and is not yet part of the
-automated suite.
+coordinates, log-odds PSSM thresholds and tail probabilities, interval
+subtraction, overlap selection, nearest-reference selection, overlap counting,
+and the normalized Smith-Waterman recurrence. If BEDTools, Biopython, or FIMO
+is installed, compatible external checks are also executed; otherwise they are
+reported as skipped.
 
 ## Publication checklist
 

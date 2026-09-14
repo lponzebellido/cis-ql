@@ -55,6 +55,13 @@ interface SpatialRelation {
   overlaps: boolean;
 }
 
+interface CountEvidence {
+  relation: string;
+  countedSet: string;
+  containerSet: string;
+  count: number;
+}
+
 interface GenomicRegion {
   chr: string;
   start: number;
@@ -65,6 +72,7 @@ interface GenomicRegion {
   sequence?: string;
   motifEvidence?: MotifEvidence;
   spatialRelation?: SpatialRelation;
+  countEvidence?: CountEvidence;
 }
 
 interface TrackViewerProps {
@@ -606,6 +614,12 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                   <br /><span className="tt-label">Overlap:</span> {hoveredRegion.spatialRelation.overlaps ? 'yes' : 'no'}
                 </>
               )}
+              {hoveredRegion.countEvidence && (
+                <>
+                  <br /><span className="tt-label">Overlap count:</span> {hoveredRegion.countEvidence.count.toLocaleString()}
+                  <br /><span className="tt-label">Counted set:</span> {hoveredRegion.countEvidence.countedSet}
+                </>
+              )}
               {hoveredRegion.sequence && (
                 <div style={{ marginTop: 6, fontFamily: "'JetBrains Mono', monospace", fontSize: '0.65rem', color: '#3fb950', wordBreak: 'break-all', maxWidth: 250 }}>
                   {hoveredRegion.sequence.substring(0, 40)}{hoveredRegion.sequence.length > 40 ? '...' : ''}
@@ -702,6 +716,15 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                     </span>
                   </div>
                 </>
+              )}
+              {selectedRegion.countEvidence && (
+                <div className="detail-field">
+                  <span className="detail-label">Overlap count</span>
+                  <span className="detail-value">
+                    {selectedRegion.countEvidence.count.toLocaleString()} from {selectedRegion.countEvidence.countedSet}<br />
+                    {selectedRegion.countEvidence.relation} in {selectedRegion.countEvidence.containerSet}
+                  </span>
+                </div>
               )}
               {selectedRegion.sequence && (
                 <div className="detail-seq">

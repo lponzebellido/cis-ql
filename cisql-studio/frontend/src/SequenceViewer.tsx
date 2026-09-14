@@ -55,6 +55,13 @@ interface SpatialRelation {
   overlaps: boolean;
 }
 
+interface CountEvidence {
+  relation: string;
+  countedSet: string;
+  containerSet: string;
+  count: number;
+}
+
 interface GenomicRegion {
   chr: string;
   start: number;
@@ -65,6 +72,7 @@ interface GenomicRegion {
   sequence?: string;
   motifEvidence?: MotifEvidence;
   spatialRelation?: SpatialRelation;
+  countEvidence?: CountEvidence;
 }
 
 interface SequenceViewerProps {
@@ -306,6 +314,9 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
                                   <span>{region.spatialRelation.relation}: {region.spatialRelation.reference.name || region.spatialRelation.reference.type}</span>
                                   <span>Distance: {region.spatialRelation.distance.toLocaleString()} bp (limit {region.spatialRelation.maximumDistance.toLocaleString()} bp; {region.spatialRelation.overlaps ? 'overlapping' : 'not overlapping'})</span>
                                 </>
+                              )}
+                              {region.countEvidence && (
+                                <span>Overlap count: {region.countEvidence.count.toLocaleString()} from {region.countEvidence.countedSet}</span>
                               )}
                               {(() => {
                                 const c = ntCounts(region.sequence!);

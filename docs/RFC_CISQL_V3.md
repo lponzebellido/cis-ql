@@ -1,6 +1,6 @@
 # Cis-QL v3: regulatory genomics direction
 
-Status: incremental implementation. Parts 1 through 2B3 and Parts 3A-3B are
+Status: incremental implementation. Parts 1 through 2B3 and Parts 3A-3C are
 implemented; later parts are a design contract, not yet accepted syntax.
 
 ## Product definition
@@ -254,9 +254,42 @@ reported as proof that the selected feature regulates the recorded gene; later
 evidence-integration layers can add accessibility, binding, expression, or
 chromatin-contact support.
 
+#### Part 3C: overlap counts per regulatory region
+
+Implemented syntax:
+
+```cql
+COUNT significant_myb_sites IN proximal_promoters
+  AS promoter_myb_counts;
+
+COUNT significant_myb_sites IN proximal_promoters
+  AS supported_promoters
+  WHERE COUNT >= 1;
+```
+
+The second entity is the container set and therefore determines the emitted
+geometry. Every valid container is emitted once, including containers with a
+zero count. `countEvidence` records the `OVERLAPS` relation, counted-set alias,
+container-set alias, and non-negative integer count. It is preserved by later
+selection operations while the container geometry remains unchanged and is
+available in JSON, GFF3, TSV, and both Studio inspectors. BED is lossy.
+
+Half-open overlap semantics match `OVERLAPS`, so touching boundaries are not
+counted. Per chromosome, separately sorted start and end arrays reduce each
+container count to two binary searches instead of comparing every interval
+pair. `WHERE COUNT` supports integer thresholds without genomic units.
+Counting is strand-agnostic and counts input records, so duplicate intervals
+remain separate observations; callers must constrain or normalize the input
+set when a distinct-locus interpretation is required.
+
+This is descriptive aggregation. A larger raw count is not automatically motif
+enrichment or stronger regulatory evidence because expected counts vary with
+region length, nucleotide composition, accessibility, motif model, and the
+selected statistical background.
+
 Still planned:
 
-- unbounded `CLOSEST`, standalone `DISTANCE`, `COUNT`, and grouped aggregation;
+- unbounded `CLOSEST`, standalone `DISTANCE`, and richer grouped aggregation;
 - Motif modules with order, orientation, minimum and maximum spacing.
 - Matched backgrounds and enrichment with multiple-testing correction.
 

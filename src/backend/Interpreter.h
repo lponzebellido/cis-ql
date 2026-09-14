@@ -87,6 +87,7 @@ private:
   void executeFilterSimilarity(const IRInstruction &instr);
   void executeFilterCondition(const IRInstruction &instr);
   void executeSetOp(const IRInstruction &instr);
+  void executeCountOverlaps(const IRInstruction &instr);
   void executePrint(const IRInstruction &instr);
   void executeLoadMatrix(const IRInstruction &instr);
   void executeScanOptStrand(const IRInstruction &instr);

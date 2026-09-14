@@ -1,7 +1,7 @@
 # Cis-QL example paths
 
 The examples are intended to be read as small analysis paths, not as a list of
-unrelated syntax fragments. Examples 07, 17, 18, 19, 20, and 14 form the current
+unrelated syntax fragments. Examples 07, 17, 18, 19, 20, 21, and 14 form the current
 cis-regulatory path:
 
 1. `07_pwm_scanning.cql` introduces a plant MYB position-frequency matrix and
@@ -18,10 +18,14 @@ cis-regulatory path:
 5. `20_nearest_gene_candidates.cql` asks which significant sites lie within
    50 bp of a gene. It retains two sites and records their nearest genes at
    interval distances of 41 bp and 30 bp.
-6. `14_integrated_query.cql` is the compact end-to-end demonstration. It
+6. `21_count_promoter_support.cql` counts significant sites in every candidate
+   promoter, retaining counts `[1, 1, 0]`, and then selects the two promoters
+   with at least one supported MYB site.
+7. `14_integrated_query.cql` is the compact end-to-end demonstration. It
    separates two promoter-supported MYB sites from one site supported by the
-   annotated candidate enhancer. It then records the nearest gene to the
-   enhancer-supported site as a deliberately provisional target hypothesis.
+   annotated candidate enhancer, summarizes site support per promoter, and
+   records the nearest gene to the enhancer-supported site as a deliberately
+   provisional target hypothesis.
 
 The shared `anthocyanin_regulatory_demo` FASTA and GFF3 files are deliberately
 small synthetic fixtures. They contain three annotated genes, one candidate
@@ -33,6 +37,12 @@ evidence for a regulatory relationship.
 candidate link suitable for downstream prioritization; it is not evidence that
 the feature regulates that gene. Accessibility, binding, expression, chromatin
 contact, or other independent evidence is needed to strengthen that claim.
+
+`COUNT sites IN regions` is descriptive overlap aggregation. Zero counts are
+retained so the output can represent unsupported regions and later serve as an
+explicit universe. Raw counts should not be called motif enrichment: promoter
+length, nucleotide composition, accessibility, and the chosen background can
+all affect the expected count.
 
 The `MA0054.1 myb.Ph3` frequency matrix is an official plant MYB profile from
 [JASPAR CORE](https://jaspar.elixir.no/matrix/MA0054.1/) (*Petunia x hybrida*,

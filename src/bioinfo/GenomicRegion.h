@@ -3,6 +3,7 @@
 
 #include "MotifEvidence.h"
 #include "SpatialRelationEvidence.h"
+#include "CountEvidence.h"
 #include <string>
 #include <algorithm>
 
@@ -16,6 +17,7 @@ struct GenomicRegion {
   std::string sequence;
   MotifEvidence motifEvidence;
   SpatialRelationEvidence spatialRelation;
+  CountEvidence countEvidence;
 
   size_t length() const { return end - start; }
 

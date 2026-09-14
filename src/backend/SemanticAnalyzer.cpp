@@ -259,6 +259,35 @@ void SemanticAnalyzer::visit(SetOpStmtNode *node) {
   }
 }
 
+void SemanticAnalyzer::visit(CountStmtNode *node) {
+  const auto validateEntity = [this](const std::string &entity,
+                                     const std::string &role) {
+    if (isBuiltinEntity(entity)) {
+      if (!annotationLoaded) {
+        reportError("COUNT " + role + " entity " + entity +
+                    " requires annotation data.");
+      }
+      return;
+    }
+    if (!symbolTable.lookup(entity)) {
+      reportError("Alias '" + entity + "' is not defined.");
+    } else if (!isResultAlias(symbolTable, entity)) {
+      reportError("COUNT requires region or motif-hit sets; '" + entity +
+                  "' has type " + symbolTable.typeOf(entity) + ".");
+    }
+  };
+
+  validateEntity(node->countedEntity, "counted");
+  validateEntity(node->containerEntity, "container");
+  if (node->whereClause)
+    node->whereClause->accept(*this);
+  if (symbolTable.lookup(node->alias)) {
+    reportError("Alias '" + node->alias + "' is already defined.");
+  } else {
+    symbolTable.insert(node->alias, "RESULT_SET");
+  }
+}
+
 void SemanticAnalyzer::visit(BinaryConditionNode *node) {
   if (node->left)
     node->left->accept(*this);
@@ -273,7 +302,7 @@ void SemanticAnalyzer::visit(NotConditionNode *node) {
 
 void SemanticAnalyzer::visit(SimpleConditionNode *node) {
   static const std::set<std::string> supportedProperties = {
-      "LENGTH", "SIMILARITY", "GC_CONTENT", "ID", "NAME"};
+      "LENGTH", "SIMILARITY", "GC_CONTENT", "COUNT", "ID", "NAME"};
   if (!supportedProperties.count(node->property)) {
     reportError("Unsupported condition property '" + node->property + "'.");
     return;
@@ -307,6 +336,14 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
     double gc = parseValue(node->value);
     if (gc < 0 || gc > 100) {
       reportError("GC_CONTENT must be between 0 and 100.");
+    }
+  } else if (node->property == "COUNT") {
+    const double count = parseValue(node->value);
+    if (!std::isfinite(count) || count < 0.0 || std::floor(count) != count ||
+        node->value.find(' ') != std::string::npos ||
+        (!node->value.empty() && node->value.front() == '"')) {
+      reportError("COUNT must be compared with a finite, non-negative whole "
+                  "number without a unit.");
     }
   } else if ((node->property == "ID" || node->property == "NAME") &&
              (node->value.size() < 2 || node->value.front() != '"' ||

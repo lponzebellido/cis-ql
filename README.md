@@ -35,7 +35,7 @@ Cis-QL operates across three primary modes:
 
 - **Native IUPAC Degeneration Engine:** Translates IUPAC nucleotide ambiguity codes (`R`, `Y`, `S`, `W`, `K`, `M`, `B`, `D`, `H`, `V`, `N`) automatically into regular expression search patterns (e.g., `TATAWAW` translates to `TATA[AT]A[AT]`).
 - **Multi-Chromosome Scanning:** Uses `std::async` to scan loaded contigs independently. Performance depends on contig count, input size, and the host implementation.
-- **Interval Algebra and Spatial Selection:** Supports geometric `INTERSECT`, `UNION`, and `EXCEPT` operations, directional `OVERLAPS`, and evidence-preserving nearest-feature selection with `NEAR ... WITHIN`.
+- **Regulatory Interval Queries:** Supports geometric interval algebra, directional `OVERLAPS`, evidence-preserving nearest-feature selection, and per-region overlap counts with explicit provenance.
 - **Pairwise Smith-Waterman Local Alignment:** Computes a normalized local-alignment score in C++. `SIMILARITY TO alias` requires an explicit one-region reference set. The older implicit-reference form remains available for compatibility.
 - **Explicit Dataset Context:** Multiple FASTA and GFF3 datasets can be loaded and selected deterministically with `USE SEQUENCE` and `USE ANNOTATION`.
 - **Standard Result Export:** Named region sets can be written as BED, GFF3, or TSV; GC profiles can be written as TSV.
@@ -154,6 +154,8 @@ UNION minus35_box AND minus10_box AS promoter_boxes;
 EXCEPT ctcf_sites FROM CDS AS noncoding_ctcf_sites;
 OVERLAPS myb_sites WITH candidate_promoters AS promoter_myb_sites;
 NEAR significant_myb_sites TO GENE WITHIN 2 KB AS proximal_gene_candidates;
+COUNT significant_myb_sites IN candidate_promoters AS promoter_site_counts;
+EXTRACT promoter_site_counts AS supported_promoters WHERE COUNT >= 1;
 ```
 
 `INTERSECT` emits the clipped overlap geometry. `OVERLAPS query WITH reference`
@@ -170,6 +172,16 @@ but the `overlaps` field distinguishes them. Equal-distance ties are resolved
 deterministically by reference coordinate and metadata. Proximity is a
 candidate association—not evidence of regulation by itself.
 
+`COUNT query IN containers` emits every container, including zero-count
+regions, and records the number of query intervals that overlap it. The count,
+counted set, container set, and overlap relation remain available in JSON,
+GFF3, TSV, and Studio. `WHERE COUNT` can then select regions by support. These
+are descriptive counts, not motif enrichment: region length, composition,
+accessibility, and the statistical background still need explicit treatment.
+Counting is strand-agnostic and operates on input records; duplicate records
+are counted separately. Restrict or normalize the counted set first when that
+is not the intended universe.
+
 ### 6. Feature Extraction & Filtering (`EXTRACT`, `WHERE`)
 
 Filter genomic entities by physical length or alignment similarity:
@@ -182,9 +194,10 @@ EXTRACT GENE AS homologous_genes
 ```
 
 Condition properties are result-specific: region sets support `LENGTH`,
-`SIMILARITY`, `GC_CONTENT`, and `ID`; motif results support `LENGTH` and
-`GC_CONTENT`; GC profiles support `GC_CONTENT`. `IF` currently evaluates the
-GC content of the active sequence dataset.
+`SIMILARITY`, `GC_CONTENT`, and `ID`, plus `COUNT` when count evidence is
+attached; motif results support `LENGTH` and `GC_CONTENT`; GC profiles support
+`GC_CONTENT`. `IF` currently evaluates the GC content of the active sequence
+dataset.
 
 An explicit similarity reference must be a named result set containing exactly
 one region. Similarity percentages are normalized local-alignment scores, not
@@ -297,9 +310,10 @@ make test
 make validate
 ```
 
-`make validate` compares motif coordinates, PSSM thresholds, interval
-subtraction, and normalized local-alignment filtering with independent
-reference implementations. If BEDTools or Biopython are installed, compatible
+`make validate` compares motif coordinates, PSSM thresholds and tail
+probabilities, interval subtraction, overlap/nearest selection, overlap counts,
+and normalized local-alignment filtering with independent reference
+implementations. If BEDTools, Biopython, or FIMO are installed, compatible
 external checks run as additional optional comparisons.
 
 Deterministic scaling measurements and complete-query timings are available
@@ -318,7 +332,7 @@ requirements needed before reporting external benchmark results.
 
 ## Curated Examples Suite (`cql_examples/`)
 
-The repository includes 20 structured `.cql` scripts demonstrating specific language capabilities:
+The repository includes 21 structured `.cql` scripts demonstrating specific language capabilities:
 
 The regulatory progression and its expected outputs are described in
 [`cql_examples/README.md`](cql_examples/README.md).
@@ -338,13 +352,14 @@ The regulatory progression and its expected outputs are described in
 | `11_strand_search.cql` | Sense vs. antisense motif profiling | `STRAND POSITIVE / NEGATIVE` |
 | `12_gc_content.cql` | Sliding-window GC landscape | `ANALYZE GC_CONTENT WINDOW` |
 | `13_complex_where.cql` | Multi-property conditional queries | Combined `LENGTH` & `SIMILARITY` |
-| `14_integrated_query.cql` | Anthocyanin regulatory evidence map | Promoters, calibrated MYB sites, regulatory overlap |
+| `14_integrated_query.cql` | Anthocyanin regulatory evidence map | Promoters, calibrated MYB sites, overlap counts and candidate links |
 | `15_if_else_branching.cql` | Conditional flow execution | `IF / ELSE / ENDIF` |
 | `16_foreach_batch_scan.cql` | Batch processing over matrix lists | `FOREACH / DO / ENDFOR` |
 | `17_explicit_promoters.cql` | TSS-oriented candidate promoters | `DEFINE PROMOTERS`, explicit bounds |
 | `18_statistical_pwm_scan.cql` | Calibrated plant MYB-site selection | `BACKGROUND FROM`, `QVALUE` |
 | `19_regulatory_overlap.cql` | Promoter-supported MYB evidence | Directional `OVERLAPS`, evidence preservation |
 | `20_nearest_gene_candidates.cql` | Proximity-based candidate gene links | `NEAR ... WITHIN`, auditable reference evidence |
+| `21_count_promoter_support.cql` | MYB support summarized per promoter | `COUNT ... IN`, zero retention, `WHERE COUNT` |
 
 ---
 

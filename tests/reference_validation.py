@@ -123,6 +123,21 @@ def select_nearest_intervals(
     return selected
 
 
+def count_overlaps_by_container(
+    counted: list[tuple[str, int, int]],
+    containers: list[tuple[str, int, int]],
+) -> list[int]:
+    return [
+        sum(
+            candidate[0] == container[0]
+            and candidate[1] < container[2]
+            and candidate[2] > container[1]
+            for candidate in counted
+        )
+        for container in containers
+    ]
+
+
 def smith_waterman_similarity(first: str, second: str) -> float:
     previous = [0] * (len(second) + 1)
     best = 0
@@ -424,6 +439,7 @@ def main() -> int:
             "EXCEPT genes FROM exons AS difference;\n"
             "OVERLAPS all_genes WITH enhancers AS supported;\n"
             "NEAR all_genes TO enhancers WITHIN 0 BP AS nearest;\n"
+            "COUNT enhancers IN all_genes AS enhancer_counts;\n"
             'EXPORT difference TO "difference.bed" FORMAT BED;\n'
             'EXPORT supported TO "supported.bed" FORMAT BED;\n',
         )
@@ -471,6 +487,17 @@ def main() -> int:
         require(observed_nearest == expected_nearest,
                 "NEAR differs from independent nearest-interval selection")
         print("[ok] bounded nearest-reference selection")
+        observed_counts = [
+            region["countEvidence"]["count"]
+            for region in interval_data["resultSets"]["enhancer_counts"]
+        ]
+        expected_counts = count_overlaps_by_container(
+            [("chr1", 3, 6), ("chr1", 8, 10)],
+            [("chr1", 0, 10), ("chr1", 10, 15)],
+        )
+        require(observed_counts == expected_counts == [2, 0],
+                "COUNT differs from independent overlap aggregation")
+        print("[ok] overlap counting by container")
 
         (workspace / "similarity.fasta").write_text(
             ">chr1\nACGTNNACGA\n", encoding="utf-8"

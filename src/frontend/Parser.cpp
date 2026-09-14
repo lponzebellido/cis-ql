@@ -63,6 +63,7 @@ void Parser::synchronize() {
     case TokenType::EXCEPT:
     case TokenType::OVERLAPS:
     case TokenType::NEAR:
+    case TokenType::COUNT:
       return;
     default:
       break;
@@ -99,6 +100,8 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
     return parseFind();
   if (match(TokenType::EXTRACT))
     return parseExtract();
+  if (match(TokenType::COUNT))
+    return parseCount();
   if (match(TokenType::INTERSECT) || match(TokenType::UNION) ||
       match(TokenType::EXCEPT) || match(TokenType::OVERLAPS) ||
       match(TokenType::NEAR)) {
@@ -120,7 +123,7 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
 
   reportError(peek(), "Expected start of a statement (LOAD, USE, EXPORT, FIND, "
                       "EXTRACT, INTERSECT, UNION, EXCEPT, OVERLAPS, NEAR, SCAN, "
-                      "ANALYZE, IF, FOREACH, DEFINE)");
+                      "COUNT, ANALYZE, IF, FOREACH, DEFINE)");
   throw std::runtime_error("Parse error");
 }
 
@@ -409,6 +412,41 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
   throw std::runtime_error("Parse error");
 }
 
+std::unique_ptr<CountStmtNode> Parser::parseCount() {
+  std::string countedEntity;
+  if (match(TokenType::GENE) || match(TokenType::PROMOTER) ||
+      match(TokenType::ENHANCER) || match(TokenType::EXON) ||
+      match(TokenType::INTRON) || match(TokenType::UTR) ||
+      match(TokenType::TSS) || match(TokenType::CDS) ||
+      match(TokenType::REGION) || match(TokenType::ID)) {
+    countedEntity = previous().lexeme;
+  } else {
+    reportError(peek(), "Expected an entity or alias after COUNT.");
+    throw std::runtime_error("Parse error");
+  }
+
+  consume(TokenType::IN, "Expected 'IN' after the counted entity.");
+  std::string containerEntity;
+  if (match(TokenType::GENE) || match(TokenType::PROMOTER) ||
+      match(TokenType::ENHANCER) || match(TokenType::EXON) ||
+      match(TokenType::INTRON) || match(TokenType::UTR) ||
+      match(TokenType::TSS) || match(TokenType::CDS) ||
+      match(TokenType::REGION) || match(TokenType::ID)) {
+    containerEntity = previous().lexeme;
+  } else {
+    reportError(peek(), "Expected a container entity or alias after IN.");
+    throw std::runtime_error("Parse error");
+  }
+
+  consume(TokenType::AS, "Expected 'AS' after the container entity.");
+  consume(TokenType::ID, "Expected a result alias after AS.");
+  const std::string alias = previous().lexeme;
+  auto whereClause = parseWhereClause();
+  consume(TokenType::SEMICOLON, "Expected ';' at the end of COUNT.");
+  return std::unique_ptr<CountStmtNode>(new CountStmtNode(
+      countedEntity, containerEntity, alias, std::move(whereClause)));
+}
+
 std::unique_ptr<ScanStmtNode> Parser::parseScan() {
   
   consume(TokenType::ID, "Expected a matrix alias after SCAN.");
@@ -586,10 +624,13 @@ std::unique_ptr<ConditionNode> Parser::parseFactor() {
 
 std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
   std::string prop;
-  if (match(TokenType::LENGTH) || match(TokenType::SIMILARITY) || match(TokenType::GC_CONTENT) || match(TokenType::ID)) {
+  if (match(TokenType::LENGTH) || match(TokenType::SIMILARITY) ||
+      match(TokenType::GC_CONTENT) || match(TokenType::COUNT) ||
+      match(TokenType::ID)) {
     prop = previous().lexeme;
   } else {
-    reportError(peek(), "Expected property name ('LENGTH', 'SIMILARITY', 'GC_CONTENT', or identifier).");
+    reportError(peek(), "Expected property name ('LENGTH', 'SIMILARITY', "
+                        "'GC_CONTENT', 'COUNT', or identifier).");
     throw std::runtime_error("Parse error");
   }
 

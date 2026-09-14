@@ -190,6 +190,12 @@ void Interpreter::printRegions(const std::vector<GenomicRegion> &regions,
                 << (r.spatialRelation.overlaps ? "true" : "false")
                 << std::endl;
     }
+    if (r.countEvidence.present) {
+      std::cout << "      COUNT " << r.countEvidence.countedSet << " "
+                << r.countEvidence.relation << " "
+                << r.countEvidence.containerSet << ":"
+                << r.countEvidence.count << std::endl;
+    }
     if (!r.sequence.empty()) {
       std::string display = r.sequence;
       if (display.size() > 60) {
@@ -479,6 +485,15 @@ void Interpreter::executeExport(const IRInstruction &instr) {
             << ";Overlaps="
             << (region.spatialRelation.overlaps ? "true" : "false");
       }
+      if (region.countEvidence.present) {
+        out << ";CountRelation="
+            << gffAttributeEscape(region.countEvidence.relation)
+            << ";CountedSet="
+            << gffAttributeEscape(region.countEvidence.countedSet)
+            << ";ContainerSet="
+            << gffAttributeEscape(region.countEvidence.containerSet)
+            << ";OverlapCount=" << region.countEvidence.count;
+      }
       out << '\n';
     }
   } else if (format == "TSV") {
@@ -496,7 +511,8 @@ void Interpreter::executeExport(const IRInstruction &instr) {
            "\tspatial_relation\treference_set\treference_chr"
            "\treference_start\treference_end\treference_strand"
            "\treference_type\treference_name\tdistance_bp"
-           "\tmaximum_distance_bp\toverlaps\n";
+           "\tmaximum_distance_bp\toverlaps"
+           "\tcount_relation\tcounted_set\tcontainer_set\toverlap_count\n";
     for (const auto &region : regionsIt->second) {
       out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
           << region.end << '\t' << cleanTabularField(region.strand) << '\t'
@@ -563,6 +579,16 @@ void Interpreter::executeExport(const IRInstruction &instr) {
             << (region.spatialRelation.overlaps ? "true" : "false");
       } else {
         for (int emptyColumn = 0; emptyColumn < 10; ++emptyColumn)
+          out << '\t';
+      }
+      out << '\t';
+      if (region.countEvidence.present) {
+        out << cleanTabularField(region.countEvidence.relation) << '\t'
+            << cleanTabularField(region.countEvidence.countedSet) << '\t'
+            << cleanTabularField(region.countEvidence.containerSet) << '\t'
+            << region.countEvidence.count;
+      } else {
+        for (int emptyColumn = 0; emptyColumn < 3; ++emptyColumn)
           out << '\t';
       }
       out << '\n';
@@ -1021,6 +1047,11 @@ bool Interpreter::evaluateRegionCondition(
         100.0 * static_cast<double>(gc) / region.sequence.size();
     return compareValues(percent, condition->op, condition->value);
   }
+  if (condition->property == "COUNT") {
+    return region.countEvidence.present &&
+           compareValues(static_cast<double>(region.countEvidence.count),
+                         condition->op, condition->value);
+  }
   if (condition->property == "ID" || condition->property == "NAME") {
     const std::string expected = stripQuotes(condition->value);
     if (condition->op == "=" || condition->op == "==")
@@ -1135,7 +1166,8 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
   } else if (resultSets.count(resultId)) {
     if (!conditionUsesOnly(
             instr.condition,
-            {"LENGTH", "SIMILARITY", "GC_CONTENT", "ID", "NAME"})) {
+            {"LENGTH", "SIMILARITY", "GC_CONTENT", "COUNT", "ID",
+             "NAME"})) {
       reportRuntimeError("Unsupported condition for a genomic region set.");
       return;
     }
@@ -1325,6 +1357,35 @@ void Interpreter::executeSetOp(const IRInstruction &instr) {
   }
 
   resultSets[resultId] = result;
+}
+
+void Interpreter::executeCountOverlaps(const IRInstruction &instr) {
+  const std::string &countedEntity = instr.arg1;
+  const std::string &containerEntity = instr.arg2;
+  const std::string &resultId = instr.arg3;
+  const std::vector<GenomicRegion> counted = resolveEntity(countedEntity);
+  std::vector<GenomicRegion> containers = resolveEntity(containerEntity);
+
+  const auto activeGenome = sequenceChrMaps.find(activeSequenceAlias);
+  if (activeGenome != sequenceChrMaps.end()) {
+    for (auto &container : containers) {
+      const auto chromosome = activeGenome->second.find(container.chr);
+      if (container.sequence.empty() &&
+          chromosome != activeGenome->second.end() &&
+          container.start < container.end &&
+          container.end <= chromosome->second.sequence.size()) {
+        container.sequence = chromosome->second.sequence.substr(
+            container.start, container.end - container.start);
+      }
+    }
+  }
+
+  if (debugMode) {
+    std::cout << "> COUNT " << countedEntity << " IN " << containerEntity
+              << std::endl;
+  }
+  resultSets[resultId] = SetOperations::countOverlaps(
+      counted, containers, countedEntity, containerEntity);
 }
 
 void Interpreter::executePrint(const IRInstruction &instr) {
@@ -1896,6 +1957,17 @@ void Interpreter::dumpResultsJSON() const {
             << (r.spatialRelation.overlaps ? "true" : "false") << "\n"
             << "        }";
       }
+      if (r.countEvidence.present) {
+        out << ",\n        \"countEvidence\": {\n"
+            << "          \"relation\": \""
+            << jsonEscape(r.countEvidence.relation) << "\",\n"
+            << "          \"countedSet\": \""
+            << jsonEscape(r.countEvidence.countedSet) << "\",\n"
+            << "          \"containerSet\": \""
+            << jsonEscape(r.countEvidence.containerSet) << "\",\n"
+            << "          \"count\": " << r.countEvidence.count << "\n"
+            << "        }";
+      }
       out << "\n      }";
     }
     out << "\n    ]";
@@ -2081,6 +2153,9 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
     case IROpCode::SET_OVERLAPS:
     case IROpCode::SET_NEAR:
       executeSetOp(instr);
+      break;
+    case IROpCode::COUNT_OVERLAPS:
+      executeCountOverlaps(instr);
       break;
     case IROpCode::PRINT_RESULTS:
       executePrint(instr);

@@ -38,6 +38,8 @@ SetOperations::intersect(std::vector<GenomicRegion> a,
         overlap.motifEvidence = MotifEvidence();
       if (start != a[i].start || end != a[i].end)
         overlap.spatialRelation = SpatialRelationEvidence();
+      if (start != a[i].start || end != a[i].end)
+        overlap.countEvidence = CountEvidence();
       result.push_back(std::move(overlap));
     }
 
@@ -73,6 +75,7 @@ std::vector<GenomicRegion> SetOperations::unite(std::vector<GenomicRegion> a,
       last.type = "union";
       last.motifEvidence = MotifEvidence();
       last.spatialRelation = SpatialRelationEvidence();
+      last.countEvidence = CountEvidence();
     } else {
       result.push_back(all[i]);
     }
@@ -113,6 +116,7 @@ std::vector<GenomicRegion> SetOperations::except(std::vector<GenomicRegion> a,
         }
         fragment.motifEvidence = MotifEvidence();
         fragment.spatialRelation = SpatialRelationEvidence();
+        fragment.countEvidence = CountEvidence();
         result.push_back(std::move(fragment));
       }
       cursor = std::max(cursor, b[k].end);
@@ -133,6 +137,8 @@ std::vector<GenomicRegion> SetOperations::except(std::vector<GenomicRegion> a,
         fragment.motifEvidence = MotifEvidence();
       if (fragment.start != region.start || fragment.end != region.end)
         fragment.spatialRelation = SpatialRelationEvidence();
+      if (fragment.start != region.start || fragment.end != region.end)
+        fragment.countEvidence = CountEvidence();
       result.push_back(std::move(fragment));
     }
   }
@@ -291,6 +297,59 @@ std::vector<GenomicRegion> SetOperations::selectOverlapping(
         index.maximumEnds[candidateCount - 1] > region.start) {
       result.push_back(region);
     }
+  }
+  return result;
+}
+
+std::vector<GenomicRegion> SetOperations::countOverlaps(
+    const std::vector<GenomicRegion> &counted,
+    const std::vector<GenomicRegion> &containers,
+    const std::string &countedSet, const std::string &containerSet) {
+  struct ChromosomeIndex {
+    std::vector<size_t> starts;
+    std::vector<size_t> ends;
+  };
+
+  std::unordered_map<std::string, ChromosomeIndex> indexes;
+  for (const auto &region : counted) {
+    if (region.start >= region.end)
+      continue;
+    ChromosomeIndex &index = indexes[region.chr];
+    index.starts.push_back(region.start);
+    index.ends.push_back(region.end);
+  }
+  for (auto &entry : indexes) {
+    std::sort(entry.second.starts.begin(), entry.second.starts.end());
+    std::sort(entry.second.ends.begin(), entry.second.ends.end());
+  }
+
+  std::vector<GenomicRegion> result;
+  result.reserve(containers.size());
+  for (const auto &container : containers) {
+    if (container.start >= container.end)
+      continue;
+    size_t overlapCount = 0;
+    const auto chromosome = indexes.find(container.chr);
+    if (chromosome != indexes.end()) {
+      const ChromosomeIndex &index = chromosome->second;
+      const size_t startedBeforeEnd = static_cast<size_t>(std::distance(
+          index.starts.begin(),
+          std::lower_bound(index.starts.begin(), index.starts.end(),
+                           container.end)));
+      const size_t endedBeforeOrAtStart = static_cast<size_t>(std::distance(
+          index.ends.begin(),
+          std::upper_bound(index.ends.begin(), index.ends.end(),
+                           container.start)));
+      overlapCount = startedBeforeEnd - endedBeforeOrAtStart;
+    }
+
+    GenomicRegion countedContainer = container;
+    countedContainer.countEvidence.present = true;
+    countedContainer.countEvidence.relation = "OVERLAPS";
+    countedContainer.countEvidence.countedSet = countedSet;
+    countedContainer.countEvidence.containerSet = containerSet;
+    countedContainer.countEvidence.count = overlapCount;
+    result.push_back(std::move(countedContainer));
   }
   return result;
 }
