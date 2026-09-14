@@ -20,6 +20,17 @@ static bool isResultAlias(const SymbolTable &symbolTable,
   return type == "RESULT_SET" || type == "MOTIF_HITS";
 }
 
+// Decimal genomic distances such as 0.004 KB are mathematically integral
+// (4 bp), but their floating-point representation can be a few ulps below
+// the integer on one platform and above it on another.  Accept only that
+// tiny representation error; genuine fractions (e.g. 0.5 bp) remain invalid.
+static bool resolvesToWholeBasePairs(long double value) {
+  const long double rounded = std::round(value);
+  const long double magnitude = std::fabs(value);
+  const long double tolerance = 1e-12L * (magnitude < 1.0L ? 1.0L : magnitude);
+  return std::fabs(value - rounded) <= tolerance;
+}
+
 SemanticAnalyzer::SemanticAnalyzer(SymbolTable &symTab)
     : symbolTable(symTab), hasError(false), annotationLoaded(false),
       sequenceLoaded(false) {}
@@ -168,8 +179,8 @@ void SemanticAnalyzer::visit(DefineModuleStmtNode *node) {
       maximum >= coordinateLimit) {
     reportError("Module spacing bounds must be finite, non-negative genomic "
                 "distances within the coordinate range.");
-  } else if (std::floor(minimum) != minimum ||
-             std::floor(maximum) != maximum) {
+  } else if (!resolvesToWholeBasePairs(minimum) ||
+             !resolvesToWholeBasePairs(maximum)) {
     reportError("Module spacing bounds must resolve to whole numbers of base "
                 "pairs.");
   } else if (minimum > maximum) {
@@ -263,7 +274,7 @@ void SemanticAnalyzer::visit(SetOpStmtNode *node) {
                         std::numeric_limits<size_t>::max())) {
       reportError("NEAR distance must be a finite, non-negative genomic "
                   "distance within the coordinate range.");
-    } else if (std::floor(basePairs) != basePairs) {
+    } else if (!resolvesToWholeBasePairs(basePairs)) {
       reportError("NEAR distance must resolve to a whole number of base pairs.");
     }
   }

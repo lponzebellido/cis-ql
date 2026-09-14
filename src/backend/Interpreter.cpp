@@ -121,11 +121,15 @@ void Interpreter::reportRuntimeError(const std::string &message) {
 }
 
 size_t Interpreter::toBasePairs(double value, const std::string &unit) {
+  double factor = 1.0;
   if (unit == "KB")
-    return static_cast<size_t>(value * 1000.0);
-  if (unit == "MB")
-    return static_cast<size_t>(value * 1000000.0);
-  return static_cast<size_t>(value);
+    factor = 1000.0;
+  else if (unit == "MB")
+    factor = 1000000.0;
+  // Semantic analysis guarantees integral distances. Rounding here keeps
+  // the runtime conversion consistent across libstdc++ and libc++ when a
+  // decimal unit conversion lands a few ulps below its mathematical value.
+  return static_cast<size_t>(std::round(value * factor));
 }
 
 void Interpreter::printMotifMatches(const std::vector<MotifMatch> &matches,
