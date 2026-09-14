@@ -90,6 +90,12 @@ def main() -> int:
         (workspace / "alternate.fasta").write_text(
             ">chr1\n" + ("T" * len(sequence)) + "\n", encoding="utf-8"
         )
+        (workspace / "statistics.fasta").write_text(
+            ">chrStats\nAAAA\n", encoding="utf-8"
+        )
+        (workspace / "mixed_statistics.fasta").write_text(
+            ">chrMixed\nAACA\n", encoding="utf-8"
+        )
         (workspace / "alternate.gff3").write_text(
             "##gff-version 3\n"
             "chr1\ttest\tgene\t101\t200\t.\t-\t.\tID=alternate\n",
@@ -497,6 +503,138 @@ def main() -> int:
                 first_tsv_site[32:34] == ["short_promoter", "promoter"] and
                 first_tsv_site[36] == "0",
                 "motif TSV export retains evidence columns")
+
+        data, _ = run_query(
+            workspace,
+            "pvalue_scientific_threshold",
+            'LOAD SEQUENCE "statistics.fasta" AS genome;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix STRAND POSITIVE PVALUE <= 1e-1 AS sites;\n",
+        )
+        pvalue_sites = data["resultSets"]["sites"]
+        require(len(pvalue_sites) == 3 and
+                all(abs(site["motifEvidence"]["statistics"]["pValue"]
+                        - 0.0625) < 1e-12 and
+                    abs(site["motifEvidence"]["statistics"]["qValue"]
+                        - 0.0625) < 1e-12
+                    for site in pvalue_sites),
+                "PVALUE accepts scientific notation without implicit score filtering")
+
+        data, _ = run_query(
+            workspace,
+            "statistical_threshold_replaces_default_score",
+            'LOAD SEQUENCE "mixed_statistics.fasta" AS genome;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix STRAND POSITIVE PVALUE <= 1 AS sites;\n",
+        )
+        require(len(data["resultSets"]["sites"]) == 3 and
+                any(site["motifEvidence"]["scorePercent"] < 75
+                    for site in data["resultSets"]["sites"]),
+                "statistical scans do not inherit the legacy 75% threshold")
+
+        data, _ = run_query(
+            workspace,
+            "combined_score_and_pvalue_thresholds",
+            'LOAD SEQUENCE "mixed_statistics.fasta" AS genome;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix STRAND POSITIVE THRESHOLD 100 % "
+            "PVALUE <= 1 AS sites;\n",
+        )
+        require(len(data["resultSets"]["sites"]) == 1 and
+                data["resultSets"]["sites"][0]["start"] == 0,
+                "explicit score and statistical thresholds compose with AND")
+
+        data, _ = run_query(
+            workspace,
+            "strict_pvalue_threshold",
+            'LOAD SEQUENCE "statistics.fasta" AS genome;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix STRAND POSITIVE PVALUE < 6.25e-2 AS sites;\n",
+        )
+        require(data["resultSets"]["sites"] == [],
+                "strict PVALUE thresholds exclude tied boundary values")
+
+        data, _ = run_query(
+            workspace,
+            "qvalue_test_universe",
+            'LOAD SEQUENCE "statistics.fasta" AS genome;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix QVALUE <= 1e-1 AS sites;\n",
+        )
+        require(data["resultSets"]["sites"] == [],
+                "QVALUE filtering includes tests from both selected strands")
+
+        data, _ = run_query(
+            workspace,
+            "inclusive_qvalue_threshold",
+            'LOAD SEQUENCE "statistics.fasta" AS genome;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix QVALUE <= 0.125 AS sites;\n",
+        )
+        qvalue_sites = data["resultSets"]["sites"]
+        require(len(qvalue_sites) == 3 and
+                all(abs(site["motifEvidence"]["statistics"]["qValue"]
+                        - 0.125) < 1e-12 and
+                    site["motifEvidence"]["statistics"]["testedPositions"]
+                    == 6 for site in qvalue_sites),
+                "inclusive QVALUE thresholds retain boundary hits")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "out_of_range_pvalue",
+            'LOAD SEQUENCE "statistics.fasta" AS genome;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix PVALUE <= 1.1 AS sites;\n",
+            3,
+        )
+        require("PVALUE threshold must be between 0 and 1"
+                in semantic_error,
+                "statistical thresholds are probability-bounded")
+
+        parser_error = run_invalid_query(
+            workspace,
+            "duplicate_statistical_threshold",
+            'LOAD SEQUENCE "statistics.fasta" AS genome;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix PVALUE <= 0.1 QVALUE <= 0.2 AS sites;\n",
+            2,
+        )
+        require("only one PVALUE or QVALUE" in parser_error,
+                "SCAN rejects ambiguous statistical threshold combinations")
+
+        parser_error = run_invalid_query(
+            workspace,
+            "invalid_statistical_operator",
+            'LOAD SEQUENCE "statistics.fasta" AS genome;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix PVALUE >= 0.1 AS sites;\n",
+            2,
+        )
+        require("Expected '<' or '<=' after PVALUE" in parser_error,
+                "statistical scan options reject reverse comparisons")
+
+        lexical_error = run_invalid_query(
+            workspace,
+            "invalid_scientific_notation",
+            'LOAD SEQUENCE "statistics.fasta" AS genome;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix PVALUE <= 1e AS sites;\n",
+            2,
+        )
+        require("Invalid numeric exponent" in lexical_error,
+                "malformed scientific notation is a lexical error")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "overflowing_statistical_threshold",
+            'LOAD SEQUENCE "statistics.fasta" AS genome;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix PVALUE <= 1e9999 AS sites;\n",
+            3,
+        )
+        require("PVALUE threshold must be between 0 and 1"
+                in semantic_error,
+                "overflowing scientific notation is rejected")
 
         data, _ = run_query(
             workspace,

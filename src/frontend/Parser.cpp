@@ -385,6 +385,9 @@ std::unique_ptr<ScanStmtNode> Parser::parseScan() {
   std::string target;
   std::string strandFilter;
   std::string threshold;
+  std::string significanceMetric;
+  std::string significanceOperator;
+  std::string significanceThreshold;
   std::string backgroundMode;
   std::string backgroundSource;
 
@@ -414,13 +417,37 @@ std::unique_ptr<ScanStmtNode> Parser::parseScan() {
         throw std::runtime_error("Parse error");
       }
     } else if (match(TokenType::THRESHOLD)) {
+      if (!threshold.empty()) {
+        reportError(previous(), "SCAN accepts only one THRESHOLD option.");
+        throw std::runtime_error("Parse error");
+      }
       if (match(TokenType::NUM) || match(TokenType::FLOAT)) {
         threshold = previous().lexeme;
-        if (match(TokenType::PERCENT)) {
-          threshold += " %";
-        }
+        consume(TokenType::PERCENT,
+                "Expected '%' after the relative THRESHOLD value.");
+        threshold += " %";
       } else {
         reportError(peek(), "Expected a numeric value for THRESHOLD.");
+        throw std::runtime_error("Parse error");
+      }
+    } else if (match(TokenType::PVALUE) || match(TokenType::QVALUE)) {
+      if (!significanceMetric.empty()) {
+        reportError(previous(),
+                    "SCAN accepts only one PVALUE or QVALUE option.");
+        throw std::runtime_error("Parse error");
+      }
+      significanceMetric = previous().lexeme;
+      if (match(TokenType::LESS) || match(TokenType::LESS_EQ)) {
+        significanceOperator = previous().lexeme;
+      } else {
+        reportError(peek(), "Expected '<' or '<=' after " +
+                                significanceMetric + ".");
+        throw std::runtime_error("Parse error");
+      }
+      if (match(TokenType::NUM) || match(TokenType::FLOAT)) {
+        significanceThreshold = previous().lexeme;
+      } else {
+        reportError(peek(), "Expected a numeric significance threshold.");
         throw std::runtime_error("Parse error");
       }
     } else if (match(TokenType::BACKGROUND)) {
@@ -467,6 +494,8 @@ std::unique_ptr<ScanStmtNode> Parser::parseScan() {
 
   return std::unique_ptr<ScanStmtNode>(
       new ScanStmtNode(matrixAlias, target, strandFilter, threshold,
+                       significanceMetric, significanceOperator,
+                       significanceThreshold,
                        backgroundMode, backgroundSource, alias,
                        std::move(whereClause)));
 }

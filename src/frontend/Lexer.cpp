@@ -71,6 +71,8 @@ void Lexer::initKeywords() {
     keywords["MATRIX"] = TokenType::MATRIX;
     keywords["SCAN"] = TokenType::SCAN;
     keywords["THRESHOLD"] = TokenType::THRESHOLD;
+    keywords["PVALUE"] = TokenType::PVALUE;
+    keywords["QVALUE"] = TokenType::QVALUE;
     keywords["BACKGROUND"] = TokenType::BACKGROUND;
     keywords["UNIFORM"] = TokenType::UNIFORM;
 
@@ -212,6 +214,39 @@ Token Lexer::number(char firstChar, int startLine, int startCol) {
             ungetChar();
             break;
         }
+    }
+
+    char exponent = getChar();
+    if (exponent == 'e' || exponent == 'E') {
+        std::string exponentText(1, exponent);
+        char next = getChar();
+        if (next == '+' || next == '-') {
+            exponentText += next;
+            next = getChar();
+        }
+        if (!std::isdigit(static_cast<unsigned char>(next))) {
+            if (next != EOF) ungetChar();
+            hasError = true;
+            std::cerr << "Lexical Error at L" << startLine << ":C"
+                      << startCol << " - Invalid numeric exponent in '"
+                      << lexeme + exponentText << "'" << std::endl;
+            return createToken(TokenType::ERROR_TOKEN,
+                               lexeme + exponentText,
+                               startLine, startCol);
+        }
+        isFloat = true;
+        exponentText += next;
+        while (true) {
+            next = getChar();
+            if (!std::isdigit(static_cast<unsigned char>(next))) {
+                if (next != EOF) ungetChar();
+                break;
+            }
+            exponentText += next;
+        }
+        lexeme += exponentText;
+    } else if (exponent != EOF) {
+        ungetChar();
     }
     return createToken(isFloat ? TokenType::FLOAT : TokenType::NUM, lexeme, startLine, startCol);
 }
@@ -363,6 +398,8 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::MATRIX: return "MATRIX";
         case TokenType::SCAN: return "SCAN";
         case TokenType::THRESHOLD: return "THRESHOLD";
+        case TokenType::PVALUE: return "PVALUE";
+        case TokenType::QVALUE: return "QVALUE";
         case TokenType::ID: return "ID";
         case TokenType::NUM: return "NUM";
         case TokenType::FLOAT: return "FLOAT";

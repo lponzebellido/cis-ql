@@ -124,6 +124,9 @@ Scan loaded sequences using Position Weight Matrices with log-odds scoring:
 
 ```sql
 SCAN tbp_matrix STRAND POSITIVE THRESHOLD 80 % AS tbp_sites;
+
+SCAN tbp_matrix BACKGROUND FROM genome
+    QVALUE <= 0.05 AS significant_tbp_sites;
 ```
 
 ### 4. Biological & Structural Analysis (`ANALYZE`)
@@ -294,7 +297,7 @@ requirements needed before reporting external benchmark results.
 
 ## Curated Examples Suite (`cql_examples/`)
 
-The repository includes 16 structured `.cql` scripts demonstrating specific language capabilities:
+The repository includes 18 structured `.cql` scripts demonstrating specific language capabilities:
 
 | Script | Description | Primary Features |
 | :--- | :--- | :--- |
@@ -314,6 +317,8 @@ The repository includes 16 structured `.cql` scripts demonstrating specific lang
 | `14_integrated_query.cql` | Master genome-wide regulatory map | Complete multi-track pipeline |
 | `15_if_else_branching.cql` | Conditional flow execution | `IF / ELSE / ENDIF` |
 | `16_foreach_batch_scan.cql` | Batch processing over matrix lists | `FOREACH / DO / ENDFOR` |
+| `17_explicit_promoters.cql` | TSS-oriented promoter construction | `DEFINE PROMOTERS`, explicit bounds |
+| `18_statistical_pwm_scan.cql` | Calibrated motif-site selection | `BACKGROUND FROM`, `PVALUE` |
 
 ---
 

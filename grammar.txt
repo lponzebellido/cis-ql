@@ -6,7 +6,7 @@ LOAD, USE, EXPORT, DEFINE, PROMOTERS, OF, SEQUENCE, ANNOTATION, MATRIX, STRING, 
 FROM, GENE, PROMOTER, ENHANCER, EXON, INTRON, UTR, TSS, CDS, REGION, STRAND, POSITIVE, NEGATIVE,
 CHR, EXTRACT, WHERE, INTERSECT, UNION, EXCEPT, AND, OR, NOT, LPAREN, RPAREN, LBRACKET, RBRACKET,
 LENGTH, SIMILARITY, GREATER, LESS, GREATER_EQ, LESS_EQ, ASSIGN, FLOAT, PERCENT, BP, KB, MB,
-UPSTREAM, DOWNSTREAM, SCAN, THRESHOLD, BACKGROUND, UNIFORM, ANALYZE, GC_CONTENT, CPG_ISLANDS, WINDOW,
+UPSTREAM, DOWNSTREAM, SCAN, THRESHOLD, PVALUE, QVALUE, BACKGROUND, UNIFORM, ANALYZE, GC_CONTENT, CPG_ISLANDS, WINDOW,
 IF, THEN, ELSE, ENDIF, FOREACH, IN, DO, ENDFOR, COMMA, TO, FORMAT, BED, GFF3, TSV.
 
 Grammar Rules:
@@ -36,6 +36,7 @@ ScanOpts           -> ScanOpt ScanOpts | λ
 ScanOpt            -> IN EntityRef
                     | STRAND StrandType
                     | THRESHOLD (NUM | FLOAT) PERCENT
+                    | (PVALUE | QVALUE) (LESS | LESS_EQ) Probability
                     | BACKGROUND (UNIFORM | FROM EntityRef)
 
 SetOperationStmt   -> (INTERSECT | UNION) EntityRef AND EntityRef AliasOpt WhereClause SEMICOLON
@@ -62,6 +63,7 @@ Property           -> LENGTH | GC_CONTENT | ID
 SimilarityRefOpt   -> TO ID | λ
 RelOp              -> GREATER | LESS | GREATER_EQ | LESS_EQ | ASSIGN
 Value              -> (NUM | FLOAT) Unit | (NUM | FLOAT) PERCENT | NUM | FLOAT | STRING
+Probability        -> NUM | FLOAT
 
 Unit               -> BP | KB | MB | λ
 RequiredUnit       -> BP | KB | MB
@@ -80,4 +82,5 @@ Note on Execution Engine & Studio Integration:
 5. `DEFINE PROMOTERS` requires an active sequence, explicit upstream/downstream distances, and stranded source features. Generated intervals are oriented from the TSS and clamped to chromosome bounds.
 6. `SCAN matrix IN regions` restricts a PWM scan to a biological entity or named region set. Each hit retains matrix identity, raw and relative scores, its source region, and the source-oriented relative start. Omitting `IN` preserves whole-genome scanning.
 7. `BACKGROUND UNIFORM` selects an explicit uniform zero-order background. `BACKGROUND FROM source` estimates nucleotide frequencies from a sequence dataset or region set and adds a total pseudocount of 0.1. The effective policy is forward, reverse-complemented for negative-only scans, or symmetrized for two-strand scans. Omitting the option retains the recorded uniform legacy default.
-8. Every retained PWM hit records a zero-order dynamic-programming p-value and a Benjamini-Hochberg q-value. The correction covers all valid position-strand tests in the complete `SCAN`, including windows below `THRESHOLD`; ambiguous windows are excluded. `THRESHOLD` remains a relative-score reporting threshold until explicit statistical-threshold syntax is introduced.
+8. Every retained PWM hit records a zero-order dynamic-programming p-value and a Benjamini-Hochberg q-value. The correction covers all valid position-strand tests in the complete `SCAN`, including windows below reporting thresholds; ambiguous windows are excluded.
+9. `PVALUE <|<= probability` and `QVALUE <|<= probability` select statistically calibrated hits. Scientific notation is accepted. Only one statistical threshold is allowed per `SCAN`; if `THRESHOLD ... %` is also present, both criteria must pass. Without an explicit relative threshold, a statistical scan does not inherit the legacy 75% cutoff.

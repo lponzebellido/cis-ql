@@ -320,7 +320,8 @@ double PWMScanner::scoreToPercent(double score, const PSSM &pssm) {
 PWMScanResult PWMScanner::scanStrand(const std::string &sequence,
                                      const PSSM &pssm,
                                      double minRawScore,
-                                     const std::string &strand) {
+                                     const std::string &strand,
+                                     double maximumPValueForRetention) {
 
   PWMScanResult result;
   result.testedScoreCounts.assign(pssm.pValueByScaledScore.size(), 0);
@@ -353,7 +354,9 @@ PWMScanResult PWMScanner::scanStrand(const std::string &sequence,
     ++result.testedPositions;
     ++result.testedScoreCounts[static_cast<size_t>(scaledScore)];
 
-    if (score >= minRawScore) {
+    const double pValue =
+        pssm.pValueByScaledScore[static_cast<size_t>(scaledScore)];
+    if (score >= minRawScore && pValue <= maximumPValueForRetention) {
       MotifMatch m;
       m.position = (size_t)pos;
       m.matchLength = (size_t)motifLen;
@@ -366,8 +369,7 @@ PWMScanResult PWMScanner::scanStrand(const std::string &sequence,
       m.evidence.scorePercent = scoreToPercent(score, pssm);
       m.evidence.background = pssm.background;
       m.evidence.motifPseudocount = pssm.motifPseudocount;
-      m.evidence.statistics.pValue =
-          pssm.pValueByScaledScore[static_cast<size_t>(scaledScore)];
+      m.evidence.statistics.pValue = pValue;
       m.evidence.statistics.scaledScore = scaledScore;
       m.evidence.statistics.scoreRange = pssm.scoreRange;
       m.evidence.statistics.scoreScale = pssm.scoreScale;
@@ -388,7 +390,8 @@ PWMScanResult PWMScanner::scanStrand(const std::string &sequence,
 PWMScanResult PWMScanner::scanWithStatistics(
     const std::string &sequence, const PSSM &pssm,
     double thresholdPercent, const std::string &chrId,
-    bool searchPositive, bool searchNegative) {
+    bool searchPositive, bool searchNegative,
+    double maximumPValueForRetention) {
 
   PWMScanResult result;
   result.testedScoreCounts.assign(pssm.pValueByScaledScore.size(), 0);
@@ -403,12 +406,16 @@ PWMScanResult PWMScanner::scanWithStatistics(
   }
 
   if (searchPositive) {
-    mergeScanResults(result, scanStrand(sequence, pssm, minRawScore, "+"));
+    mergeScanResults(
+        result, scanStrand(sequence, pssm, minRawScore, "+",
+                           maximumPValueForRetention));
   }
 
   if (searchNegative) {
     std::string rcSeq = MotifFinder::reverseComplement(sequence);
-    PWMScanResult negative = scanStrand(rcSeq, pssm, minRawScore, "-");
+    PWMScanResult negative =
+        scanStrand(rcSeq, pssm, minRawScore, "-",
+                   maximumPValueForRetention);
 
     for (auto &m : negative.matches) {
       m.position = sequence.size() - m.position - m.matchLength;

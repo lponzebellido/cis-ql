@@ -31,6 +31,9 @@ struct FindContext {
 struct ScanContext {
   std::string strandFilter;
   double threshold = -1.0;
+  std::string significanceMetric;
+  std::string significanceOperator;
+  double significanceThreshold = -1.0;
   std::string backgroundMode;
   std::string backgroundSource;
 };
@@ -88,6 +91,7 @@ private:
   void executeLoadMatrix(const IRInstruction &instr);
   void executeScanOptStrand(const IRInstruction &instr);
   void executeScanOptThreshold(const IRInstruction &instr);
+  void executeScanOptSignificance(const IRInstruction &instr);
   void executeScanOptBackground(const IRInstruction &instr);
   void executeScanExec(const IRInstruction &instr);
   void executeScanAlias(const IRInstruction &instr);

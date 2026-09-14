@@ -1325,6 +1325,12 @@ void Interpreter::executeScanOptThreshold(const IRInstruction &instr) {
   }
 }
 
+void Interpreter::executeScanOptSignificance(const IRInstruction &instr) {
+  currentScan.significanceMetric = instr.arg1;
+  currentScan.significanceOperator = instr.arg2;
+  currentScan.significanceThreshold = std::atof(instr.arg3.c_str());
+}
+
 void Interpreter::executeScanOptBackground(const IRInstruction &instr) {
   currentScan.backgroundMode = instr.arg1;
   currentScan.backgroundSource = instr.arg2;
@@ -1335,8 +1341,11 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
   std::string resultId = instr.arg2;
   std::string target = instr.arg3;
 
+  const bool hasRelativeThreshold = currentScan.threshold >= 0.0;
+  const bool hasSignificanceThreshold =
+      !currentScan.significanceMetric.empty();
   if (currentScan.threshold < 0.0) {
-    currentScan.threshold = 75.0;
+    currentScan.threshold = hasSignificanceThreshold ? 0.0 : 75.0;
   }
 
   if (debugMode) {
@@ -1352,7 +1361,13 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
     } else if (currentScan.backgroundMode == "FROM") {
       std::cout << " BACKGROUND FROM " << currentScan.backgroundSource;
     }
-    std::cout << " THRESHOLD " << currentScan.threshold << "%";
+    if (hasRelativeThreshold || !hasSignificanceThreshold)
+      std::cout << " THRESHOLD " << currentScan.threshold << "%";
+    if (hasSignificanceThreshold) {
+      std::cout << " " << currentScan.significanceMetric << " "
+                << currentScan.significanceOperator << " "
+                << currentScan.significanceThreshold;
+    }
     std::cout << std::endl;
   }
 
@@ -1440,6 +1455,8 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
 
   PWMScanResult scanResult;
   scanResult.testedScoreCounts.assign(pssm.pValueByScaledScore.size(), 0);
+  const double maximumRetainedPValue =
+      hasSignificanceThreshold ? currentScan.significanceThreshold : 1.0;
   size_t scannedUnits = 0;
   if (target.empty()) {
     const auto &targetDataset = sequenceDatasets.count(activeSequenceAlias)
@@ -1450,14 +1467,16 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
       const FastaRecord *record = &seqRec;
       const std::string chrId = seqRec.sequenceId;
       const double threshold = currentScan.threshold;
+      const double maximumPValue = maximumRetainedPValue;
       const PSSM *matrix = &pssm;
 
       futures.push_back(std::async(
           std::launch::async,
-          [record, matrix, threshold, chrId, searchPos, searchNeg]() {
+          [record, matrix, threshold, maximumPValue, chrId,
+           searchPos, searchNeg]() {
             return PWMScanner::scanWithStatistics(
                 record->sequence, *matrix, threshold, chrId,
-                searchPos, searchNeg);
+                searchPos, searchNeg, maximumPValue);
           }));
     }
     for (auto &future : futures) {
@@ -1494,7 +1513,7 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
           source.start, source.end - source.start);
       PWMScanResult regionResult = PWMScanner::scanWithStatistics(
           sequence, pssm, currentScan.threshold, source.chr,
-          searchPos, searchNeg);
+          searchPos, searchNeg, maximumRetainedPValue);
       for (auto &match : regionResult.matches) {
         const size_t localPosition = match.position;
         match.position = source.start + localPosition;
@@ -1513,6 +1532,22 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
   }
 
   PWMScanner::applyBenjaminiHochberg(scanResult, pssm);
+  if (hasSignificanceThreshold) {
+    const std::string metric = currentScan.significanceMetric;
+    const std::string comparison = currentScan.significanceOperator;
+    const double threshold = currentScan.significanceThreshold;
+    scanResult.matches.erase(
+        std::remove_if(
+            scanResult.matches.begin(), scanResult.matches.end(),
+            [metric, comparison, threshold](const MotifMatch &match) {
+              const double value =
+                  metric == "QVALUE" ? match.evidence.statistics.qValue
+                                     : match.evidence.statistics.pValue;
+              return comparison == "<" ? !(value < threshold)
+                                       : !(value <= threshold);
+            }),
+        scanResult.matches.end());
+  }
   std::vector<MotifMatch> matches = std::move(scanResult.matches);
   for (auto &match : matches)
     match.evidence.matrixAlias = matrixAlias;
@@ -1536,9 +1571,8 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
               << background.a << ", C=" << background.c << ", G="
               << background.g << ", T=" << background.t << "] from "
               << background.source << std::endl;
-    std::cout << "  PWM scan found " << matches.size() << " site(s) above "
-              << currentScan.threshold << "% threshold across "
-              << scannedUnits
+    std::cout << "  PWM scan retained " << matches.size()
+              << " site(s) across " << scannedUnits
               << (target.empty() ? " chromosome(s)." : " source region(s).")
               << std::endl;
     std::cout << "  Statistical universe: " << scanResult.testedPositions
@@ -1958,6 +1992,9 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
       break;
     case IROpCode::SCAN_OPT_THRESHOLD:
       executeScanOptThreshold(instr);
+      break;
+    case IROpCode::SCAN_OPT_SIGNIFICANCE:
+      executeScanOptSignificance(instr);
       break;
     case IROpCode::SCAN_OPT_BACKGROUND:
       executeScanOptBackground(instr);

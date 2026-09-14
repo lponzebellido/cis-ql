@@ -1,4 +1,6 @@
 #include "SemanticAnalyzer.h"
+#include <cmath>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <set>
@@ -27,11 +29,7 @@ void SemanticAnalyzer::reportError(const std::string &message) {
 }
 
 double SemanticAnalyzer::parseValue(const std::string &val) {
-  try {
-    return std::stod(val);
-  } catch (...) {
-    return 0.0;
-  }
+  return std::strtod(val.c_str(), nullptr);
 }
 
 void SemanticAnalyzer::analyze(ProgramNode *node) {
@@ -355,8 +353,16 @@ void SemanticAnalyzer::visit(ScanStmtNode *node) {
   
   if (!node->threshold.empty()) {
     double threshold = parseValue(node->threshold);
-    if (threshold < 0 || threshold > 100) {
+    if (!std::isfinite(threshold) || threshold < 0 || threshold > 100) {
       reportError("THRESHOLD must be between 0 and 100.");
+    }
+  }
+
+  if (!node->significanceMetric.empty()) {
+    const double threshold = parseValue(node->significanceThreshold);
+    if (!std::isfinite(threshold) || threshold < 0.0 || threshold > 1.0) {
+      reportError(node->significanceMetric +
+                  " threshold must be between 0 and 1.");
     }
   }
 

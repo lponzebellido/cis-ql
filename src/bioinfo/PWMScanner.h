@@ -64,7 +64,8 @@ public:
   static PWMScanResult scanWithStatistics(
       const std::string &sequence, const PSSM &pssm,
       double thresholdPercent, const std::string &chrId,
-      bool searchPositive = true, bool searchNegative = true);
+      bool searchPositive = true, bool searchNegative = true,
+      double maximumPValueForRetention = 1.0);
 
   static void mergeScanResults(PWMScanResult &destination,
                                PWMScanResult source);
@@ -79,7 +80,8 @@ private:
   static PWMScanResult scanStrand(const std::string& sequence,
                                   const PSSM& pssm,
                                   double minRawScore,
-                                  const std::string& strand);
+                                  const std::string& strand,
+                                  double maximumPValueForRetention);
 };
 
 #endif

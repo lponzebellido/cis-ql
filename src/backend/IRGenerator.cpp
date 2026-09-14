@@ -26,6 +26,7 @@ std::string irOpcodeToString(IROpCode op) {
     case IROpCode::SCAN_EXEC:        return "SCAN_EXEC";
     case IROpCode::SCAN_OPT_STRAND:  return "SCAN_OPT_STRAND";
     case IROpCode::SCAN_OPT_THRESHOLD:return "SCAN_OPT_THRESHOLD";
+    case IROpCode::SCAN_OPT_SIGNIFICANCE:return "SCAN_OPT_SIGNIFICANCE";
     case IROpCode::SCAN_OPT_BACKGROUND:return "SCAN_OPT_BACKGROUND";
     case IROpCode::SCAN_ALIAS:       return "SCAN_ALIAS";
     case IROpCode::RESULT_ALIAS:     return "RESULT_ALIAS";
@@ -278,6 +279,15 @@ void IRGenerator::visit(ScanStmtNode* node) {
     threshInstr.opcode = IROpCode::SCAN_OPT_THRESHOLD;
     threshInstr.arg1 = node->threshold;
     instructions.push_back(threshInstr);
+  }
+
+  if (!node->significanceMetric.empty()) {
+    IRInstruction significanceInstr;
+    significanceInstr.opcode = IROpCode::SCAN_OPT_SIGNIFICANCE;
+    significanceInstr.arg1 = node->significanceMetric;
+    significanceInstr.arg2 = node->significanceOperator;
+    significanceInstr.arg3 = node->significanceThreshold;
+    instructions.push_back(significanceInstr);
   }
 
   if (!node->backgroundMode.empty()) {

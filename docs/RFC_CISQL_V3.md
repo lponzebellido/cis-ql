@@ -159,15 +159,42 @@ Independent validation exhaustively enumerates the null distribution of a
 small motif. The validation suite also compares p-values with the `fimo`
 executable when it is locally available.
 
-`THRESHOLD ... %` continues to control which matches are retained, so existing
-programs do not silently change selection semantics. A subsequent grammar slice
-will add explicit p-value/q-value selection and is intentionally separate from
-the evidence calculation.
+`THRESHOLD ... %` continues to control relative-score selection, so existing
+programs do not silently change semantics.
+
+### Part 2B3: statistical selection in the language
+
+Implemented syntax:
+
+```cql
+SCAN myb_matrix IN proximal_promoters
+  BACKGROUND FROM genome
+  PVALUE <= 1e-4
+  AS candidate_myb_sites;
+
+SCAN myb_matrix IN proximal_promoters
+  BACKGROUND FROM genome
+  QVALUE <= 0.05
+  AS significant_myb_sites;
+```
+
+Both `<` and `<=` are supported and probability thresholds must lie in `[0, 1]`.
+Scientific notation is tokenized as one numeric literal. A `SCAN` may select by
+p-value or q-value, but not both. When no relative `THRESHOLD` is written, a
+statistical scan evaluates the entire score range instead of inheriting the
+legacy 75% default. If both forms are explicit, they are combined with logical
+AND.
+
+The statistical universe is accumulated before final selection. To avoid
+materializing every genomic window, Cis-QL retains only candidates with
+`p <= alpha` while building the complete observed score histogram. This is safe
+for q-value filtering because a Benjamini-Hochberg adjusted p-value cannot be
+smaller than its raw p-value. Strict-boundary filtering is applied after q-values
+have been assigned.
 
 Still planned:
 
 - richer JASPAR metadata such as TF family and matrix release/version;
-- explicit p-value and q-value threshold syntax; and
 - installed-FIMO parity fixtures in continuous integration.
 
 ### Part 3: regulatory interval algebra

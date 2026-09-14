@@ -197,14 +197,20 @@ public:
   std::string target;
   std::string strandFilter;
   std::string threshold;
+  std::string significanceMetric;
+  std::string significanceOperator;
+  std::string significanceThreshold;
   std::string backgroundMode;
   std::string backgroundSource;
   std::string alias;
   std::unique_ptr<ConditionNode> whereClause;
   ScanStmtNode(std::string ma, std::string t, std::string sf, std::string th,
+               std::string sm, std::string so, std::string st,
                std::string bm, std::string bs, std::string a,
                std::unique_ptr<ConditionNode> w)
       : matrixAlias(ma), target(t), strandFilter(sf), threshold(th),
+        significanceMetric(sm), significanceOperator(so),
+        significanceThreshold(st),
         backgroundMode(bm), backgroundSource(bs), alias(a),
         whereClause(std::move(w)) {}
   void print(std::string prefix = "", bool isLast = true) const override;
