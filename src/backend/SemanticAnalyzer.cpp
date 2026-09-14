@@ -332,6 +332,26 @@ void SemanticAnalyzer::visit(ScanStmtNode *node) {
     }
   }
 
+  if (node->backgroundMode == "FROM") {
+    if (isBuiltinEntity(node->backgroundSource) && !annotationLoaded) {
+      reportError("BACKGROUND FROM " + node->backgroundSource +
+                  " requires annotation data.");
+    } else if (!isBuiltinEntity(node->backgroundSource) &&
+               !symbolTable.lookup(node->backgroundSource)) {
+      reportError("Background source alias '" + node->backgroundSource +
+                  "' is not defined.");
+    } else if (!isBuiltinEntity(node->backgroundSource)) {
+      const std::string type = symbolTable.typeOf(node->backgroundSource);
+      if (type != "GENOME_DATA" && !isResultAlias(
+                                       symbolTable,
+                                       node->backgroundSource)) {
+        reportError("BACKGROUND FROM expects a sequence dataset or region "
+                    "set, but '" + node->backgroundSource + "' has type " +
+                    type + ".");
+      }
+    }
+  }
+
   
   if (!node->threshold.empty()) {
     double threshold = parseValue(node->threshold);

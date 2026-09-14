@@ -1,7 +1,7 @@
 # Cis-QL v3: regulatory genomics direction
 
-Status: incremental implementation. Part 1 and Part 2A are implemented; later
-parts are a design contract, not yet accepted syntax.
+Status: incremental implementation. Part 1, Part 2A, and Part 2B1 are
+implemented; later parts are a design contract, not yet accepted syntax.
 
 ## Product definition
 
@@ -26,9 +26,10 @@ It must not equate a motif match or a coexpression edge with direct regulation.
 2. Genome assembly, annotation, and imported tracks must be compatible.
 3. Promoter boundaries are always explicit; importing a GFF never invents them.
 4. Transcript and TSS policy must be visible in the query.
-5. Motif hits retain matrix identity and their available statistical evidence.
-   Background model, p-value, q-value, database source, and version become
-   mandatory once Part 2B introduces statistically calibrated scans.
+5. Motif hits retain matrix identity, effective background frequencies, motif
+   pseudocount, and their available statistical evidence. P-value, q-value,
+   database source, and version become mandatory once Part 2B2 introduces
+   statistically calibrated scans.
 6. Enrichment requires an explicit or reproducibly generated background.
 7. Coexpression, motif presence, accessibility, conservation, and direct
    experimental validation are distinct evidence classes.
@@ -80,10 +81,55 @@ region operations. BED score carries the normalized score on its 0-1000 scale;
 GFF3, TSV, JSON, and Cis-QL Studio retain the richer evidence fields. Interval
 operations discard hit evidence whenever they change the hit geometry.
 
-### Part 2B: statistically calibrated motif scans
+### Part 2B1: explicit zero-order background models
+
+Implemented syntax:
+
+```cql
+SCAN myb_matrix IN proximal_promoters
+  BACKGROUND FROM genome
+  THRESHOLD 85 %
+  AS myb_sites;
+
+SCAN myb_matrix IN proximal_promoters
+  BACKGROUND UNIFORM
+  THRESHOLD 85 %
+  AS uniform_sites;
+```
+
+`BACKGROUND FROM` accepts a loaded sequence dataset, annotated entity, or named
+region set. Cis-QL estimates A/C/G/T frequencies after ignoring ambiguous bases
+and adds a total pseudocount of 0.1 to prevent zero probabilities. Negative-only
+scans complement the frequencies; when both strands are searched, complementary
+frequencies are averaged (`A=T`, `C=G`) as in FIMO. The effective frequencies,
+source, observed-base count, estimation pseudocount, strand policy, and motif
+pseudocount are retained in each hit and its machine-readable exports.
+
+Frequency estimation is incremental and uses constant auxiliary memory, so a
+whole plant genome can serve as background without making a second in-memory
+copy of its sequences. Region-set backgrounds are counted directly from their
+validated intervals in the active genome.
+
+The matrix-to-PSSM conversion now applies the MEME/FIMO convention in which the
+total motif pseudocount is distributed according to background frequencies.
+Omitting `BACKGROUND` preserves the legacy uniform default, but records it as
+such. Because this corrects the former per-letter pseudocount calculation,
+percentage thresholds can produce different hit counts than earlier Cis-QL
+versions. Future p/q-value syntax will require an explicit statistical policy.
+
+Compatibility basis:
+
+- [FIMO manual](https://meme-suite.org/meme/doc/fimo.html): zero-order
+  backgrounds, reverse-complement averaging, motif pseudocounts, and score
+  calibration.
+- [fasta-get-markov manual](https://meme-suite.org/meme/doc/fasta-get-markov.html):
+  zero-order frequency estimation, ambiguity handling, and pseudocount policy.
+- [FIMO output contract](https://meme-suite.org/meme/doc/fimo-output-format.html):
+  score and future p/q-value meanings.
+
+### Part 2B2: statistically calibrated motif scans
 
 - JASPAR identifiers, TF names/families, source and version.
-- Configurable and recorded background models.
 - P-values and multiple-testing-corrected q-values.
 - A FIMO-compatible execution backend and parity tests.
 

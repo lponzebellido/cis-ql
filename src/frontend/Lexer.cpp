@@ -71,6 +71,8 @@ void Lexer::initKeywords() {
     keywords["MATRIX"] = TokenType::MATRIX;
     keywords["SCAN"] = TokenType::SCAN;
     keywords["THRESHOLD"] = TokenType::THRESHOLD;
+    keywords["BACKGROUND"] = TokenType::BACKGROUND;
+    keywords["UNIFORM"] = TokenType::UNIFORM;
 
     keywords["ANALYZE"] = TokenType::ANALYZE;
     keywords["GC_CONTENT"] = TokenType::GC_CONTENT;
@@ -375,6 +377,8 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::LPAREN: return "LPAREN";
         case TokenType::RPAREN: return "RPAREN";
         case TokenType::PERCENT: return "PERCENT";
+        case TokenType::BACKGROUND: return "BACKGROUND";
+        case TokenType::UNIFORM: return "UNIFORM";
         case TokenType::END_OF_FILE: return "EOF";
         case TokenType::ERROR_TOKEN: return "ERROR_TOKEN";
         default: return "UNKNOWN";

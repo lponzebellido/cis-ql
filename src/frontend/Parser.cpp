@@ -385,6 +385,8 @@ std::unique_ptr<ScanStmtNode> Parser::parseScan() {
   std::string target;
   std::string strandFilter;
   std::string threshold;
+  std::string backgroundMode;
+  std::string backgroundSource;
 
   
   while (!check(TokenType::SEMICOLON) && !check(TokenType::AS) &&
@@ -421,6 +423,31 @@ std::unique_ptr<ScanStmtNode> Parser::parseScan() {
         reportError(peek(), "Expected a numeric value for THRESHOLD.");
         throw std::runtime_error("Parse error");
       }
+    } else if (match(TokenType::BACKGROUND)) {
+      if (!backgroundMode.empty()) {
+        reportError(previous(), "SCAN accepts only one BACKGROUND option.");
+        throw std::runtime_error("Parse error");
+      }
+      if (match(TokenType::UNIFORM)) {
+        backgroundMode = "UNIFORM";
+      } else if (match(TokenType::FROM)) {
+        backgroundMode = "FROM";
+        if (match(TokenType::GENE) || match(TokenType::PROMOTER) ||
+            match(TokenType::ENHANCER) || match(TokenType::EXON) ||
+            match(TokenType::INTRON) || match(TokenType::UTR) ||
+            match(TokenType::TSS) || match(TokenType::CDS) ||
+            match(TokenType::REGION) || match(TokenType::ID)) {
+          backgroundSource = previous().lexeme;
+        } else {
+          reportError(peek(),
+                      "Expected a sequence or region alias after "
+                      "BACKGROUND FROM.");
+          throw std::runtime_error("Parse error");
+        }
+      } else {
+        reportError(peek(), "Expected UNIFORM or FROM after BACKGROUND.");
+        throw std::runtime_error("Parse error");
+      }
     } else {
       break;
     }
@@ -440,7 +467,8 @@ std::unique_ptr<ScanStmtNode> Parser::parseScan() {
 
   return std::unique_ptr<ScanStmtNode>(
       new ScanStmtNode(matrixAlias, target, strandFilter, threshold,
-                       alias, std::move(whereClause)));
+                       backgroundMode, backgroundSource, alias,
+                       std::move(whereClause)));
 }
 
 std::unique_ptr<ConditionNode> Parser::parseWhereClause() {

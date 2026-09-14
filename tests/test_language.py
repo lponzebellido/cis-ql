@@ -299,8 +299,12 @@ def main() -> int:
                 ).splitlines()[0]
                 == "chromosome\tstart\tend\tstrand\ttype\tname\tlength"
                 "\tmatrix_alias\tmatrix_id\tmatrix_name\tmatrix_source"
-                "\traw_score\tscore_percent\tsource_region\tsource_type"
-                "\tsource_start\tsource_end\trelative_start",
+                "\traw_score\tscore_percent\tbackground_mode\tbackground_source"
+                "\tbackground_a\tbackground_c\tbackground_g\tbackground_t"
+                "\tbackground_estimation_pseudocount\tbackground_observed_bases"
+                "\tbackground_strand_policy\tmotif_pseudocount"
+                "\tsource_region\tsource_type\tsource_start\tsource_end"
+                "\trelative_start",
                 "region TSV export")
         profile_lines = (workspace / "profile.tsv").read_text(
             encoding="utf-8"
@@ -423,6 +427,11 @@ def main() -> int:
                     site["motifEvidence"]["matrixId"] == "TEST" and
                     site["motifEvidence"]["matrixName"] == "test" and
                     site["motifEvidence"]["scorePercent"] == 100 and
+                    site["motifEvidence"]["background"]["mode"]
+                    == "uniform" and
+                    site["motifEvidence"]["background"]["source"]
+                    == "default" and
+                    site["motifEvidence"]["motifPseudocount"] == 0.1 and
                     site["motifEvidence"]["sourceRegion"]["name"]
                     == "short_promoter" and
                     site["motifEvidence"]["sourceRegion"]["relativeStart"]
@@ -440,6 +449,9 @@ def main() -> int:
         ).splitlines()
         require("MatrixID=TEST" in gff_rows[1] and
                 "MatrixSource=fixture.pwm" in gff_rows[1] and
+                "BackgroundMode=uniform" in gff_rows[1] and
+                "BackgroundSource=default" in gff_rows[1] and
+                "MotifPseudocount=0.1" in gff_rows[1] and
                 "SourceRegion=short_promoter" in gff_rows[1] and
                 "SourceRegionType=promoter" in gff_rows[1] and
                 "RelativeStart=0" in gff_rows[1],
@@ -448,14 +460,84 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()
         first_tsv_site = tsv_rows[1].split("\t")
-        require(len(tsv_rows) == 10 and len(first_tsv_site) == 18 and
+        require(len(tsv_rows) == 10 and len(first_tsv_site) == 28 and
                 first_tsv_site[7:11]
                 == ["matrix", "TEST", "test", "fixture.pwm"] and
                 float(first_tsv_site[11]) > 0 and
-                first_tsv_site[12:15]
-                == ["100", "short_promoter", "promoter"] and
-                first_tsv_site[17] == "0",
+                first_tsv_site[12:15] == ["100", "uniform", "default"] and
+                first_tsv_site[21] == "forward" and
+                abs(float(first_tsv_site[22]) - 0.1) < 1e-12 and
+                first_tsv_site[23:25] == ["short_promoter", "promoter"] and
+                first_tsv_site[27] == "0",
                 "motif TSV export retains evidence columns")
+
+        data, _ = run_query(
+            workspace,
+            "estimated_sequence_background",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix STRAND POSITIVE BACKGROUND FROM genome "
+            "THRESHOLD 100 % AS sites;\n",
+        )
+        estimated = data["resultSets"]["sites"][0]["motifEvidence"]
+        background = estimated["background"]
+        require(background["mode"] == "estimated_zero_order" and
+                background["source"] == "genome" and
+                background["observedBases"] == len(sequence) and
+                background["strandPolicy"] == "forward" and
+                background["T"] > 0 and
+                abs(sum(background[base] for base in "ACGT") - 1.0) < 1e-6,
+                "BACKGROUND FROM sequence estimates and records composition")
+
+        data, _ = run_query(
+            workspace,
+            "symmetric_sequence_background",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix BACKGROUND FROM genome "
+            "THRESHOLD 100 % AS sites;\n",
+        )
+        background = data["resultSets"]["sites"][0]["motifEvidence"][
+            "background"
+        ]
+        require(background["strandPolicy"] == "symmetric" and
+                abs(background["A"] - background["T"]) < 1e-12 and
+                abs(background["C"] - background["G"]) < 1e-12,
+                "two-strand scans symmetrize background frequencies")
+
+        data, _ = run_query(
+            workspace,
+            "explicit_uniform_background",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix STRAND POSITIVE BACKGROUND UNIFORM "
+            "THRESHOLD 100 % AS sites;\n",
+        )
+        background = data["resultSets"]["sites"][0]["motifEvidence"][
+            "background"
+        ]
+        require(background["mode"] == "uniform" and
+                background["source"] == "explicit" and
+                all(background[base] == 0.25 for base in "ACGT"),
+                "explicit uniform backgrounds are distinguished from default")
+
+        data, _ = run_query(
+            workspace,
+            "estimated_region_background",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            'EXTRACT GENE AS selected WHERE ID = "short";\n'
+            "SCAN matrix STRAND POSITIVE BACKGROUND FROM selected "
+            "THRESHOLD 100 % AS sites;\n",
+        )
+        background = data["resultSets"]["sites"][0]["motifEvidence"][
+            "background"
+        ]
+        require(background["source"] == "selected" and
+                background["observedBases"] == 1200 and
+                background["A"] > 0.8,
+                "BACKGROUND FROM region sets uses active-genome intervals")
 
         data, _ = run_query(
             workspace,
@@ -471,6 +553,8 @@ def main() -> int:
         negative_sites = data["resultSets"]["sites"]
         require(len(negative_sites) == 59 and
                 negative_sites[0]["start"] == 190 and
+                negative_sites[0]["motifEvidence"]["background"]
+                ["strandPolicy"] == "reverse_complement" and
                 negative_sites[0]["motifEvidence"]["sourceRegion"]
                 ["relativeStart"] == 58 and
                 negative_sites[-1]["start"] == 248 and
@@ -488,6 +572,20 @@ def main() -> int:
         )
         require("SCAN IN expects a region or motif-hit set" in semantic_error,
                 "SCAN IN rejects dataset aliases as region targets")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "wrong_background_source_type",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            'LOAD MATRIX "fixture.pwm" AS matrix;\n'
+            "SCAN matrix BACKGROUND FROM annot "
+            "THRESHOLD 80 % AS sites;\n",
+            3,
+        )
+        require("BACKGROUND FROM expects a sequence dataset or region set"
+                in semantic_error,
+                "BACKGROUND FROM rejects annotation dataset aliases")
 
         data, _ = run_query(
             workspace,

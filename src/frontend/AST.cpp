@@ -96,6 +96,10 @@ void ScanStmtNode::print(std::string prefix, bool isLast) const {
     if (!target.empty()) std::cout << ", IN: " << target;
     if (!strandFilter.empty()) std::cout << ", Strand: " << strandFilter;
     if (!threshold.empty()) std::cout << ", Threshold: " << threshold;
+    if (!backgroundMode.empty()) {
+        std::cout << ", Background: " << backgroundMode;
+        if (!backgroundSource.empty()) std::cout << " " << backgroundSource;
+    }
     if (!alias.empty()) std::cout << ", AS: " << alias;
     std::cout << ")" << std::endl;
     std::string childPrefix = prefix + (isLast ? "    " : "│   ");

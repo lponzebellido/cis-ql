@@ -31,6 +31,8 @@ struct FindContext {
 struct ScanContext {
   std::string strandFilter;
   double threshold = -1.0;
+  std::string backgroundMode;
+  std::string backgroundSource;
 };
 
 class Interpreter {
@@ -43,7 +45,6 @@ private:
   std::unordered_map<std::string, std::vector<MotifMatch>> motifResults;
   std::unordered_map<std::string, std::vector<GenomicRegion>> namedRegions;
   std::unordered_map<std::string, PWMatrix> loadedMatrices;
-  std::unordered_map<std::string, PSSM> loadedPSSMs;
   std::unordered_map<std::string, std::vector<GCWindow>> gcResults;
 
   FindContext currentFind;
@@ -87,6 +88,7 @@ private:
   void executeLoadMatrix(const IRInstruction &instr);
   void executeScanOptStrand(const IRInstruction &instr);
   void executeScanOptThreshold(const IRInstruction &instr);
+  void executeScanOptBackground(const IRInstruction &instr);
   void executeScanExec(const IRInstruction &instr);
   void executeScanAlias(const IRInstruction &instr);
   void executeResultAlias(const IRInstruction &instr);

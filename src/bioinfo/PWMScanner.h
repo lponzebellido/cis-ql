@@ -1,6 +1,7 @@
 #ifndef PWM_SCANNER_H
 #define PWM_SCANNER_H
 
+#include "BackgroundModel.h"
 #include "MotifFinder.h"
 #include <string>
 #include <vector>
@@ -25,6 +26,8 @@ struct PSSM {
   std::vector<std::vector<double>> scores; 
   double maxScore;  
   double minScore;  
+  BackgroundModel background;
+  double motifPseudocount;
 };
 
 class PWMScanner {
@@ -34,9 +37,10 @@ public:
 
   
   
-  static PSSM computePSSM(const PWMatrix& pwm,
-                           double bgA = 0.25, double bgC = 0.25,
-                           double bgG = 0.25, double bgT = 0.25);
+  static PSSM computePSSM(
+      const PWMatrix &pwm,
+      const BackgroundModel &background = BackgroundModel(),
+      double motifPseudocount = 0.1);
 
   
   static std::vector<MotifMatch> scan(const std::string& sequence,

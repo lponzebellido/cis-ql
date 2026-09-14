@@ -1,6 +1,7 @@
 #ifndef MOTIF_EVIDENCE_H
 #define MOTIF_EVIDENCE_H
 
+#include "BackgroundModel.h"
 #include <cstddef>
 #include <string>
 
@@ -12,6 +13,8 @@ struct MotifEvidence {
   std::string matrixSource;
   double rawScore = 0.0;
   double scorePercent = 0.0;
+  BackgroundModel background;
+  double motifPseudocount = 0.1;
 
   bool hasSourceRegion = false;
   std::string sourceRegionName;

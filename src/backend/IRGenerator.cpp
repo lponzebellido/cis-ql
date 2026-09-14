@@ -26,6 +26,7 @@ std::string irOpcodeToString(IROpCode op) {
     case IROpCode::SCAN_EXEC:        return "SCAN_EXEC";
     case IROpCode::SCAN_OPT_STRAND:  return "SCAN_OPT_STRAND";
     case IROpCode::SCAN_OPT_THRESHOLD:return "SCAN_OPT_THRESHOLD";
+    case IROpCode::SCAN_OPT_BACKGROUND:return "SCAN_OPT_BACKGROUND";
     case IROpCode::SCAN_ALIAS:       return "SCAN_ALIAS";
     case IROpCode::RESULT_ALIAS:     return "RESULT_ALIAS";
     case IROpCode::ANALYZE_GC:       return "ANALYZE_GC";
@@ -277,6 +278,14 @@ void IRGenerator::visit(ScanStmtNode* node) {
     threshInstr.opcode = IROpCode::SCAN_OPT_THRESHOLD;
     threshInstr.arg1 = node->threshold;
     instructions.push_back(threshInstr);
+  }
+
+  if (!node->backgroundMode.empty()) {
+    IRInstruction backgroundInstr;
+    backgroundInstr.opcode = IROpCode::SCAN_OPT_BACKGROUND;
+    backgroundInstr.arg1 = node->backgroundMode;
+    backgroundInstr.arg2 = node->backgroundSource;
+    instructions.push_back(backgroundInstr);
   }
 
   

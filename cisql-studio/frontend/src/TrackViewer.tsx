@@ -7,6 +7,18 @@ interface MotifEvidence {
   matrixSource: string;
   rawScore: number;
   scorePercent: number;
+  motifPseudocount: number;
+  background?: {
+    mode: string;
+    source: string;
+    A: number;
+    C: number;
+    G: number;
+    T: number;
+    estimationPseudocount: number;
+    observedBases: number;
+    strandPolicy: string;
+  };
   sourceRegion?: {
     name: string;
     type: string;
@@ -548,6 +560,9 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                 <>
                   <br /><span className="tt-label">Matrix:</span> {hoveredRegion.motifEvidence.matrixId || hoveredRegion.motifEvidence.matrixAlias}
                   <br /><span className="tt-label">Score:</span> {hoveredRegion.motifEvidence.rawScore.toFixed(3)} ({hoveredRegion.motifEvidence.scorePercent.toFixed(1)}%)
+                  {hoveredRegion.motifEvidence.background && (
+                    <><br /><span className="tt-label">Background:</span> {hoveredRegion.motifEvidence.background.mode} ({hoveredRegion.motifEvidence.background.source})</>
+                  )}
                   {hoveredRegion.motifEvidence.sourceRegion && (
                     <><br /><span className="tt-label">Source:</span> {hoveredRegion.motifEvidence.sourceRegion.name} +{hoveredRegion.motifEvidence.sourceRegion.relativeStart} bp</>
                   )}
@@ -607,6 +622,15 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                     <span className="detail-label">PWM score</span>
                     <span className="detail-value">{selectedRegion.motifEvidence.rawScore.toFixed(3)} / {selectedRegion.motifEvidence.scorePercent.toFixed(1)}%</span>
                   </div>
+                  {selectedRegion.motifEvidence.background && (
+                    <div className="detail-field">
+                      <span className="detail-label">Background</span>
+                      <span className="detail-value">
+                        {selectedRegion.motifEvidence.background.mode} from {selectedRegion.motifEvidence.background.source} ({selectedRegion.motifEvidence.background.strandPolicy})<br />
+                        A {selectedRegion.motifEvidence.background.A.toFixed(3)} · C {selectedRegion.motifEvidence.background.C.toFixed(3)} · G {selectedRegion.motifEvidence.background.G.toFixed(3)} · T {selectedRegion.motifEvidence.background.T.toFixed(3)}
+                      </span>
+                    </div>
+                  )}
                   {selectedRegion.motifEvidence.sourceRegion && (
                     <div className="detail-field">
                       <span className="detail-label">Source region</span>

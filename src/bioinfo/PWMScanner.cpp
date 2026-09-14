@@ -138,15 +138,23 @@ PWMatrix PWMScanner::loadJASPAR(const std::string &filename) {
   return pwm;
 }
 
-PSSM PWMScanner::computePSSM(const PWMatrix &pwm, double bgA, double bgC,
-                             double bgG, double bgT) {
+PSSM PWMScanner::computePSSM(const PWMatrix &pwm,
+                             const BackgroundModel &background,
+                             double motifPseudocount) {
   PSSM pssm;
   pssm.name = pwm.name;
   pssm.id = pwm.id;
   pssm.source = pwm.source;
   pssm.length = pwm.length;
-  if (pwm.length <= 0 || pwm.counts.size() != 4 || bgA <= 0.0 || bgC <= 0.0 ||
-      bgG <= 0.0 || bgT <= 0.0) {
+  pssm.background = background;
+  pssm.motifPseudocount = motifPseudocount;
+  const double backgroundSum =
+      background.a + background.c + background.g + background.t;
+  if (pwm.length <= 0 || pwm.counts.size() != 4 || background.a <= 0.0 ||
+      background.c <= 0.0 || background.g <= 0.0 || background.t <= 0.0 ||
+      !std::isfinite(backgroundSum) ||
+      std::abs(backgroundSum - 1.0) > 1e-6 ||
+      !std::isfinite(motifPseudocount) || motifPseudocount < 0.0) {
     pssm.length = 0;
     return pssm;
   }
@@ -154,8 +162,7 @@ PSSM PWMScanner::computePSSM(const PWMatrix &pwm, double bgA, double bgC,
   pssm.maxScore = 0.0;
   pssm.minScore = 0.0;
 
-  double bg[4] = {bgA, bgC, bgG, bgT};
-  const double pseudocount = 0.1;
+  double bg[4] = {background.a, background.c, background.g, background.t};
 
   for (int i = 0; i < 4; i++) {
     pssm.scores[i].resize(pwm.length, 0.0);
@@ -179,12 +186,18 @@ PSSM PWMScanner::computePSSM(const PWMatrix &pwm, double bgA, double bgC,
       }
       colTotal += pwm.counts[i][j];
     }
+    if (colTotal + motifPseudocount <= 0.0) {
+      pssm.length = 0;
+      pssm.scores.clear();
+      return pssm;
+    }
 
     double colMax = -1e9;
     double colMin = 1e9;
     for (int i = 0; i < 4; i++) {
-      double freq =
-          (pwm.counts[i][j] + pseudocount) / (colTotal + 4.0 * pseudocount);
+      const double adjustedCount =
+          pwm.counts[i][j] + motifPseudocount * bg[i];
+      const double freq = adjustedCount / (colTotal + motifPseudocount);
       pssm.scores[i][j] = std::log2(freq / bg[i]);
 
       if (pssm.scores[i][j] > colMax)
@@ -245,6 +258,8 @@ std::vector<MotifMatch> PWMScanner::scanStrand(const std::string &sequence,
       m.evidence.matrixSource = pssm.source;
       m.evidence.rawScore = score;
       m.evidence.scorePercent = scoreToPercent(score, pssm);
+      m.evidence.background = pssm.background;
+      m.evidence.motifPseudocount = pssm.motifPseudocount;
 
       size_t ctxStart =
           (m.position > contextSize) ? m.position - contextSize : 0;
@@ -265,8 +280,14 @@ PWMScanner::scan(const std::string &sequence, const PSSM &pssm,
 
   std::vector<MotifMatch> allMatches;
 
-  double range = pssm.maxScore - pssm.minScore;
-  double minRawScore = pssm.minScore + (thresholdPercent / 100.0) * range;
+  double minRawScore = pssm.minScore;
+  if (thresholdPercent >= 100.0) {
+    minRawScore = pssm.maxScore;
+  } else if (thresholdPercent > 0.0) {
+    const double range = pssm.maxScore - pssm.minScore;
+    minRawScore =
+        pssm.minScore + (thresholdPercent / 100.0) * range;
+  }
 
   if (searchPositive) {
     auto posMatches = scanStrand(sequence, pssm, minRawScore, "+");

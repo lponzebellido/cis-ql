@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <iomanip>
 #include <iostream>
 #include <set>
 #include <thread>
@@ -345,6 +346,7 @@ void Interpreter::executeExport(const IRInstruction &instr) {
     reportRuntimeError("Could not open export file '" + filename + "'.");
     return;
   }
+  out << std::setprecision(17);
 
   if (gcIt != gcResults.end()) {
     out << "chromosome\tstart\tgc_percent\n";
@@ -396,7 +398,24 @@ void Interpreter::executeExport(const IRInstruction &instr) {
             << gffAttributeEscape(region.motifEvidence.matrixName)
             << ";MatrixSource="
             << gffAttributeEscape(region.motifEvidence.matrixSource)
-            << ";ScorePercent=" << region.motifEvidence.scorePercent;
+            << ";ScorePercent=" << region.motifEvidence.scorePercent
+            << ";BackgroundMode="
+            << gffAttributeEscape(region.motifEvidence.background.mode)
+            << ";BackgroundSource="
+            << gffAttributeEscape(region.motifEvidence.background.source)
+            << ";BackgroundA=" << region.motifEvidence.background.a
+            << ";BackgroundC=" << region.motifEvidence.background.c
+            << ";BackgroundG=" << region.motifEvidence.background.g
+            << ";BackgroundT=" << region.motifEvidence.background.t
+            << ";BackgroundEstimationPseudocount="
+            << region.motifEvidence.background.estimationPseudocount
+            << ";BackgroundObservedBases="
+            << region.motifEvidence.background.observedBases
+            << ";BackgroundStrandPolicy="
+            << gffAttributeEscape(
+                   region.motifEvidence.background.strandPolicy)
+            << ";MotifPseudocount="
+            << region.motifEvidence.motifPseudocount;
         if (region.motifEvidence.hasSourceRegion) {
           out << ";SourceRegion="
               << gffAttributeEscape(
@@ -413,8 +432,12 @@ void Interpreter::executeExport(const IRInstruction &instr) {
   } else if (format == "TSV") {
     out << "chromosome\tstart\tend\tstrand\ttype\tname\tlength"
            "\tmatrix_alias\tmatrix_id\tmatrix_name\tmatrix_source"
-           "\traw_score\tscore_percent\tsource_region\tsource_type"
-           "\tsource_start\tsource_end\trelative_start\n";
+           "\traw_score\tscore_percent\tbackground_mode\tbackground_source"
+           "\tbackground_a\tbackground_c\tbackground_g\tbackground_t"
+           "\tbackground_estimation_pseudocount\tbackground_observed_bases"
+           "\tbackground_strand_policy\tmotif_pseudocount"
+           "\tsource_region\tsource_type\tsource_start\tsource_end"
+           "\trelative_start\n";
     for (const auto &region : regionsIt->second) {
       out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
           << region.end << '\t' << cleanTabularField(region.strand) << '\t'
@@ -427,7 +450,18 @@ void Interpreter::executeExport(const IRInstruction &instr) {
             << cleanTabularField(region.motifEvidence.matrixName) << '\t'
             << cleanTabularField(region.motifEvidence.matrixSource) << '\t'
             << region.motifEvidence.rawScore << '\t'
-            << region.motifEvidence.scorePercent << '\t';
+            << region.motifEvidence.scorePercent << '\t'
+            << cleanTabularField(region.motifEvidence.background.mode) << '\t'
+            << cleanTabularField(region.motifEvidence.background.source)
+            << '\t' << region.motifEvidence.background.a << '\t'
+            << region.motifEvidence.background.c << '\t'
+            << region.motifEvidence.background.g << '\t'
+            << region.motifEvidence.background.t << '\t'
+            << region.motifEvidence.background.estimationPseudocount << '\t'
+            << region.motifEvidence.background.observedBases << '\t'
+            << cleanTabularField(
+                   region.motifEvidence.background.strandPolicy)
+            << '\t' << region.motifEvidence.motifPseudocount << '\t';
         if (region.motifEvidence.hasSourceRegion) {
           out << cleanTabularField(
                      region.motifEvidence.sourceRegionName)
@@ -440,7 +474,7 @@ void Interpreter::executeExport(const IRInstruction &instr) {
           out << "\t\t\t\t";
         }
       } else {
-        for (int emptyColumn = 0; emptyColumn < 10; ++emptyColumn)
+        for (int emptyColumn = 0; emptyColumn < 20; ++emptyColumn)
           out << '\t';
       }
       out << '\n';
@@ -1232,12 +1266,12 @@ void Interpreter::executeLoadMatrix(const IRInstruction &instr) {
     return;
   }
   loadedMatrices[alias] = pwm;
-  loadedPSSMs[alias] = pssm;
 
   if (debugMode) {
     std::cout << "  Loaded PWM \"" << pssm.name << "\" (" << pssm.length
-              << " positions, score range: " << pssm.minScore << " to "
-              << pssm.maxScore << ")" << std::endl;
+              << " positions, default-uniform score range: "
+              << pssm.minScore << " to " << pssm.maxScore << ")"
+              << std::endl;
   }
 }
 
@@ -1254,6 +1288,11 @@ void Interpreter::executeScanOptThreshold(const IRInstruction &instr) {
   } else {
     currentScan.threshold = std::atof(valueStr.c_str());
   }
+}
+
+void Interpreter::executeScanOptBackground(const IRInstruction &instr) {
+  currentScan.backgroundMode = instr.arg1;
+  currentScan.backgroundSource = instr.arg2;
 }
 
 void Interpreter::executeScanExec(const IRInstruction &instr) {
@@ -1273,6 +1312,11 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
     if (!currentScan.strandFilter.empty()) {
       std::cout << " STRAND " << currentScan.strandFilter;
     }
+    if (currentScan.backgroundMode == "UNIFORM") {
+      std::cout << " BACKGROUND UNIFORM";
+    } else if (currentScan.backgroundMode == "FROM") {
+      std::cout << " BACKGROUND FROM " << currentScan.backgroundSource;
+    }
     std::cout << " THRESHOLD " << currentScan.threshold << "%";
     std::cout << std::endl;
   }
@@ -1282,15 +1326,82 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
     return;
   }
 
-  if (!loadedPSSMs.count(matrixAlias)) {
+  if (!loadedMatrices.count(matrixAlias)) {
     reportRuntimeError("Matrix '" + matrixAlias + "' not loaded.");
     return;
   }
 
-  const PSSM &pssm = loadedPSSMs[matrixAlias];
-
   bool searchPos = (currentScan.strandFilter != "NEGATIVE");
   bool searchNeg = (currentScan.strandFilter != "POSITIVE");
+  const std::string backgroundStrandPolicy =
+      searchPos && searchNeg
+          ? "symmetric"
+          : (searchNeg ? "reverse_complement" : "forward");
+
+  BackgroundModel background;
+  if (currentScan.backgroundMode.empty()) {
+    background = BackgroundModelEstimator::uniform("default");
+    background.strandPolicy = backgroundStrandPolicy;
+  } else if (currentScan.backgroundMode == "UNIFORM") {
+    background = BackgroundModelEstimator::uniform("explicit");
+    background.strandPolicy = backgroundStrandPolicy;
+  } else {
+    BackgroundModelAccumulator backgroundAccumulator;
+    const auto sequenceDataset =
+        sequenceDatasets.find(currentScan.backgroundSource);
+    if (sequenceDataset != sequenceDatasets.end()) {
+      for (const auto &record : sequenceDataset->second)
+        backgroundAccumulator.addSequence(record.sequence);
+    } else {
+      const auto chromosomeMap = sequenceChrMaps.find(activeSequenceAlias);
+      if (chromosomeMap == sequenceChrMaps.end()) {
+        reportRuntimeError(
+            "BACKGROUND FROM regions requires an active FASTA dataset.");
+        currentScan = ScanContext();
+        return;
+      }
+      const std::vector<GenomicRegion> regions =
+          resolveEntity(currentScan.backgroundSource);
+      for (const auto &region : regions) {
+        const auto chromosome = chromosomeMap->second.find(region.chr);
+        if (chromosome == chromosomeMap->second.end()) {
+          reportRuntimeError("Background source sequence identifier '" +
+                             region.chr + "' is not present in the active "
+                             "FASTA dataset.");
+          currentScan = ScanContext();
+          return;
+        }
+        if (region.start > region.end ||
+            region.end > chromosome->second.sequence.size()) {
+          reportRuntimeError("Background source region '" + region.name +
+                             "' lies outside chromosome '" + region.chr +
+                             "'.");
+          currentScan = ScanContext();
+          return;
+        }
+        backgroundAccumulator.addRange(chromosome->second.sequence,
+                                       region.start, region.end);
+      }
+    }
+
+    std::string backgroundError;
+    if (!backgroundAccumulator.build(
+            currentScan.backgroundSource, backgroundStrandPolicy,
+            background, backgroundError)) {
+      reportRuntimeError(backgroundError);
+      currentScan = ScanContext();
+      return;
+    }
+  }
+
+  const PSSM pssm =
+      PWMScanner::computePSSM(loadedMatrices[matrixAlias], background);
+  if (pssm.length == 0) {
+    reportRuntimeError("Could not construct a PSSM for matrix '" +
+                       matrixAlias + "' with the selected background.");
+    currentScan = ScanContext();
+    return;
+  }
 
   std::vector<MotifMatch> matches;
   size_t scannedUnits = 0;
@@ -1385,6 +1496,10 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
   motifResults[resultId] = matches;
 
   if (debugMode) {
+    std::cout << "  Background " << background.mode << " [A="
+              << background.a << ", C=" << background.c << ", G="
+              << background.g << ", T=" << background.t << "] from "
+              << background.source << std::endl;
     std::cout << "  PWM scan found " << matches.size() << " site(s) above "
               << currentScan.threshold << "% threshold across "
               << scannedUnits
@@ -1503,6 +1618,7 @@ void Interpreter::executeAnalyzeCpG(const IRInstruction &instr) {
 void Interpreter::dumpResultsJSON() const {
   std::ofstream out(".cisql_results.json");
   if (!out.is_open()) return;
+  out << std::setprecision(17);
 
   out << "{\n"
       << "  \"metadata\": {\n"
@@ -1544,7 +1660,30 @@ void Interpreter::dumpResultsJSON() const {
             << "          \"rawScore\": "
             << r.motifEvidence.rawScore << ",\n"
             << "          \"scorePercent\": "
-            << r.motifEvidence.scorePercent;
+            << r.motifEvidence.scorePercent << ",\n"
+            << "          \"motifPseudocount\": "
+            << r.motifEvidence.motifPseudocount << ",\n"
+            << "          \"background\": {\n"
+            << "            \"mode\": \""
+            << jsonEscape(r.motifEvidence.background.mode) << "\",\n"
+            << "            \"source\": \""
+            << jsonEscape(r.motifEvidence.background.source) << "\",\n"
+            << "            \"A\": " << r.motifEvidence.background.a
+            << ",\n"
+            << "            \"C\": " << r.motifEvidence.background.c
+            << ",\n"
+            << "            \"G\": " << r.motifEvidence.background.g
+            << ",\n"
+            << "            \"T\": " << r.motifEvidence.background.t
+            << ",\n"
+            << "            \"estimationPseudocount\": "
+            << r.motifEvidence.background.estimationPseudocount << ",\n"
+            << "            \"observedBases\": "
+            << r.motifEvidence.background.observedBases << ",\n"
+            << "            \"strandPolicy\": \""
+            << jsonEscape(r.motifEvidence.background.strandPolicy) << "\""
+            << "\n"
+            << "          }";
         if (r.motifEvidence.hasSourceRegion) {
           out << ",\n          \"sourceRegion\": {\n"
               << "            \"name\": \""
@@ -1756,6 +1895,9 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
       break;
     case IROpCode::SCAN_OPT_THRESHOLD:
       executeScanOptThreshold(instr);
+      break;
+    case IROpCode::SCAN_OPT_BACKGROUND:
+      executeScanOptBackground(instr);
       break;
     case IROpCode::SCAN_EXEC:
       executeScanExec(instr);

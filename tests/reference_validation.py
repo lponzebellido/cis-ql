@@ -101,7 +101,8 @@ def pssm_percent_scores(
         total = sum(row[position] for row in counts)
         column = [
             math.log2(
-                ((counts[base][position] + 0.1) / (total + 0.4))
+                ((counts[base][position] + 0.1 * backgrounds[base])
+                 / (total + 0.1))
                 / backgrounds[base]
             )
             for base in range(4)

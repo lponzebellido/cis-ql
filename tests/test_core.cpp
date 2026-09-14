@@ -181,6 +181,46 @@ int main() {
   require(!GCAnalyzer::findCpGIslands(repeatedCpG, "chr1").empty(),
           "CpG island detection");
 
+  BackgroundModel estimatedBackground;
+  std::string backgroundError;
+  BackgroundModelAccumulator backgroundAccumulator;
+  backgroundAccumulator.addSequence("AAAACCGTNN");
+  require(backgroundAccumulator.build("test-sequences", "forward",
+                                      estimatedBackground, backgroundError),
+          "zero-order background estimation succeeds");
+  require(estimatedBackground.observedBases == 8 &&
+              estimatedBackground.strandPolicy == "forward" &&
+              std::abs(estimatedBackground.a - 4.025 / 8.1) < 1e-12 &&
+              std::abs(estimatedBackground.c - 2.025 / 8.1) < 1e-12 &&
+              std::abs(estimatedBackground.g - 1.025 / 8.1) < 1e-12 &&
+              std::abs(estimatedBackground.t - 1.025 / 8.1) < 1e-12,
+          "background estimation ignores ambiguity and applies a total "
+          "pseudocount of 0.1");
+
+  BackgroundModel symmetricBackground;
+  require(backgroundAccumulator.build("test-sequences", "symmetric",
+                                      symmetricBackground, backgroundError) &&
+              std::abs(symmetricBackground.a - symmetricBackground.t) <
+                  1e-12 &&
+              std::abs(symmetricBackground.c - symmetricBackground.g) <
+                  1e-12,
+          "two-strand backgrounds average reverse-complement frequencies");
+  BackgroundModel reverseBackground;
+  require(backgroundAccumulator.build("test-sequences", "reverse_complement",
+                                      reverseBackground, backgroundError) &&
+              std::abs(reverseBackground.a - estimatedBackground.t) < 1e-12 &&
+              std::abs(reverseBackground.c - estimatedBackground.g) < 1e-12 &&
+              std::abs(reverseBackground.g - estimatedBackground.c) < 1e-12 &&
+              std::abs(reverseBackground.t - estimatedBackground.a) < 1e-12,
+          "negative-strand backgrounds use reverse-complement frequencies");
+  BackgroundModelAccumulator ambiguousBackground;
+  ambiguousBackground.addSequence("NNNN");
+  require(!ambiguousBackground.build("ambiguous", "forward",
+                                     estimatedBackground, backgroundError) &&
+              backgroundError.find("no unambiguous DNA bases") !=
+                  std::string::npos,
+          "empty effective background sources are rejected");
+
   PWMatrix matrix;
   matrix.id = "TEST";
   matrix.name = "TEST";
@@ -188,6 +228,10 @@ int main() {
   matrix.length = 2;
   matrix.counts = {{10, 10}, {0, 0}, {0, 0}, {0, 0}};
   const PSSM pssm = PWMScanner::computePSSM(matrix);
+  const double expectedBestScore =
+      2.0 * std::log2(((10.0 + 0.1 * 0.25) / 10.1) / 0.25);
+  require(std::abs(pssm.maxScore - expectedBestScore) < 1e-12,
+          "PSSM uses the MEME/FIMO background-weighted motif pseudocount");
   const auto pwmHits = PWMScanner::scan("AAAA", pssm, 90.0, "chrPWM", true,
                                         false);
   require(pwmHits.size() == 3 && pwmHits[0].chr == "chrPWM",
@@ -196,6 +240,8 @@ int main() {
               pwmHits[0].evidence.matrixId == "TEST" &&
               pwmHits[0].evidence.matrixName == "TEST" &&
               pwmHits[0].evidence.matrixSource == "test-matrix.pwm" &&
+              pwmHits[0].evidence.background.mode == "uniform" &&
+              pwmHits[0].evidence.motifPseudocount == 0.1 &&
               std::abs(pwmHits[0].evidence.rawScore - pssm.maxScore) < 1e-9 &&
               std::abs(pwmHits[0].evidence.scorePercent - 100.0) < 1e-9,
           "PWM matches retain matrix provenance and scores");
