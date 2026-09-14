@@ -1,3 +1,0 @@
-##gff-version 3
-chrDemo	Cis-QL	promoter	101	220	.	+	.	ID=anthocyanin_enzyme_promoter;Name=anthocyanin_enzyme_promoter;CountRelation=OVERLAPS;CountedSet=supported_myb_sites;ContainerSet=candidate_promoters;OverlapCount=1
-chrDemo	Cis-QL	promoter	581	700	.	-	.	ID=transporter_candidate_promoter;Name=transporter_candidate_promoter;CountRelation=OVERLAPS;CountedSet=supported_myb_sites;ContainerSet=candidate_promoters;OverlapCount=1
