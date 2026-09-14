@@ -179,6 +179,17 @@ void Interpreter::printRegions(const std::vector<GenomicRegion> &regions,
     if (!r.name.empty())
       std::cout << "  name:" << r.name;
     std::cout << std::endl;
+    if (r.spatialRelation.present) {
+      std::cout << "      " << r.spatialRelation.relation << " "
+                << r.spatialRelation.referenceSet << ":"
+                << r.spatialRelation.referenceName << " at "
+                << r.spatialRelation.referenceChr << ":"
+                << r.spatialRelation.referenceStart << ".."
+                << r.spatialRelation.referenceEnd << "  distance:"
+                << r.spatialRelation.distance << " BP  overlaps:"
+                << (r.spatialRelation.overlaps ? "true" : "false")
+                << std::endl;
+    }
     if (!r.sequence.empty()) {
       std::string display = r.sequence;
       if (display.size() > 60) {
@@ -447,6 +458,27 @@ void Interpreter::executeExport(const IRInstruction &instr) {
               << region.motifEvidence.relativeStart;
         }
       }
+      if (region.spatialRelation.present) {
+        out << ";SpatialRelation="
+            << gffAttributeEscape(region.spatialRelation.relation)
+            << ";ReferenceSet="
+            << gffAttributeEscape(region.spatialRelation.referenceSet)
+            << ";ReferenceChr="
+            << gffAttributeEscape(region.spatialRelation.referenceChr)
+            << ";ReferenceStart=" << region.spatialRelation.referenceStart
+            << ";ReferenceEnd=" << region.spatialRelation.referenceEnd
+            << ";ReferenceStrand="
+            << gffAttributeEscape(region.spatialRelation.referenceStrand)
+            << ";ReferenceType="
+            << gffAttributeEscape(region.spatialRelation.referenceType)
+            << ";ReferenceName="
+            << gffAttributeEscape(region.spatialRelation.referenceName)
+            << ";Distance=" << region.spatialRelation.distance
+            << ";MaximumDistance="
+            << region.spatialRelation.maximumDistance
+            << ";Overlaps="
+            << (region.spatialRelation.overlaps ? "true" : "false");
+      }
       out << '\n';
     }
   } else if (format == "TSV") {
@@ -460,7 +492,11 @@ void Interpreter::executeExport(const IRInstruction &instr) {
            "\tbackground_estimation_pseudocount\tbackground_observed_bases"
            "\tbackground_strand_policy\tmotif_pseudocount"
            "\tsource_region\tsource_type\tsource_start\tsource_end"
-           "\trelative_start\n";
+           "\trelative_start"
+           "\tspatial_relation\treference_set\treference_chr"
+           "\treference_start\treference_end\treference_strand"
+           "\treference_type\treference_name\tdistance_bp"
+           "\tmaximum_distance_bp\toverlaps\n";
     for (const auto &region : regionsIt->second) {
       out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
           << region.end << '\t' << cleanTabularField(region.strand) << '\t'
@@ -510,6 +546,23 @@ void Interpreter::executeExport(const IRInstruction &instr) {
         }
       } else {
         for (int emptyColumn = 0; emptyColumn < 29; ++emptyColumn)
+          out << '\t';
+      }
+      out << '\t';
+      if (region.spatialRelation.present) {
+        out << cleanTabularField(region.spatialRelation.relation) << '\t'
+            << cleanTabularField(region.spatialRelation.referenceSet) << '\t'
+            << cleanTabularField(region.spatialRelation.referenceChr) << '\t'
+            << region.spatialRelation.referenceStart << '\t'
+            << region.spatialRelation.referenceEnd << '\t'
+            << cleanTabularField(region.spatialRelation.referenceStrand) << '\t'
+            << cleanTabularField(region.spatialRelation.referenceType) << '\t'
+            << cleanTabularField(region.spatialRelation.referenceName) << '\t'
+            << region.spatialRelation.distance << '\t'
+            << region.spatialRelation.maximumDistance << '\t'
+            << (region.spatialRelation.overlaps ? "true" : "false");
+      } else {
+        for (int emptyColumn = 0; emptyColumn < 10; ++emptyColumn)
           out << '\t';
       }
       out << '\n';
@@ -1251,12 +1304,24 @@ void Interpreter::executeSetOp(const IRInstruction &instr) {
       std::cout << "> EXCEPT " << entity1 << " FROM " << entity2 << std::endl;
     }
     result = SetOperations::except(regions1, regions2);
-  } else {
+  } else if (instr.opcode == IROpCode::SET_OVERLAPS) {
     if (debugMode) {
       std::cout << "> OVERLAPS " << entity1 << " WITH " << entity2
                 << std::endl;
     }
     result = SetOperations::selectOverlapping(regions1, regions2);
+  } else {
+    const long double factor = instr.arg5 == "MB" ? 1000000.0L
+                               : instr.arg5 == "KB" ? 1000.0L : 1.0L;
+    const size_t maximumDistance = static_cast<size_t>(
+        std::strtold(instr.arg4.c_str(), nullptr) * factor);
+    if (debugMode) {
+      std::cout << "> NEAR " << entity1 << " TO " << entity2
+                << " WITHIN " << instr.arg4 << " " << instr.arg5
+                << std::endl;
+    }
+    result = SetOperations::selectNear(regions1, regions2, maximumDistance,
+                                       entity2);
   }
 
   resultSets[resultId] = result;
@@ -1803,6 +1868,34 @@ void Interpreter::dumpResultsJSON() const {
         }
         out << "\n        }";
       }
+      if (r.spatialRelation.present) {
+        out << ",\n        \"spatialRelation\": {\n"
+            << "          \"relation\": \""
+            << jsonEscape(r.spatialRelation.relation) << "\",\n"
+            << "          \"referenceSet\": \""
+            << jsonEscape(r.spatialRelation.referenceSet) << "\",\n"
+            << "          \"reference\": {\n"
+            << "            \"chr\": \""
+            << jsonEscape(r.spatialRelation.referenceChr) << "\",\n"
+            << "            \"start\": "
+            << r.spatialRelation.referenceStart << ",\n"
+            << "            \"end\": "
+            << r.spatialRelation.referenceEnd << ",\n"
+            << "            \"strand\": \""
+            << jsonEscape(r.spatialRelation.referenceStrand) << "\",\n"
+            << "            \"type\": \""
+            << jsonEscape(r.spatialRelation.referenceType) << "\",\n"
+            << "            \"name\": \""
+            << jsonEscape(r.spatialRelation.referenceName) << "\"\n"
+            << "          },\n"
+            << "          \"distance\": "
+            << r.spatialRelation.distance << ",\n"
+            << "          \"maximumDistance\": "
+            << r.spatialRelation.maximumDistance << ",\n"
+            << "          \"overlaps\": "
+            << (r.spatialRelation.overlaps ? "true" : "false") << "\n"
+            << "        }";
+      }
       out << "\n      }";
     }
     out << "\n    ]";
@@ -1986,6 +2079,7 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
     case IROpCode::SET_UNION:
     case IROpCode::SET_EXCEPT:
     case IROpCode::SET_OVERLAPS:
+    case IROpCode::SET_NEAR:
       executeSetOp(instr);
       break;
     case IROpCode::PRINT_RESULTS:

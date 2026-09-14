@@ -65,6 +65,7 @@ void Lexer::initKeywords() {
     keywords["UNION"] = TokenType::UNION;
     keywords["EXCEPT"] = TokenType::EXCEPT;
     keywords["OVERLAPS"] = TokenType::OVERLAPS;
+    keywords["NEAR"] = TokenType::NEAR;
 
     keywords["SIMILARITY"] = TokenType::SIMILARITY;
     keywords["REVERSE_COMPLEMENT"] = TokenType::REVERSE_COMPLEMENT;
@@ -395,6 +396,7 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::UNION: return "UNION";
         case TokenType::EXCEPT: return "EXCEPT";
         case TokenType::OVERLAPS: return "OVERLAPS";
+        case TokenType::NEAR: return "NEAR";
         case TokenType::SIMILARITY: return "SIMILARITY";
         case TokenType::REVERSE_COMPLEMENT: return "REVERSE_COMPLEMENT";
         case TokenType::MATRIX: return "MATRIX";

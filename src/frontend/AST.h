@@ -181,12 +181,15 @@ public:
   std::string op;
   std::string entity1;
   std::string entity2;
+  std::string distanceValue;
+  std::string distanceUnit;
   std::string alias;
   std::unique_ptr<ConditionNode> whereClause;
   SetOpStmtNode(std::string o, std::string e1, std::string e2,
-                std::string a, std::unique_ptr<ConditionNode> w)
-      : op(o), entity1(e1), entity2(e2), alias(a),
-        whereClause(std::move(w)) {}
+                std::string dv, std::string du, std::string a,
+                std::unique_ptr<ConditionNode> w)
+      : op(o), entity1(e1), entity2(e2), distanceValue(dv), distanceUnit(du),
+        alias(a), whereClause(std::move(w)) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;
 };

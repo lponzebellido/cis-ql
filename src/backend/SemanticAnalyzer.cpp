@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <set>
 
 static const std::set<std::string> BUILTIN_ENTITIES = {
@@ -205,6 +206,21 @@ void SemanticAnalyzer::visit(ExtractStmtNode *node) {
 }
 
 void SemanticAnalyzer::visit(SetOpStmtNode *node) {
+  if (node->op == "NEAR") {
+    const long double factor = node->distanceUnit == "MB" ? 1000000.0L
+                               : node->distanceUnit == "KB" ? 1000.0L
+                               : 1.0L;
+    const long double basePairs =
+        std::strtold(node->distanceValue.c_str(), nullptr) * factor;
+    if (!std::isfinite(basePairs) || basePairs < 0.0 ||
+        basePairs >= static_cast<long double>(
+                        std::numeric_limits<size_t>::max())) {
+      reportError("NEAR distance must be a finite, non-negative genomic "
+                  "distance within the coordinate range.");
+    } else if (std::floor(basePairs) != basePairs) {
+      reportError("NEAR distance must resolve to a whole number of base pairs.");
+    }
+  }
   if (isBuiltinEntity(node->entity1) && !annotationLoaded) {
     reportError("Set operation on " + node->entity1 +
                 " requires annotation data.");

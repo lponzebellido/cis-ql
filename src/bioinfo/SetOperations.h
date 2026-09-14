@@ -15,6 +15,10 @@ public:
   static std::vector<GenomicRegion> selectOverlapping(
       const std::vector<GenomicRegion> &query,
       const std::vector<GenomicRegion> &reference);
+  static std::vector<GenomicRegion> selectNear(
+      const std::vector<GenomicRegion> &query,
+      const std::vector<GenomicRegion> &reference,
+      size_t maximumDistance, const std::string &referenceSet);
 };
 
 #endif

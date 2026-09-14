@@ -22,6 +22,7 @@ std::string irOpcodeToString(IROpCode op) {
     case IROpCode::SET_UNION:        return "SET_UNION";
     case IROpCode::SET_EXCEPT:       return "SET_EXCEPT";
     case IROpCode::SET_OVERLAPS:     return "SET_OVERLAPS";
+    case IROpCode::SET_NEAR:         return "SET_NEAR";
     case IROpCode::PRINT_RESULTS:    return "PRINT_RESULTS";
     case IROpCode::LOAD_MATRIX:      return "LOAD_MATRIX";
     case IROpCode::SCAN_EXEC:        return "SCAN_EXEC";
@@ -230,11 +231,14 @@ void IRGenerator::visit(SetOpStmtNode* node) {
   if (node->op == "INTERSECT") setInstr.opcode = IROpCode::SET_INTERSECT;
   else if (node->op == "UNION") setInstr.opcode = IROpCode::SET_UNION;
   else if (node->op == "EXCEPT") setInstr.opcode = IROpCode::SET_EXCEPT;
-  else setInstr.opcode = IROpCode::SET_OVERLAPS;
+  else if (node->op == "OVERLAPS") setInstr.opcode = IROpCode::SET_OVERLAPS;
+  else setInstr.opcode = IROpCode::SET_NEAR;
 
   setInstr.arg1 = node->entity1;
   setInstr.arg2 = node->entity2;
   setInstr.arg3 = currentTemp;
+  setInstr.arg4 = node->distanceValue;
+  setInstr.arg5 = node->distanceUnit;
   instructions.push_back(setInstr);
 
   emitFilter(node->whereClause.get(), currentTemp);

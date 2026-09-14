@@ -1,6 +1,6 @@
 # Cis-QL v3: regulatory genomics direction
 
-Status: incremental implementation. Parts 1 through 2B3 and Part 3A are
+Status: incremental implementation. Parts 1 through 2B3 and Parts 3A-3B are
 implemented; later parts are a design contract, not yet accepted syntax.
 
 ## Product definition
@@ -220,9 +220,43 @@ The reference side is indexed per chromosome by sorted starts and prefix
 maximum ends. After index construction, each query is evaluated in logarithmic
 time without enumerating every overlapping pair.
 
+#### Part 3B: bounded nearest-reference selection
+
+Implemented syntax:
+
+```cql
+NEAR significant_myb_sites TO GENE WITHIN 2 KB
+  AS proximal_gene_candidates;
+```
+
+`NEAR query TO reference WITHIN distance` is a directional, bounded nearest
+selection. For every valid query interval, Cis-QL finds one nearest reference
+on the same chromosome and retains the complete query only when its interval
+gap is less than or equal to the explicit limit. Overlaps and directly adjacent
+half-open intervals both have gap zero; the stored `overlaps` Boolean keeps
+those cases distinguishable. Limits must be finite, non-negative, explicitly
+unit-qualified, and resolve to whole base pairs.
+
+Each retained record preserves existing motif evidence and attaches a typed
+`spatialRelation` containing the reference set, chosen reference coordinates,
+strand, type, name, observed distance, requested maximum distance, and overlap
+state. JSON preserves the nested structure; TSV and GFF3 expose equivalent
+fields. Reference coordinates embedded in GFF3 attributes remain zero-based,
+half-open even though the feature columns follow the GFF3 coordinate system.
+BED remains intentionally lossy.
+
+The choice is deterministic: equal-distance references are ordered by start,
+end, name, type, then strand. A per-chromosome index of sorted starts and prefix
+maximum ends avoids scanning all reference intervals for every query.
+
+This operator creates a proximity-based candidate association. It must not be
+reported as proof that the selected feature regulates the recorded gene; later
+evidence-integration layers can add accessibility, binding, expression, or
+chromatin-contact support.
+
 Still planned:
 
-- `NEAR`, `CLOSEST`, `DISTANCE`, `COUNT`, and grouped aggregation;
+- unbounded `CLOSEST`, standalone `DISTANCE`, `COUNT`, and grouped aggregation;
 - Motif modules with order, orientation, minimum and maximum spacing.
 - Matched backgrounds and enrichment with multiple-testing correction.
 

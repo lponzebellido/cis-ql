@@ -39,6 +39,22 @@ interface MotifEvidence {
   };
 }
 
+interface SpatialRelation {
+  relation: string;
+  referenceSet: string;
+  reference: {
+    chr: string;
+    start: number;
+    end: number;
+    strand: string;
+    type: string;
+    name: string;
+  };
+  distance: number;
+  maximumDistance: number;
+  overlaps: boolean;
+}
+
 interface GenomicRegion {
   chr: string;
   start: number;
@@ -48,6 +64,7 @@ interface GenomicRegion {
   name: string;
   sequence?: string;
   motifEvidence?: MotifEvidence;
+  spatialRelation?: SpatialRelation;
 }
 
 interface TrackViewerProps {
@@ -582,6 +599,13 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                   )}
                 </>
               )}
+              {hoveredRegion.spatialRelation && (
+                <>
+                  <br /><span className="tt-label">{hoveredRegion.spatialRelation.relation}:</span> {hoveredRegion.spatialRelation.reference.name || hoveredRegion.spatialRelation.reference.type}
+                  <br /><span className="tt-label">Distance:</span> {formatBp(hoveredRegion.spatialRelation.distance)} / {formatBp(hoveredRegion.spatialRelation.maximumDistance)} max
+                  <br /><span className="tt-label">Overlap:</span> {hoveredRegion.spatialRelation.overlaps ? 'yes' : 'no'}
+                </>
+              )}
               {hoveredRegion.sequence && (
                 <div style={{ marginTop: 6, fontFamily: "'JetBrains Mono', monospace", fontSize: '0.65rem', color: '#3fb950', wordBreak: 'break-all', maxWidth: 250 }}>
                   {hoveredRegion.sequence.substring(0, 40)}{hoveredRegion.sequence.length > 40 ? '...' : ''}
@@ -660,6 +684,23 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                       <span className="detail-value">{selectedRegion.motifEvidence.sourceRegion.name}, +{selectedRegion.motifEvidence.sourceRegion.relativeStart} bp</span>
                     </div>
                   )}
+                </>
+              )}
+              {selectedRegion.spatialRelation && (
+                <>
+                  <div className="detail-field">
+                    <span className="detail-label">Spatial relation</span>
+                    <span className="detail-value">
+                      {selectedRegion.spatialRelation.relation} {selectedRegion.spatialRelation.referenceSet}<br />
+                      {selectedRegion.spatialRelation.reference.name || selectedRegion.spatialRelation.reference.type} · {selectedRegion.spatialRelation.reference.chr}:{selectedRegion.spatialRelation.reference.start.toLocaleString()}-{selectedRegion.spatialRelation.reference.end.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="detail-field">
+                    <span className="detail-label">Interval distance</span>
+                    <span className="detail-value">
+                      {formatBp(selectedRegion.spatialRelation.distance)} (limit {formatBp(selectedRegion.spatialRelation.maximumDistance)}) · {selectedRegion.spatialRelation.overlaps ? 'overlapping' : 'not overlapping'}
+                    </span>
+                  </div>
                 </>
               )}
               {selectedRegion.sequence && (

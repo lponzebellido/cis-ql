@@ -319,7 +319,11 @@ def main() -> int:
                 "\tbackground_estimation_pseudocount\tbackground_observed_bases"
                 "\tbackground_strand_policy\tmotif_pseudocount"
                 "\tsource_region\tsource_type\tsource_start\tsource_end"
-                "\trelative_start",
+                "\trelative_start"
+                "\tspatial_relation\treference_set\treference_chr"
+                "\treference_start\treference_end\treference_strand"
+                "\treference_type\treference_name\tdistance_bp"
+                "\tmaximum_distance_bp\toverlaps",
                 "region TSV export")
         profile_lines = (workspace / "profile.tsv").read_text(
             encoding="utf-8"
@@ -492,7 +496,7 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()
         first_tsv_site = tsv_rows[1].split("\t")
-        require(len(tsv_rows) == 10 and len(first_tsv_site) == 37 and
+        require(len(tsv_rows) == 10 and len(first_tsv_site) == 48 and
                 first_tsv_site[7:11]
                 == ["matrix", "TEST", "test", "fixture.pwm"] and
                 float(first_tsv_site[11]) > 0 and
@@ -507,7 +511,8 @@ def main() -> int:
                 first_tsv_site[30] == "forward" and
                 abs(float(first_tsv_site[31]) - 0.1) < 1e-12 and
                 first_tsv_site[32:34] == ["short_promoter", "promoter"] and
-                first_tsv_site[36] == "0",
+                first_tsv_site[36] == "0" and
+                first_tsv_site[37:] == [""] * 11,
                 "motif TSV export retains evidence columns")
 
         data, _ = run_query(
@@ -547,6 +552,108 @@ def main() -> int:
         require("'WITH' (for OVERLAPS)" in parser_error,
                 "OVERLAPS requires an explicit directional separator")
 
+        data, _ = run_query(
+            workspace,
+            "nearest_reference_evidence",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            "DEFINE PROMOTERS OF GENE FROM TSS "
+            "UPSTREAM 100 BP DOWNSTREAM 20 BP AS promoters;\n"
+            "NEAR promoters TO GENE WITHIN 0 BP AS linked_promoters;\n"
+            'EXPORT linked_promoters TO "linked.gff3" FORMAT GFF3;\n'
+            'EXPORT linked_promoters TO "linked.tsv" FORMAT TSV;\n',
+        )
+        linked_promoters = data["resultSets"]["linked_promoters"]
+        first_relation = linked_promoters[0]["spatialRelation"]
+        require(len(linked_promoters) == 3 and
+                first_relation["relation"] == "NEAR" and
+                first_relation["referenceSet"] == "GENE" and
+                first_relation["reference"] == {
+                    "chr": "chr1", "start": 0, "end": 1200,
+                    "strand": "+", "type": "gene", "name": "short",
+                } and
+                first_relation["distance"] == 0 and
+                first_relation["maximumDistance"] == 0 and
+                first_relation["overlaps"] is True,
+                "NEAR emits auditable nearest-reference evidence")
+        linked_gff = (workspace / "linked.gff3").read_text(
+            encoding="utf-8"
+        ).splitlines()[1]
+        require("SpatialRelation=NEAR" in linked_gff and
+                "ReferenceSet=GENE" in linked_gff and
+                "ReferenceName=short" in linked_gff and
+                "Distance=0" in linked_gff and
+                "MaximumDistance=0" in linked_gff and
+                "Overlaps=true" in linked_gff,
+                "GFF3 export retains nearest-reference evidence")
+        linked_tsv = (workspace / "linked.tsv").read_text(
+            encoding="utf-8"
+        ).splitlines()[1].split("\t")
+        require(len(linked_tsv) == 48 and linked_tsv[37:] == [
+                    "NEAR", "GENE", "chr1", "0", "1200", "+", "gene",
+                    "short", "0", "0", "true",
+                ],
+                "TSV export retains typed nearest-reference evidence")
+
+        (workspace / "distance_units.gff3").write_text(
+            "##gff-version 3\n"
+            "chrU\ttest\tgene\t1\t10\t.\t+\t.\tID=query_gene\n"
+            "chrU\ttest\tenhancer\t15\t20\t.\t.\t.\tID=reference_enhancer\n",
+            encoding="utf-8",
+        )
+        data, _ = run_query(
+            workspace,
+            "near_converts_distance_units",
+            'LOAD ANNOTATION "distance_units.gff3" AS annot;\n'
+            "NEAR GENE TO ENHANCER WITHIN 0.004 KB AS linked;\n",
+        )
+        converted_relation = data["resultSets"]["linked"][0][
+            "spatialRelation"
+        ]
+        require(converted_relation["distance"] == 4 and
+                converted_relation["maximumDistance"] == 4,
+                "NEAR converts explicit distance units to whole base pairs")
+
+        parser_error = run_invalid_query(
+            workspace,
+            "near_requires_to",
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            "NEAR GENE WITH CDS WITHIN 5 BP AS invalid;\n",
+            2,
+        )
+        require("'TO' (for NEAR)" in parser_error,
+                "NEAR requires its directional separator")
+
+        parser_error = run_invalid_query(
+            workspace,
+            "near_requires_unit",
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            "NEAR GENE TO CDS WITHIN 5 AS invalid;\n",
+            2,
+        )
+        require("Expected BP, KB, or MB" in parser_error,
+                "NEAR requires an explicit genomic distance unit")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "near_requires_whole_base_pairs",
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            "NEAR GENE TO CDS WITHIN 0.0001 KB AS invalid;\n",
+            3,
+        )
+        require("whole number of base pairs" in semantic_error,
+                "NEAR rejects sub-base-pair distances")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "near_rejects_non_finite_distance",
+            'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
+            "NEAR GENE TO CDS WITHIN 1e999 MB AS invalid;\n",
+            3,
+        )
+        require("finite, non-negative" in semantic_error,
+                "NEAR rejects non-finite or overflowing distances")
+
         showcase_source = (
             ROOT / "cql_examples" / "14_integrated_query.cql"
         ).read_text(encoding="utf-8")
@@ -562,8 +669,43 @@ def main() -> int:
                 == [(400, "+")] and
                 all(site["motifEvidence"]["statistics"]["qValue"] <= 0.01
                     for site in
-                    data["resultSets"]["promoter_myb_evidence"]),
-                "integrated example separates promoter and enhancer MYB evidence")
+                    data["resultSets"]["promoter_myb_evidence"]) and
+                len(data["resultSets"]
+                    ["enhancer_nearest_gene_hypotheses"]) == 1 and
+                data["resultSets"]["enhancer_nearest_gene_hypotheses"][0]
+                    ["motifEvidence"]["matrixId"] == "MA0054.1" and
+                data["resultSets"]["enhancer_nearest_gene_hypotheses"][0]
+                    ["spatialRelation"]["reference"]["name"]
+                    == "transporter_candidate" and
+                data["resultSets"]["enhancer_nearest_gene_hypotheses"][0]
+                    ["spatialRelation"]["distance"] == 91 and
+                data["resultSets"]["enhancer_nearest_gene_hypotheses"][0]
+                    ["spatialRelation"]["maximumDistance"] == 100 and
+                data["resultSets"]["enhancer_nearest_gene_hypotheses"][0]
+                    ["spatialRelation"]["overlaps"] is False,
+                "integrated example separates regulatory evidence and records a provisional nearest-gene link")
+
+        nearest_example = (
+            ROOT / "cql_examples" / "20_nearest_gene_candidates.cql"
+        ).read_text(encoding="utf-8")
+        data, _ = run_query(
+            workspace, "anthocyanin_nearest_gene_candidates", nearest_example
+        )
+        proximal = data["resultSets"]["gene_proximal_myb_candidates"]
+        require([
+                    (
+                        site["start"],
+                        site["spatialRelation"]["reference"]["name"],
+                        site["spatialRelation"]["distance"],
+                    )
+                    for site in proximal
+                ] == [
+                    (150, "anthocyanin_enzyme", 41),
+                    (630, "transporter_candidate", 30),
+                ] and
+                all(site["motifEvidence"]["matrixId"] == "MA0054.1"
+                    for site in proximal),
+                "nearest-gene example exposes two auditable MYB candidates")
 
         data, _ = run_query(
             workspace,

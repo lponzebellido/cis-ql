@@ -62,6 +62,7 @@ void Parser::synchronize() {
     case TokenType::UNION:
     case TokenType::EXCEPT:
     case TokenType::OVERLAPS:
+    case TokenType::NEAR:
       return;
     default:
       break;
@@ -99,7 +100,8 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
   if (match(TokenType::EXTRACT))
     return parseExtract();
   if (match(TokenType::INTERSECT) || match(TokenType::UNION) ||
-      match(TokenType::EXCEPT) || match(TokenType::OVERLAPS)) {
+      match(TokenType::EXCEPT) || match(TokenType::OVERLAPS) ||
+      match(TokenType::NEAR)) {
     current--;
     return parseSetOperation();
   }
@@ -117,7 +119,7 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
   }
 
   reportError(peek(), "Expected start of a statement (LOAD, USE, EXPORT, FIND, "
-                      "EXTRACT, INTERSECT, UNION, EXCEPT, OVERLAPS, SCAN, "
+                      "EXTRACT, INTERSECT, UNION, EXCEPT, OVERLAPS, NEAR, SCAN, "
                       "ANALYZE, IF, FOREACH, DEFINE)");
   throw std::runtime_error("Parse error");
 }
@@ -343,6 +345,8 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
     op = "EXCEPT";
   else if (match(TokenType::OVERLAPS))
     op = "OVERLAPS";
+  else if (match(TokenType::NEAR))
+    op = "NEAR";
 
   if (match(TokenType::GENE) || match(TokenType::PROMOTER) ||
       match(TokenType::ENHANCER) || match(TokenType::EXON) ||
@@ -352,11 +356,14 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
     std::string e1 = previous().lexeme;
 
     std::string sepError = "Expected 'AND' (for INTERSECT/UNION), 'FROM' "
-                           "(for EXCEPT), or 'WITH' (for OVERLAPS).";
+                           "(for EXCEPT), 'WITH' (for OVERLAPS), or 'TO' "
+                           "(for NEAR).";
     if (op == "EXCEPT") {
       consume(TokenType::FROM, sepError);
     } else if (op == "OVERLAPS") {
       consume(TokenType::WITH, sepError);
+    } else if (op == "NEAR") {
+      consume(TokenType::TO, sepError);
     } else {
       consume(TokenType::AND, sepError);
     }
@@ -367,6 +374,24 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
         match(TokenType::TSS) || match(TokenType::CDS) ||
         match(TokenType::REGION) || match(TokenType::ID)) {
       std::string e2 = previous().lexeme;
+      std::string distanceValue;
+      std::string distanceUnit;
+      if (op == "NEAR") {
+        consume(TokenType::WITHIN,
+                "Expected 'WITHIN' after the NEAR reference entity.");
+        if (!match(TokenType::NUM) && !match(TokenType::FLOAT)) {
+          reportError(peek(), "Expected a maximum distance after WITHIN.");
+          throw std::runtime_error("Parse error");
+        }
+        distanceValue = previous().lexeme;
+        if (!match(TokenType::BP) && !match(TokenType::KB) &&
+            !match(TokenType::MB)) {
+          reportError(peek(),
+                      "Expected BP, KB, or MB after the NEAR distance.");
+          throw std::runtime_error("Parse error");
+        }
+        distanceUnit = previous().lexeme;
+      }
       std::string alias;
       if (match(TokenType::AS)) {
         consume(TokenType::ID, "Expected an alias identifier after AS.");
@@ -376,7 +401,8 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
       consume(TokenType::SEMICOLON,
               "Expected ';' at the end of the set operation.");
       return std::unique_ptr<SetOpStmtNode>(
-          new SetOpStmtNode(op, e1, e2, alias, std::move(whereClause)));
+          new SetOpStmtNode(op, e1, e2, distanceValue, distanceUnit, alias,
+                            std::move(whereClause)));
     }
   }
   reportError(peek(), "Expected an entity or alias in the set operation.");

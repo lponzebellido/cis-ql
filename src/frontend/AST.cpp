@@ -81,7 +81,14 @@ void ExtractStmtNode::print(std::string prefix, bool isLast) const {
 }
 
 void SetOpStmtNode::print(std::string prefix, bool isLast) const {
-    std::cout << prefix << (isLast ? "└── " : "├── ") << "SetOperationStmt(" << op << " " << entity1 << " AND " << entity2;
+    const std::string separator = op == "EXCEPT" ? " FROM "
+                                  : op == "OVERLAPS" ? " WITH "
+                                  : op == "NEAR" ? " TO " : " AND ";
+    std::cout << prefix << (isLast ? "└── " : "├── ")
+              << "SetOperationStmt(" << op << " " << entity1
+              << separator << entity2;
+    if (op == "NEAR")
+        std::cout << " WITHIN " << distanceValue << " " << distanceUnit;
     if (!alias.empty()) std::cout << ", AS: " << alias;
     std::cout << ")" << std::endl;
     std::string childPrefix = prefix + (isLast ? "    " : "│   ");

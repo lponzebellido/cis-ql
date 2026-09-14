@@ -21,5 +21,10 @@ OVERLAPS supported_myb_sites WITH candidate_promoters
 OVERLAPS supported_myb_sites WITH candidate_enhancers
     AS enhancer_myb_evidence;
 
+NEAR enhancer_myb_evidence TO GENE WITHIN 100 BP
+    AS enhancer_nearest_gene_hypotheses;
+
 EXPORT promoter_myb_evidence TO "promoter_myb_evidence.tsv" FORMAT TSV;
 EXPORT enhancer_myb_evidence TO "enhancer_myb_evidence.tsv" FORMAT TSV;
+EXPORT enhancer_nearest_gene_hypotheses
+    TO "enhancer_nearest_gene_hypotheses.tsv" FORMAT TSV;

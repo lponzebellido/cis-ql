@@ -35,7 +35,7 @@ Cis-QL operates across three primary modes:
 
 - **Native IUPAC Degeneration Engine:** Translates IUPAC nucleotide ambiguity codes (`R`, `Y`, `S`, `W`, `K`, `M`, `B`, `D`, `H`, `V`, `N`) automatically into regular expression search patterns (e.g., `TATAWAW` translates to `TATA[AT]A[AT]`).
 - **Multi-Chromosome Scanning:** Uses `std::async` to scan loaded contigs independently. Performance depends on contig count, input size, and the host implementation.
-- **Interval Algebra and Spatial Selection:** Supports geometric `INTERSECT`, `UNION`, and `EXCEPT` operations, plus directional `OVERLAPS` selection that retains complete query records and their evidence.
+- **Interval Algebra and Spatial Selection:** Supports geometric `INTERSECT`, `UNION`, and `EXCEPT` operations, directional `OVERLAPS`, and evidence-preserving nearest-feature selection with `NEAR ... WITHIN`.
 - **Pairwise Smith-Waterman Local Alignment:** Computes a normalized local-alignment score in C++. `SIMILARITY TO alias` requires an explicit one-region reference set. The older implicit-reference form remains available for compatibility.
 - **Explicit Dataset Context:** Multiple FASTA and GFF3 datasets can be loaded and selected deterministically with `USE SEQUENCE` and `USE ANNOTATION`.
 - **Standard Result Export:** Named region sets can be written as BED, GFF3, or TSV; GC profiles can be written as TSV.
@@ -144,7 +144,7 @@ ANALYZE GC_CONTENT WINDOW 1 KB AS gc_profile;
 ANALYZE CPG_ISLANDS AS cpg_islands;
 ```
 
-### 5. Interval Operations (`INTERSECT`, `UNION`, `EXCEPT`, `OVERLAPS`)
+### 5. Interval Operations (`INTERSECT`, `UNION`, `EXCEPT`, `OVERLAPS`, `NEAR`)
 
 Combine or filter interval sets using high-speed interval algebra:
 
@@ -153,12 +153,22 @@ INTERSECT sp1_sites AND cpg_islands AS supported_sites;
 UNION minus35_box AND minus10_box AS promoter_boxes;
 EXCEPT ctcf_sites FROM CDS AS noncoding_ctcf_sites;
 OVERLAPS myb_sites WITH candidate_promoters AS promoter_myb_sites;
+NEAR significant_myb_sites TO GENE WITHIN 2 KB AS proximal_gene_candidates;
 ```
 
 `INTERSECT` emits the clipped overlap geometry. `OVERLAPS query WITH reference`
 instead performs a directional semi-join: each query interval is retained once
 if any reference interval overlaps it. This preserves the query coordinates,
 sequence, and motif evidence.
+
+`NEAR query TO reference WITHIN distance` also preserves each complete query
+record, but retains it only when its nearest same-chromosome reference is no
+farther than the inclusive limit. It records that reference's identity and
+coordinates, the interval gap, the requested limit, and whether the intervals
+actually overlap. Overlap and directly touching boundaries both have gap 0,
+but the `overlaps` field distinguishes them. Equal-distance ties are resolved
+deterministically by reference coordinate and metadata. Proximity is a
+candidate association—not evidence of regulation by itself.
 
 ### 6. Feature Extraction & Filtering (`EXTRACT`, `WHERE`)
 
@@ -308,7 +318,7 @@ requirements needed before reporting external benchmark results.
 
 ## Curated Examples Suite (`cql_examples/`)
 
-The repository includes 19 structured `.cql` scripts demonstrating specific language capabilities:
+The repository includes 20 structured `.cql` scripts demonstrating specific language capabilities:
 
 The regulatory progression and its expected outputs are described in
 [`cql_examples/README.md`](cql_examples/README.md).
@@ -334,6 +344,7 @@ The regulatory progression and its expected outputs are described in
 | `17_explicit_promoters.cql` | TSS-oriented candidate promoters | `DEFINE PROMOTERS`, explicit bounds |
 | `18_statistical_pwm_scan.cql` | Calibrated plant MYB-site selection | `BACKGROUND FROM`, `QVALUE` |
 | `19_regulatory_overlap.cql` | Promoter-supported MYB evidence | Directional `OVERLAPS`, evidence preservation |
+| `20_nearest_gene_candidates.cql` | Proximity-based candidate gene links | `NEAR ... WITHIN`, auditable reference evidence |
 
 ---
 

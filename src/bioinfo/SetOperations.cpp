@@ -36,6 +36,8 @@ SetOperations::intersect(std::vector<GenomicRegion> a,
       }
       if (start != a[i].start || end != a[i].end)
         overlap.motifEvidence = MotifEvidence();
+      if (start != a[i].start || end != a[i].end)
+        overlap.spatialRelation = SpatialRelationEvidence();
       result.push_back(std::move(overlap));
     }
 
@@ -70,6 +72,7 @@ std::vector<GenomicRegion> SetOperations::unite(std::vector<GenomicRegion> a,
       }
       last.type = "union";
       last.motifEvidence = MotifEvidence();
+      last.spatialRelation = SpatialRelationEvidence();
     } else {
       result.push_back(all[i]);
     }
@@ -109,6 +112,7 @@ std::vector<GenomicRegion> SetOperations::except(std::vector<GenomicRegion> a,
               fragment.start - region.start, fragment.end - fragment.start);
         }
         fragment.motifEvidence = MotifEvidence();
+        fragment.spatialRelation = SpatialRelationEvidence();
         result.push_back(std::move(fragment));
       }
       cursor = std::max(cursor, b[k].end);
@@ -127,8 +131,120 @@ std::vector<GenomicRegion> SetOperations::except(std::vector<GenomicRegion> a,
       }
       if (fragment.start != region.start || fragment.end != region.end)
         fragment.motifEvidence = MotifEvidence();
+      if (fragment.start != region.start || fragment.end != region.end)
+        fragment.spatialRelation = SpatialRelationEvidence();
       result.push_back(std::move(fragment));
     }
+  }
+  return result;
+}
+
+std::vector<GenomicRegion> SetOperations::selectNear(
+    const std::vector<GenomicRegion> &query,
+    const std::vector<GenomicRegion> &reference,
+    size_t maximumDistance, const std::string &referenceSet) {
+  struct ChromosomeIndex {
+    std::vector<const GenomicRegion *> regions;
+    std::vector<size_t> starts;
+    std::vector<size_t> maximumEnds;
+    std::vector<size_t> maximumEndIndexes;
+  };
+
+  std::unordered_map<std::string, ChromosomeIndex> indexes;
+  for (const auto &region : reference) {
+    if (region.start < region.end)
+      indexes[region.chr].regions.push_back(&region);
+  }
+
+  const auto referenceOrder = [](const GenomicRegion *left,
+                                 const GenomicRegion *right) {
+    if (left->start != right->start)
+      return left->start < right->start;
+    if (left->end != right->end)
+      return left->end < right->end;
+    if (left->name != right->name)
+      return left->name < right->name;
+    if (left->type != right->type)
+      return left->type < right->type;
+    return left->strand < right->strand;
+  };
+
+  for (auto &entry : indexes) {
+    ChromosomeIndex &index = entry.second;
+    std::sort(index.regions.begin(), index.regions.end(), referenceOrder);
+    size_t maximumEnd = 0;
+    size_t maximumEndIndex = 0;
+    for (size_t position = 0; position < index.regions.size(); ++position) {
+      const GenomicRegion &region = *index.regions[position];
+      index.starts.push_back(region.start);
+      if (position == 0 || region.end > maximumEnd) {
+        maximumEnd = region.end;
+        maximumEndIndex = position;
+      }
+      index.maximumEnds.push_back(maximumEnd);
+      index.maximumEndIndexes.push_back(maximumEndIndex);
+    }
+  }
+
+  std::vector<GenomicRegion> result;
+  for (const auto &region : query) {
+    if (region.start >= region.end)
+      continue;
+    const auto chromosome = indexes.find(region.chr);
+    if (chromosome == indexes.end())
+      continue;
+    const ChromosomeIndex &index = chromosome->second;
+
+    const auto firstAtOrAfterEnd =
+        std::lower_bound(index.starts.begin(), index.starts.end(), region.end);
+    const size_t beforeEnd = static_cast<size_t>(
+        std::distance(index.starts.begin(), firstAtOrAfterEnd));
+
+    const GenomicRegion *nearest = nullptr;
+    size_t nearestDistance = 0;
+    if (beforeEnd > 0) {
+      const auto firstOverlap = std::upper_bound(
+          index.maximumEnds.begin(), index.maximumEnds.begin() + beforeEnd,
+          region.start);
+      if (firstOverlap != index.maximumEnds.begin() + beforeEnd) {
+        const size_t overlapIndex = static_cast<size_t>(
+            std::distance(index.maximumEnds.begin(), firstOverlap));
+        nearest = index.regions[overlapIndex];
+      } else {
+        const size_t leftIndex = index.maximumEndIndexes[beforeEnd - 1];
+        nearest = index.regions[leftIndex];
+        nearestDistance = region.start - nearest->end;
+      }
+    }
+
+    if (beforeEnd < index.regions.size()) {
+      const GenomicRegion *right = index.regions[beforeEnd];
+      const size_t rightDistance = right->start - region.end;
+      if (!nearest || rightDistance < nearestDistance ||
+          (rightDistance == nearestDistance &&
+           referenceOrder(right, nearest))) {
+        nearest = right;
+        nearestDistance = rightDistance;
+      }
+    }
+
+    if (!nearest || nearestDistance > maximumDistance)
+      continue;
+
+    GenomicRegion selected = region;
+    selected.spatialRelation.present = true;
+    selected.spatialRelation.relation = "NEAR";
+    selected.spatialRelation.referenceSet = referenceSet;
+    selected.spatialRelation.referenceChr = nearest->chr;
+    selected.spatialRelation.referenceStart = nearest->start;
+    selected.spatialRelation.referenceEnd = nearest->end;
+    selected.spatialRelation.referenceStrand = nearest->strand;
+    selected.spatialRelation.referenceType = nearest->type;
+    selected.spatialRelation.referenceName = nearest->name;
+    selected.spatialRelation.distance = nearestDistance;
+    selected.spatialRelation.maximumDistance = maximumDistance;
+    selected.spatialRelation.overlaps = region.overlaps(*nearest);
+    result.push_back(std::move(selected));
   }
   return result;
 }

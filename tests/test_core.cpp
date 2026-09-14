@@ -123,6 +123,51 @@ int main() {
               supportedSites[0].motifEvidence.matrixId == "TEST",
           "overlap semi-join preserves each supported query interval once");
 
+  GenomicRegion nearQuery = region(10, 20);
+  nearQuery.sequence = "AAAAAAAAAA";
+  nearQuery.motifEvidence.present = true;
+  nearQuery.motifEvidence.matrixId = "TEST";
+  GenomicRegion leftReference = region(0, 5);
+  leftReference.name = "left_gene";
+  leftReference.type = "gene";
+  GenomicRegion rightReference = region(25, 30);
+  rightReference.name = "right_gene";
+  rightReference.type = "gene";
+  const auto nearest = SetOperations::selectNear(
+      {nearQuery}, {rightReference, leftReference}, 5, "GENE");
+  require(nearest.size() == 1 && nearest[0].start == 10 &&
+              nearest[0].end == 20 && nearest[0].sequence == "AAAAAAAAAA" &&
+              nearest[0].motifEvidence.present &&
+              nearest[0].spatialRelation.present &&
+              nearest[0].spatialRelation.relation == "NEAR" &&
+              nearest[0].spatialRelation.referenceSet == "GENE" &&
+              nearest[0].spatialRelation.referenceName == "left_gene" &&
+              nearest[0].spatialRelation.distance == 5 &&
+              nearest[0].spatialRelation.maximumDistance == 5 &&
+              !nearest[0].spatialRelation.overlaps,
+          "nearest selection preserves query evidence and breaks ties deterministically");
+
+  GenomicRegion overlappingReference = region(0, 12);
+  overlappingReference.name = "overlapping_gene";
+  const auto overlappingNearest = SetOperations::selectNear(
+      {nearQuery}, {overlappingReference, rightReference}, 0, "genes");
+  require(overlappingNearest.size() == 1 &&
+              overlappingNearest[0].spatialRelation.distance == 0 &&
+              overlappingNearest[0].spatialRelation.overlaps &&
+              overlappingNearest[0].spatialRelation.referenceName ==
+                  "overlapping_gene",
+          "NEAR records overlap as zero-distance spatial evidence");
+
+  const auto adjacentNearest = SetOperations::selectNear(
+      {region(10, 20)}, {region(20, 30)}, 0, "features");
+  require(adjacentNearest.size() == 1 &&
+              adjacentNearest[0].spatialRelation.distance == 0 &&
+              !adjacentNearest[0].spatialRelation.overlaps,
+          "NEAR distinguishes adjacent intervals from overlap at distance zero");
+  require(SetOperations::selectNear(
+              {nearQuery}, {rightReference}, 4, "GENE").empty(),
+          "NEAR applies its inclusive maximum-distance boundary");
+
   GenomicRegion firstUnion = region(0, 10);
   firstUnion.sequence = "AAAAAAAAAA";
   const auto merged = SetOperations::unite({firstUnion}, {region(5, 15)});
@@ -289,10 +334,12 @@ int main() {
   GenomicRegion scoredHit = region(0, 10);
   scoredHit.motifEvidence.present = true;
   scoredHit.motifEvidence.matrixId = "TEST";
+  scoredHit.spatialRelation.present = true;
   const auto croppedHit =
       SetOperations::intersect({scoredHit}, {region(5, 15)});
   require(croppedHit.size() == 1 &&
-              !croppedHit[0].motifEvidence.present,
+              !croppedHit[0].motifEvidence.present &&
+              !croppedHit[0].spatialRelation.present,
           "interval operations discard evidence when hit geometry changes");
   PWMatrix invalidMatrix = matrix;
   invalidMatrix.counts[3].pop_back();

@@ -86,6 +86,43 @@ def select_overlapping_intervals(
     ]
 
 
+def interval_gap(
+    query: tuple[str, int, int], reference: tuple[str, int, int]
+) -> int:
+    if query[1] < reference[2] and query[2] > reference[1]:
+        return 0
+    if query[2] <= reference[1]:
+        return reference[1] - query[2]
+    return query[1] - reference[2]
+
+
+def select_nearest_intervals(
+    query: list[tuple[str, int, int]],
+    reference: list[tuple[str, int, int, str]],
+    maximum_distance: int,
+) -> list[tuple[tuple[str, int, int], tuple[str, int, int, str], int, bool]]:
+    selected = []
+    for interval in query:
+        same_chromosome = [
+            candidate for candidate in reference
+            if candidate[0] == interval[0]
+        ]
+        if not same_chromosome:
+            continue
+        nearest = min(
+            same_chromosome,
+            key=lambda candidate: (
+                interval_gap(interval, candidate[:3]), candidate[1],
+                candidate[2], candidate[3],
+            ),
+        )
+        distance = interval_gap(interval, nearest[:3])
+        if distance <= maximum_distance:
+            overlaps = interval[1] < nearest[2] and interval[2] > nearest[1]
+            selected.append((interval, nearest, distance, overlaps))
+    return selected
+
+
 def smith_waterman_similarity(first: str, second: str) -> float:
     previous = [0] * (len(second) + 1)
     best = 0
@@ -386,6 +423,7 @@ def main() -> int:
             "EXTRACT ENHANCER AS enhancers;\n"
             "EXCEPT genes FROM exons AS difference;\n"
             "OVERLAPS all_genes WITH enhancers AS supported;\n"
+            "NEAR all_genes TO enhancers WITHIN 0 BP AS nearest;\n"
             'EXPORT difference TO "difference.bed" FORMAT BED;\n'
             'EXPORT supported TO "supported.bed" FORMAT BED;\n',
         )
@@ -409,6 +447,30 @@ def main() -> int:
         require(observed_supported == expected_supported,
                 "OVERLAPS differs from independent interval semi-join")
         print("[ok] directional overlap selection")
+        expected_nearest = select_nearest_intervals(
+            [("chr1", 0, 10), ("chr1", 10, 15)],
+            [("chr1", 3, 6, "enhancer_a"),
+             ("chr1", 8, 10, "enhancer_b")],
+            0,
+        )
+        observed_nearest = [
+            (
+                (region["chr"], region["start"], region["end"]),
+                (
+                    relation["reference"]["chr"],
+                    relation["reference"]["start"],
+                    relation["reference"]["end"],
+                    relation["reference"]["name"],
+                ),
+                relation["distance"],
+                relation["overlaps"],
+            )
+            for region in interval_data["resultSets"]["nearest"]
+            for relation in [region["spatialRelation"]]
+        ]
+        require(observed_nearest == expected_nearest,
+                "NEAR differs from independent nearest-interval selection")
+        print("[ok] bounded nearest-reference selection")
 
         (workspace / "similarity.fasta").write_text(
             ">chr1\nACGTNNACGA\n", encoding="utf-8"

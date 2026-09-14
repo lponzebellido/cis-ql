@@ -4,7 +4,7 @@ Terminals (Tokens):
 
 LOAD, USE, EXPORT, DEFINE, PROMOTERS, OF, SEQUENCE, ANNOTATION, MATRIX, STRING, AS, ID, SEMICOLON, FIND, MOTIF, WITHIN, NUM,
 FROM, WITH, GENE, PROMOTER, ENHANCER, EXON, INTRON, UTR, TSS, CDS, REGION, STRAND, POSITIVE, NEGATIVE,
-CHR, EXTRACT, WHERE, INTERSECT, UNION, EXCEPT, OVERLAPS, AND, OR, NOT, LPAREN, RPAREN, LBRACKET, RBRACKET,
+CHR, EXTRACT, WHERE, INTERSECT, UNION, EXCEPT, OVERLAPS, NEAR, AND, OR, NOT, LPAREN, RPAREN, LBRACKET, RBRACKET,
 LENGTH, SIMILARITY, GREATER, LESS, GREATER_EQ, LESS_EQ, ASSIGN, FLOAT, PERCENT, BP, KB, MB,
 UPSTREAM, DOWNSTREAM, SCAN, THRESHOLD, PVALUE, QVALUE, BACKGROUND, UNIFORM, ANALYZE, GC_CONTENT, CPG_ISLANDS, WINDOW,
 IF, THEN, ELSE, ENDIF, FOREACH, IN, DO, ENDFOR, COMMA, TO, FORMAT, BED, GFF3, TSV.
@@ -42,6 +42,7 @@ ScanOpt            -> IN EntityRef
 SetOperationStmt   -> (INTERSECT | UNION) EntityRef AND EntityRef AliasOpt WhereClause SEMICOLON
                     | EXCEPT EntityRef FROM EntityRef AliasOpt WhereClause SEMICOLON
                     | OVERLAPS EntityRef WITH EntityRef AliasOpt WhereClause SEMICOLON
+                    | NEAR EntityRef TO EntityRef WITHIN (NUM | FLOAT) RequiredUnit AliasOpt WhereClause SEMICOLON
 
 ExtractStmt        -> EXTRACT EntityRef AliasOpt WhereClause SEMICOLON
 
@@ -86,3 +87,4 @@ Note on Execution Engine & Studio Integration:
 8. Every retained PWM hit records a zero-order dynamic-programming p-value and a Benjamini-Hochberg q-value. The correction covers all valid position-strand tests in the complete `SCAN`, including windows below reporting thresholds; ambiguous windows are excluded.
 9. `PVALUE <|<= probability` and `QVALUE <|<= probability` select statistically calibrated hits. Scientific notation is accepted. Only one statistical threshold is allowed per `SCAN`; if `THRESHOLD ... %` is also present, both criteria must pass. Without an explicit relative threshold, a statistical scan does not inherit the legacy 75% cutoff.
 10. `OVERLAPS query WITH reference` is a directional interval semi-join: it retains each query interval once when any reference interval overlaps it. Query coordinates, sequence, and motif evidence remain unchanged. `INTERSECT` remains the geometric operation that emits clipped overlap segments.
+11. `NEAR query TO reference WITHIN distance` retains each query interval whose nearest same-chromosome reference has an interval gap less than or equal to the explicit limit. Overlap and adjacency have distance zero but are distinguished by recorded overlap evidence. The complete query and its motif evidence are preserved; the chosen reference, distance, limit, and overlap state are attached to JSON, GFF3, and TSV results. Equal-distance ties use deterministic reference ordering. Proximity is not interpreted as proof of regulation.

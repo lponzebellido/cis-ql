@@ -39,6 +39,22 @@ interface MotifEvidence {
   };
 }
 
+interface SpatialRelation {
+  relation: string;
+  referenceSet: string;
+  reference: {
+    chr: string;
+    start: number;
+    end: number;
+    strand: string;
+    type: string;
+    name: string;
+  };
+  distance: number;
+  maximumDistance: number;
+  overlaps: boolean;
+}
+
 interface GenomicRegion {
   chr: string;
   start: number;
@@ -48,6 +64,7 @@ interface GenomicRegion {
   name: string;
   sequence?: string;
   motifEvidence?: MotifEvidence;
+  spatialRelation?: SpatialRelation;
 }
 
 interface SequenceViewerProps {
@@ -282,6 +299,12 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
                                   {region.motifEvidence.sourceRegion && (
                                     <span>Source: {region.motifEvidence.sourceRegion.name} +{region.motifEvidence.sourceRegion.relativeStart} bp</span>
                                   )}
+                                </>
+                              )}
+                              {region.spatialRelation && (
+                                <>
+                                  <span>{region.spatialRelation.relation}: {region.spatialRelation.reference.name || region.spatialRelation.reference.type}</span>
+                                  <span>Distance: {region.spatialRelation.distance.toLocaleString()} bp (limit {region.spatialRelation.maximumDistance.toLocaleString()} bp; {region.spatialRelation.overlaps ? 'overlapping' : 'not overlapping'})</span>
                                 </>
                               )}
                               {(() => {
