@@ -17,7 +17,8 @@ static bool isBuiltinEntity(const std::string &name) {
 static bool isResultAlias(const SymbolTable &symbolTable,
                           const std::string &name) {
   const std::string type = symbolTable.typeOf(name);
-  return type == "RESULT_SET" || type == "MOTIF_HITS";
+  return type == "RESULT_SET" || type == "MOTIF_HITS" ||
+         type == "REGULATORY_TRACK";
 }
 
 // Decimal genomic distances such as 0.004 KB are mathematically integral
@@ -79,6 +80,8 @@ void SemanticAnalyzer::visit(LoadStmtNode *node) {
       annotationLoaded = true;
     } else if (node->loadType == "MATRIX") {
       symbolTable.insert(node->alias, "PWM_DATA");
+    } else if (node->loadType == "TRACK") {
+      symbolTable.insert(node->alias, "REGULATORY_TRACK");
     }
   }
 }
@@ -104,6 +107,7 @@ void SemanticAnalyzer::visit(ExportStmtNode *node) {
   }
   const std::string type = symbolTable.typeOf(node->alias);
   if (type != "RESULT_SET" && type != "MOTIF_HITS" &&
+      type != "REGULATORY_TRACK" &&
       type != "GC_PROFILE") {
     reportError("EXPORT expects a result-set or GC-profile alias, but '" +
                 node->alias + "' has type " + type + ".");

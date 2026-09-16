@@ -20,6 +20,8 @@ const EXT_COLORS: Record<string, string> = {
   gff3: '#d29922',
   gff: '#d29922',
   pwm: '#bc8cff',
+  bed: '#f0883e',
+  narrowpeak: '#f0883e',
   txt: '#8b949e',
   md: '#8b949e',
   cpp: '#f85149',

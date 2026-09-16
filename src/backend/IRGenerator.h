@@ -21,6 +21,7 @@ struct IRCondition {
 enum class IROpCode {
   LOAD_SEQ,
   LOAD_ANNOT,
+  LOAD_TRACK,
   USE_SEQUENCE,
   USE_ANNOTATION,
   EXPORT_RESULTS,

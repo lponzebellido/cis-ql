@@ -1,7 +1,7 @@
 # Cis-QL v3: regulatory genomics direction
 
-Status: incremental implementation. Parts 1 through 2B3 and Parts 3A-3D are
-implemented; later parts are a design contract, not yet accepted syntax.
+Status: incremental implementation. Parts 1 through 2B3, Parts 3A-3D, and Part
+4A are implemented; later parts are a design contract, not yet accepted syntax.
 
 ## Product definition
 
@@ -348,7 +348,35 @@ Still planned:
 
 ### Part 4: evidence integration
 
-- BED/narrowPeak and tabular expression/coexpression inputs.
+#### Part 4A: imported regulatory tracks
+
+Implemented syntax:
+
+```cql
+LOAD TRACK "sample_accessibility.narrowPeak"
+  FORMAT NARROWPEAK
+  AS accessibility_peaks;
+```
+
+`LOAD TRACK` accepts BED and narrowPeak files as named interval sets without
+replacing the active GFF3 annotation. Coordinates remain zero-based and
+half-open. BED name, score, and strand are retained; narrowPeak additionally
+retains signalValue, the supplied `-log10(p)` and `-log10(q)` values, and the
+summit offset and absolute summit position. The file path, declared format,
+and query alias are recorded as typed `trackEvidence` in JSON, GFF3, TSV, and
+Studio.
+
+When a FASTA is active, every track chromosome and interval bound is checked
+against it and interval sequence is attached. A track loaded before its genome
+cannot be assembly-validated, so real workflows should load the sequence
+first. Imported tracks can participate in `SCAN`, `OVERLAPS`, `COUNT`, `NEAR`,
+and module construction. The language preserves upstream statistics; it does
+not infer assay type, quality, or biological validity from a filename.
+
+Still planned:
+
+- explicit assay/sample metadata and replicate/condition identity;
+- tabular expression/coexpression inputs;
 - Accessibility, DAP/ChIP, expression, coexpression, and literature evidence.
 - CRE-to-gene linking by promoter, distance, or an imported relationship.
 - Evidence tables and auditable candidate ranking.

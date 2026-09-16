@@ -36,6 +36,9 @@ Cis-QL operates across three primary modes:
 - **Native IUPAC Degeneration Engine:** Translates IUPAC nucleotide ambiguity codes (`R`, `Y`, `S`, `W`, `K`, `M`, `B`, `D`, `H`, `V`, `N`) automatically into regular expression search patterns (e.g., `TATAWAW` translates to `TATA[AT]A[AT]`).
 - **Multi-Chromosome Scanning:** Uses `std::async` to scan loaded contigs independently. Performance depends on contig count, input size, and the host implementation.
 - **Regulatory Interval Queries:** Supports geometric interval algebra, directional `OVERLAPS`, evidence-preserving nearest-feature selection, and per-region overlap counts with explicit provenance.
+- **Experimental Track Import:** Loads BED and narrowPeak intervals as named
+  regulatory tracks while preserving scores, signal values, supplied
+  significance fields, summit positions, and source provenance.
 - **Pairwise Smith-Waterman Local Alignment:** Computes a normalized local-alignment score in C++. `SIMILARITY TO alias` requires an explicit one-region reference set. The older implicit-reference form remains available for compatibility.
 - **Explicit Dataset Context:** Multiple FASTA and GFF3 datasets can be loaded and selected deterministically with `USE SEQUENCE` and `USE ANNOTATION`.
 - **Standard Result Export:** Named region sets can be written as BED, GFF3, or TSV; GC profiles can be written as TSV.
@@ -90,12 +93,21 @@ Load sequence files (FASTA), annotation files (GFF3), and matrix files (JASPAR f
 LOAD SEQUENCE "data_examples/anthocyanin_regulatory_demo.fasta" AS genome;
 LOAD ANNOTATION "data_examples/anthocyanin_regulatory_demo.gff3" AS annotation;
 LOAD MATRIX "matrices/MA0054.1_myb.Ph3.pwm" AS myb_matrix;
+LOAD TRACK "data_examples/anthocyanin_accessibility_demo.narrowPeak"
+    FORMAT NARROWPEAK AS accessibility_peaks;
 ```
 
 The example suite also includes the plant MYB profile `MA0054.1` from
 [JASPAR CORE](https://jaspar.elixir.no/matrix/MA0054.1/). The accompanying
 `anthocyanin_regulatory_demo` FASTA/GFF3 pair is synthetic and exists only to
 make expected regulatory-query results small, deterministic, and inspectable.
+
+`LOAD TRACK` currently accepts BED and narrowPeak. Track coordinates are
+already zero-based and half-open. When a sequence dataset is active, Cis-QL
+validates chromosome names and interval bounds, attaches interval sequence,
+and rejects assembly-incompatible records. narrowPeak's `pValue` and `qValue`
+columns are preserved according to that format as `-log10(p)` and `-log10(q)`;
+they are not confused with the calibrated probabilities produced by `SCAN`.
 
 When multiple sequence or annotation datasets are loaded, select the active
 context explicitly:
@@ -272,6 +284,7 @@ Statement          ::= LoadStmt | UseStmt | ExportStmt | FindStmt | ExtractStmt
                      | IfStmt | ForeachStmt
 
 LoadStmt           ::= LOAD (SEQUENCE | ANNOTATION | MATRIX) STRING AS ID SEMICOLON
+                     | LOAD TRACK STRING FORMAT (BED | NARROWPEAK) AS ID SEMICOLON
 UseStmt            ::= USE (SEQUENCE | ANNOTATION) ID SEMICOLON
 ExportStmt         ::= EXPORT ID TO STRING FORMAT (BED | GFF3 | TSV) SEMICOLON
 DefinePromotersStmt ::= DEFINE PROMOTERS OF (GENE | TSS | ID) FROM TSS
@@ -372,7 +385,7 @@ requirements needed before reporting external benchmark results.
 
 ## Curated Examples Suite (`cql_examples/`)
 
-The repository includes eight `.cql` analyses forming one coherent,
+The repository includes nine `.cql` analyses forming one coherent,
 synthetic anthocyanin-regulation path. Compiler feature coverage belongs in
 the automated tests; these programs are examples of scientific questions.
 
@@ -389,6 +402,7 @@ The regulatory progression and its expected outputs are described in
 | `06_nearest_gene_candidates.cql` | Form proximity-based gene hypotheses | auditable `NEAR ... WITHIN` |
 | `07_enhancer_myb_module.cql` | Detect a constrained homotypic MYB module | spacing, order, orientation, two-member evidence |
 | `08_integrated_anthocyanin_query.cql` | Connect the complete evidence path | promoters, calibrated sites, modules, counts, candidate links |
+| `09_accessible_myb_evidence.cql` | Combine imported accessibility peaks with motif support | narrowPeak provenance, `COUNT`, `NEAR` |
 
 ---
 

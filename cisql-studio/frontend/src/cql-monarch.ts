@@ -1,6 +1,6 @@
 export const cqlLanguageDef = {
   keywords: [
-    'LOAD', 'USE', 'EXPORT', 'DEFINE', 'SEQUENCE', 'ANNOTATION', 'MATRIX',
+    'LOAD', 'USE', 'EXPORT', 'DEFINE', 'SEQUENCE', 'ANNOTATION', 'TRACK', 'MATRIX',
     'AS', 'OF', 'PROMOTERS', 'FIND', 'MOTIF', 'MODULE',
     'WITHIN', 'WITH', 'FROM', 'TO', 'GENE', 'PROMOTER', 'ENHANCER', 'EXON', 'INTRON',
     'UTR', 'TSS', 'CDS', 'REGION', 'STRAND', 'POSITIVE', 'NEGATIVE',
@@ -9,7 +9,7 @@ export const cqlLanguageDef = {
     'ANY', 'SAME', 'OPPOSITE', 'AS_WRITTEN',
     'LENGTH', 'SIMILARITY', 'GC_CONTENT', 'CPG_ISLANDS', 'BP', 'KB', 'MB',
     'UPSTREAM', 'DOWNSTREAM', 'SCAN', 'THRESHOLD', 'PVALUE', 'QVALUE',
-    'BACKGROUND', 'UNIFORM', 'ANALYZE', 'WINDOW', 'FORMAT', 'BED', 'GFF3', 'TSV',
+    'BACKGROUND', 'UNIFORM', 'ANALYZE', 'WINDOW', 'FORMAT', 'BED', 'NARROWPEAK', 'GFF3', 'TSV',
     'IF', 'THEN', 'ELSE', 'ENDIF', 'FOREACH', 'IN', 'DO', 'ENDFOR'
   ],
 

@@ -43,6 +43,8 @@ SetOperations::intersect(std::vector<GenomicRegion> a,
         overlap.countEvidence = CountEvidence();
       if (start != a[i].start || end != a[i].end)
         overlap.moduleEvidence = ModuleEvidence();
+      if (start != a[i].start || end != a[i].end)
+        overlap.trackEvidence = TrackEvidence();
       result.push_back(std::move(overlap));
     }
 
@@ -80,6 +82,7 @@ std::vector<GenomicRegion> SetOperations::unite(std::vector<GenomicRegion> a,
       last.spatialRelation = SpatialRelationEvidence();
       last.countEvidence = CountEvidence();
       last.moduleEvidence = ModuleEvidence();
+      last.trackEvidence = TrackEvidence();
     } else {
       result.push_back(all[i]);
     }
@@ -122,6 +125,7 @@ std::vector<GenomicRegion> SetOperations::except(std::vector<GenomicRegion> a,
         fragment.spatialRelation = SpatialRelationEvidence();
         fragment.countEvidence = CountEvidence();
         fragment.moduleEvidence = ModuleEvidence();
+        fragment.trackEvidence = TrackEvidence();
         result.push_back(std::move(fragment));
       }
       cursor = std::max(cursor, b[k].end);
@@ -146,6 +150,8 @@ std::vector<GenomicRegion> SetOperations::except(std::vector<GenomicRegion> a,
         fragment.countEvidence = CountEvidence();
       if (fragment.start != region.start || fragment.end != region.end)
         fragment.moduleEvidence = ModuleEvidence();
+      if (fragment.start != region.start || fragment.end != region.end)
+        fragment.trackEvidence = TrackEvidence();
       result.push_back(std::move(fragment));
     }
   }

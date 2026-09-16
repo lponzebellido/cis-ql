@@ -62,6 +62,18 @@ interface CountEvidence {
   count: number;
 }
 
+interface TrackEvidence {
+  trackAlias: string;
+  source: string;
+  format: string;
+  score?: number;
+  signalValue?: number;
+  minusLog10PValue?: number;
+  minusLog10QValue?: number;
+  peakOffset?: number;
+  peakPosition?: number;
+}
+
 interface ModuleMemberEvidence {
   sourceSet: string;
   chr: string;
@@ -92,6 +104,7 @@ interface GenomicRegion {
   spatialRelation?: SpatialRelation;
   countEvidence?: CountEvidence;
   moduleEvidence?: ModuleEvidence;
+  trackEvidence?: TrackEvidence;
 }
 
 interface TrackViewerProps {
@@ -645,6 +658,14 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                   <br /><span className="tt-label">Counted set:</span> {hoveredRegion.countEvidence.countedSet}
                 </>
               )}
+              {hoveredRegion.trackEvidence && (
+                <>
+                  <br /><span className="tt-label">Track:</span> {hoveredRegion.trackEvidence.trackAlias} ({hoveredRegion.trackEvidence.format})
+                  {hoveredRegion.trackEvidence.score !== undefined && <><br /><span className="tt-label">Track score:</span> {hoveredRegion.trackEvidence.score}</>}
+                  {hoveredRegion.trackEvidence.signalValue !== undefined && <><br /><span className="tt-label">Signal:</span> {hoveredRegion.trackEvidence.signalValue}</>}
+                  {hoveredRegion.trackEvidence.peakPosition !== undefined && <><br /><span className="tt-label">Summit:</span> {hoveredRegion.trackEvidence.peakPosition.toLocaleString()}</>}
+                </>
+              )}
               {hoveredRegion.moduleEvidence && (
                 <>
                   <br /><span className="tt-label">Module spacing:</span> {formatBp(hoveredRegion.moduleEvidence.spacing.observed)} ({formatBp(hoveredRegion.moduleEvidence.spacing.minimum)}-{formatBp(hoveredRegion.moduleEvidence.spacing.maximum)})
@@ -757,6 +778,27 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                     {selectedRegion.countEvidence.relation} in {selectedRegion.countEvidence.containerSet}
                   </span>
                 </div>
+              )}
+              {selectedRegion.trackEvidence && (
+                <>
+                  <div className="detail-field">
+                    <span className="detail-label">Imported track</span>
+                    <span className="detail-value">
+                      {selectedRegion.trackEvidence.trackAlias} · {selectedRegion.trackEvidence.format}<br />
+                      {selectedRegion.trackEvidence.source}
+                    </span>
+                  </div>
+                  <div className="detail-field">
+                    <span className="detail-label">Track evidence</span>
+                    <span className="detail-value">
+                      score {selectedRegion.trackEvidence.score ?? 'N/A'}
+                      {selectedRegion.trackEvidence.signalValue !== undefined ? ` · signal ${selectedRegion.trackEvidence.signalValue}` : ''}
+                      {selectedRegion.trackEvidence.minusLog10PValue !== undefined ? ` · -log10(p) ${selectedRegion.trackEvidence.minusLog10PValue}` : ''}
+                      {selectedRegion.trackEvidence.minusLog10QValue !== undefined ? ` · -log10(q) ${selectedRegion.trackEvidence.minusLog10QValue}` : ''}
+                      {selectedRegion.trackEvidence.peakPosition !== undefined ? ` · summit ${selectedRegion.trackEvidence.peakPosition.toLocaleString()}` : ''}
+                    </span>
+                  </div>
+                </>
               )}
               {selectedRegion.moduleEvidence && (
                 <>

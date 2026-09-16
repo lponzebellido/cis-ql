@@ -308,18 +308,31 @@ std::unique_ptr<LoadStmtNode> Parser::parseLoad() {
     loadType = "ANNOTATION";
   } else if (match(TokenType::MATRIX)) {
     loadType = "MATRIX";
+  } else if (match(TokenType::TRACK)) {
+    loadType = "TRACK";
   } else {
-    reportError(peek(), "Expected 'SEQUENCE', 'ANNOTATION', or 'MATRIX' after LOAD.");
+    reportError(peek(), "Expected 'SEQUENCE', 'ANNOTATION', 'MATRIX', or 'TRACK' after LOAD.");
     throw std::runtime_error("Parse error");
   }
   consume(TokenType::STRING, "Expected a file name (string).");
   std::string file = previous().lexeme;
+  std::string format;
+  if (loadType == "TRACK") {
+    consume(TokenType::FORMAT, "Expected 'FORMAT' after the track file name.");
+    if (match(TokenType::BED) || match(TokenType::NARROWPEAK)) {
+      format = previous().lexeme;
+    } else {
+      reportError(peek(), "Expected BED or NARROWPEAK after FORMAT.");
+      throw std::runtime_error("Parse error");
+    }
+  }
   consume(TokenType::AS, "Expected 'AS' after the file name.");
   consume(TokenType::ID, "Expected an alias identifier.");
   std::string alias = previous().lexeme;
   consume(TokenType::SEMICOLON,
           "Expected ';' at the end of the LOAD statement.");
-  return std::unique_ptr<LoadStmtNode>(new LoadStmtNode(loadType, file, alias));
+  return std::unique_ptr<LoadStmtNode>(
+      new LoadStmtNode(loadType, file, format, alias));
 }
 
 std::unique_ptr<FindStmtNode> Parser::parseFind() {

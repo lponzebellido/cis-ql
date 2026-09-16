@@ -24,6 +24,7 @@ void Lexer::initKeywords() {
     keywords["GENE"] = TokenType::GENE;
     keywords["SEQUENCE"] = TokenType::SEQUENCE;
     keywords["ANNOTATION"] = TokenType::ANNOTATION;
+    keywords["TRACK"] = TokenType::TRACK;
     keywords["REGION"] = TokenType::REGION;
     keywords["PROMOTER"] = TokenType::PROMOTER;
     keywords["PROMOTERS"] = TokenType::PROMOTERS;
@@ -45,6 +46,7 @@ void Lexer::initKeywords() {
     keywords["OPPOSITE"] = TokenType::OPPOSITE;
     keywords["AS_WRITTEN"] = TokenType::AS_WRITTEN;
     keywords["BED"] = TokenType::BED;
+    keywords["NARROWPEAK"] = TokenType::NARROWPEAK;
     keywords["GFF3"] = TokenType::GFF3;
     keywords["TSV"] = TokenType::TSV;
     keywords["BP"] = TokenType::BP;
@@ -366,6 +368,7 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::GENE: return "GENE";
         case TokenType::SEQUENCE: return "SEQUENCE";
         case TokenType::ANNOTATION: return "ANNOTATION";
+        case TokenType::TRACK: return "TRACK";
         case TokenType::REGION: return "REGION";
         case TokenType::PROMOTER: return "PROMOTER";
         case TokenType::PROMOTERS: return "PROMOTERS";
@@ -387,6 +390,7 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::OPPOSITE: return "OPPOSITE";
         case TokenType::AS_WRITTEN: return "AS_WRITTEN";
         case TokenType::BED: return "BED";
+        case TokenType::NARROWPEAK: return "NARROWPEAK";
         case TokenType::GFF3: return "GFF3";
         case TokenType::TSV: return "TSV";
         case TokenType::BP: return "BP";

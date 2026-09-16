@@ -62,6 +62,18 @@ interface CountEvidence {
   count: number;
 }
 
+interface TrackEvidence {
+  trackAlias: string;
+  source: string;
+  format: string;
+  score?: number;
+  signalValue?: number;
+  minusLog10PValue?: number;
+  minusLog10QValue?: number;
+  peakOffset?: number;
+  peakPosition?: number;
+}
+
 interface ModuleMemberEvidence {
   sourceSet: string;
   chr: string;
@@ -92,6 +104,7 @@ interface GenomicRegion {
   spatialRelation?: SpatialRelation;
   countEvidence?: CountEvidence;
   moduleEvidence?: ModuleEvidence;
+  trackEvidence?: TrackEvidence;
 }
 
 interface SequenceViewerProps {
@@ -336,6 +349,13 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
                               )}
                               {region.countEvidence && (
                                 <span>Overlap count: {region.countEvidence.count.toLocaleString()} from {region.countEvidence.countedSet}</span>
+                              )}
+                              {region.trackEvidence && (
+                                <>
+                                  <span>Track: {region.trackEvidence.trackAlias} ({region.trackEvidence.format})</span>
+                                  {(region.trackEvidence.score !== undefined || region.trackEvidence.signalValue !== undefined) && <span>Track score: {region.trackEvidence.score ?? 'N/A'}{region.trackEvidence.signalValue !== undefined ? `; signal ${region.trackEvidence.signalValue}` : ''}</span>}
+                                  {region.trackEvidence.peakPosition !== undefined && <span>Peak summit: {region.trackEvidence.peakPosition.toLocaleString()}</span>}
+                                </>
                               )}
                               {region.moduleEvidence && (
                                 <>

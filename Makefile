@@ -10,6 +10,7 @@ SRCS = src/main.cpp \
        src/frontend/Lexer.cpp src/frontend/Parser.cpp src/frontend/AST.cpp \
        src/backend/SemanticAnalyzer.cpp src/backend/IRGenerator.cpp src/backend/Interpreter.cpp \
        src/bioinfo/FastaReader.cpp src/bioinfo/GFFReader.cpp src/bioinfo/MotifFinder.cpp \
+       src/bioinfo/BEDReader.cpp \
        src/bioinfo/SmithWaterman.cpp src/bioinfo/SetOperations.cpp src/bioinfo/PWMScanner.cpp \
        src/bioinfo/GCAnalyzer.cpp src/bioinfo/RegulatoryRegions.cpp \
        src/bioinfo/BackgroundModel.cpp
@@ -34,6 +35,7 @@ clean:
 $(CORE_TEST_TARGET): tests/test_core.cpp \
        src/bioinfo/MotifFinder.cpp src/bioinfo/SmithWaterman.cpp \
        src/bioinfo/SetOperations.cpp src/bioinfo/PWMScanner.cpp \
+       src/bioinfo/BEDReader.cpp \
        src/bioinfo/GCAnalyzer.cpp src/bioinfo/RegulatoryRegions.cpp \
        src/bioinfo/BackgroundModel.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $^

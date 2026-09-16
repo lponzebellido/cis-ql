@@ -2,6 +2,7 @@
 #define INTERPRETER_H
 
 #include "../bioinfo/FastaReader.h"
+#include "../bioinfo/BEDReader.h"
 #include "../bioinfo/GFFReader.h"
 #include "../bioinfo/GenomicRegion.h"
 #include "../bioinfo/MotifFinder.h"
@@ -73,6 +74,7 @@ private:
 
   void executeLoadSeq(const IRInstruction &instr);
   void executeLoadAnnot(const IRInstruction &instr);
+  void executeLoadTrack(const IRInstruction &instr);
   void executeUseDataset(const IRInstruction &instr);
   void executeExport(const IRInstruction &instr);
   void executeDefinePromoters(const IRInstruction &instr);

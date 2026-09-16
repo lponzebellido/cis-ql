@@ -21,7 +21,9 @@ void NotConditionNode::print(std::string prefix, bool isLast) const {
 }
 
 void LoadStmtNode::print(std::string prefix, bool isLast) const {
-    std::cout << prefix << (isLast ? "└── " : "├── ") << "LoadStmt(" << loadType << " File: " << filename << ", Alias: " << alias << ")" << std::endl;
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "LoadStmt(" << loadType << " File: " << filename;
+    if (!format.empty()) std::cout << ", Format: " << format;
+    std::cout << ", Alias: " << alias << ")" << std::endl;
 }
 
 void UseStmtNode::print(std::string prefix, bool isLast) const {

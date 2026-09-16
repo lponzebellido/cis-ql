@@ -5,6 +5,7 @@
 #include "SpatialRelationEvidence.h"
 #include "CountEvidence.h"
 #include "ModuleEvidence.h"
+#include "TrackEvidence.h"
 #include <string>
 #include <algorithm>
 
@@ -20,6 +21,7 @@ struct GenomicRegion {
   SpatialRelationEvidence spatialRelation;
   CountEvidence countEvidence;
   ModuleEvidence moduleEvidence;
+  TrackEvidence trackEvidence;
 
   size_t length() const { return end - start; }
 

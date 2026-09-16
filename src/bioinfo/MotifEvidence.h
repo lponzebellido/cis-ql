@@ -2,6 +2,7 @@
 #define MOTIF_EVIDENCE_H
 
 #include "BackgroundModel.h"
+#include "TrackEvidence.h"
 #include <cstddef>
 #include <string>
 
@@ -35,6 +36,7 @@ struct MotifEvidence {
   size_t sourceRegionStart = 0;
   size_t sourceRegionEnd = 0;
   size_t relativeStart = 0;
+  TrackEvidence sourceTrackEvidence;
 };
 
 #endif

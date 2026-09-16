@@ -5,6 +5,7 @@ std::string irOpcodeToString(IROpCode op) {
   switch (op) {
     case IROpCode::LOAD_SEQ:         return "LOAD_SEQ";
     case IROpCode::LOAD_ANNOT:       return "LOAD_ANNOT";
+    case IROpCode::LOAD_TRACK:       return "LOAD_TRACK";
     case IROpCode::USE_SEQUENCE:     return "USE_SEQUENCE";
     case IROpCode::USE_ANNOTATION:   return "USE_ANNOTATION";
     case IROpCode::EXPORT_RESULTS:   return "EXPORT_RESULTS";
@@ -108,11 +109,14 @@ void IRGenerator::visit(LoadStmtNode* node) {
     instr.opcode = IROpCode::LOAD_SEQ;
   } else if (node->loadType == "MATRIX") {
     instr.opcode = IROpCode::LOAD_MATRIX;
+  } else if (node->loadType == "TRACK") {
+    instr.opcode = IROpCode::LOAD_TRACK;
   } else {
     instr.opcode = IROpCode::LOAD_ANNOT;
   }
   instr.arg1 = node->filename;
   instr.arg2 = node->alias;
+  instr.arg3 = node->format;
   instructions.push_back(instr);
 }
 

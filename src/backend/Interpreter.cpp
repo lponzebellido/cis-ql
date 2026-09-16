@@ -207,6 +207,17 @@ void Interpreter::printRegions(const std::vector<GenomicRegion> &regions,
                 << r.countEvidence.containerSet << ":" << r.countEvidence.count
                 << std::endl;
     }
+    if (r.trackEvidence.present) {
+      std::cout << "      TRACK " << r.trackEvidence.trackAlias << " ("
+                << r.trackEvidence.format << ")";
+      if (r.trackEvidence.hasScore)
+        std::cout << " score:" << r.trackEvidence.score;
+      if (r.trackEvidence.hasSignalValue)
+        std::cout << " signal:" << r.trackEvidence.signalValue;
+      if (r.trackEvidence.hasPeak)
+        std::cout << " summit:" << (r.start + r.trackEvidence.peakOffset);
+      std::cout << std::endl;
+    }
     if (r.moduleEvidence.present) {
       std::cout << "      MODULE spacing:" << r.moduleEvidence.observedSpacing
                 << " BP (" << r.moduleEvidence.minimumSpacing << ".."
@@ -262,6 +273,7 @@ GenomicRegion Interpreter::motifMatchToRegion(const MotifMatch &match,
     region.name += "_in_" + match.evidence.sourceRegionName;
   }
   region.motifEvidence = match.evidence;
+  region.trackEvidence = match.evidence.sourceTrackEvidence;
 
   const auto chromosomeMap = sequenceChrMaps.find(activeSequenceAlias);
   if (chromosomeMap != sequenceChrMaps.end()) {
@@ -330,6 +342,52 @@ void Interpreter::executeLoadAnnot(const IRInstruction &instr) {
     for (const auto &pair : typeCounts) {
       std::cout << "    " << pair.first << ": " << pair.second << std::endl;
     }
+  }
+}
+
+void Interpreter::executeLoadTrack(const IRInstruction &instr) {
+  const std::string filename = stripQuotes(instr.arg1);
+  const std::string &alias = instr.arg2;
+  const std::string &format = instr.arg3;
+  if (debugMode) {
+    std::cout << "> LOAD TRACK \"" << filename << "\" FORMAT " << format
+              << " AS " << alias << std::endl;
+  }
+
+  std::string error;
+  std::vector<GenomicRegion> regions =
+      BEDReader::read(filename, format, alias, &error);
+  if (!error.empty()) {
+    reportRuntimeError(error);
+    return;
+  }
+  if (regions.empty()) {
+    reportRuntimeError("No track intervals found in " + filename + ".");
+    return;
+  }
+  const auto activeGenome = sequenceChrMaps.find(activeSequenceAlias);
+  if (activeGenome != sequenceChrMaps.end()) {
+    for (auto &region : regions) {
+      const auto chromosome = activeGenome->second.find(region.chr);
+      if (chromosome == activeGenome->second.end()) {
+        reportRuntimeError("Track chromosome '" + region.chr +
+                           "' is absent from the active sequence dataset.");
+        return;
+      }
+      if (region.end > chromosome->second.sequence.size()) {
+        reportRuntimeError("Track interval '" + region.name +
+                           "' exceeds chromosome '" + region.chr + "'.");
+        return;
+      }
+      region.sequence = chromosome->second.sequence.substr(
+          region.start, region.end - region.start);
+    }
+  }
+  namedRegions[alias] = regions;
+  resultSets[alias] = std::move(regions);
+  if (debugMode) {
+    std::cout << "  Loaded " << resultSets[alias].size() << " " << format
+              << " interval(s) from " << filename << std::endl;
   }
 }
 
@@ -407,6 +465,10 @@ void Interpreter::executeExport(const IRInstruction &instr) {
         bedScore = static_cast<int>(
             std::round(region.motifEvidence.scorePercent * 10.0));
         bedScore = std::max(0, std::min(1000, bedScore));
+      } else if (region.trackEvidence.present &&
+                 region.trackEvidence.hasScore) {
+        bedScore = static_cast<int>(std::round(region.trackEvidence.score));
+        bedScore = std::max(0, std::min(1000, bedScore));
       }
       out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
           << region.end << '\t' << name << '\t' << bedScore << '\t' << strand
@@ -425,7 +487,9 @@ void Interpreter::executeExport(const IRInstruction &instr) {
       const std::string score =
           region.motifEvidence.present
               ? std::to_string(region.motifEvidence.rawScore)
-              : ".";
+              : region.trackEvidence.present && region.trackEvidence.hasScore
+                    ? std::to_string(region.trackEvidence.score)
+                    : ".";
       out << cleanTabularField(region.chr) << "\tCis-QL\t"
           << cleanTabularField(type) << '\t' << (region.start + 1) << '\t'
           << region.end << '\t' << score << '\t' << strand
@@ -549,6 +613,23 @@ void Interpreter::executeExport(const IRInstruction &instr) {
               << module.second.motifEvidence.statistics.qValue;
         }
       }
+      if (region.trackEvidence.present) {
+        const TrackEvidence &track = region.trackEvidence;
+        out << ";TrackAlias=" << gffAttributeEscape(track.trackAlias)
+            << ";TrackSource=" << gffAttributeEscape(track.source)
+            << ";TrackFormat=" << gffAttributeEscape(track.format);
+        if (track.hasScore)
+          out << ";TrackScore=" << track.score;
+        if (track.hasSignalValue)
+          out << ";SignalValue=" << track.signalValue;
+        if (track.hasMinusLog10PValue)
+          out << ";TrackMinusLog10PValue=" << track.minusLog10PValue;
+        if (track.hasMinusLog10QValue)
+          out << ";TrackMinusLog10QValue=" << track.minusLog10QValue;
+        if (track.hasPeak)
+          out << ";PeakOffset=" << track.peakOffset
+              << ";PeakPosition=" << (region.start + track.peakOffset);
+      }
       out << '\n';
     }
   } else if (format == "TSV") {
@@ -577,7 +658,11 @@ void Interpreter::executeExport(const IRInstruction &instr) {
            "\tfirst_p_value\tfirst_q_value"
            "\tsecond_set\tsecond_chr\tsecond_start\tsecond_end"
            "\tsecond_strand\tsecond_type\tsecond_name\tsecond_matrix_id"
-           "\tsecond_raw_score\tsecond_p_value\tsecond_q_value\n";
+           "\tsecond_raw_score\tsecond_p_value\tsecond_q_value"
+           "\ttrack_alias\ttrack_source\ttrack_format\ttrack_score"
+           "\tsignal_value\ttrack_minus_log10_p_value"
+           "\ttrack_minus_log10_q_value"
+           "\tpeak_offset\tpeak_position\n";
     for (const auto &region : regionsIt->second) {
       out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
           << region.end << '\t' << cleanTabularField(region.strand) << '\t'
@@ -681,6 +766,33 @@ void Interpreter::executeExport(const IRInstruction &instr) {
         writeMember(module.second);
       } else {
         for (int emptyColumn = 0; emptyColumn < 28; ++emptyColumn)
+          out << '\t';
+      }
+      out << '\t';
+      if (region.trackEvidence.present) {
+        const TrackEvidence &track = region.trackEvidence;
+        out << cleanTabularField(track.trackAlias) << '\t'
+            << cleanTabularField(track.source) << '\t'
+            << cleanTabularField(track.format) << '\t';
+        if (track.hasScore)
+          out << track.score;
+        out << '\t';
+        if (track.hasSignalValue)
+          out << track.signalValue;
+        out << '\t';
+        if (track.hasMinusLog10PValue)
+          out << track.minusLog10PValue;
+        out << '\t';
+        if (track.hasMinusLog10QValue)
+          out << track.minusLog10QValue;
+        out << '\t';
+        if (track.hasPeak)
+          out << track.peakOffset;
+        out << '\t';
+        if (track.hasPeak)
+          out << region.start + track.peakOffset;
+      } else {
+        for (int emptyColumn = 0; emptyColumn < 8; ++emptyColumn)
           out << '\t';
       }
       out << '\n';
@@ -1776,6 +1888,7 @@ void Interpreter::executeScanExec(const IRInstruction &instr) {
             source.strand == "-"
                 ? source.end - (match.position + match.matchLength)
                 : localPosition;
+        match.evidence.sourceTrackEvidence = source.trackEvidence;
       }
       PWMScanner::mergeScanResults(scanResult, std::move(regionResult));
     }
@@ -2086,6 +2199,32 @@ void Interpreter::dumpResultsJSON() const {
             << "          \"count\": " << r.countEvidence.count << "\n"
             << "        }";
       }
+      if (r.trackEvidence.present) {
+        const TrackEvidence &track = r.trackEvidence;
+        out << ",\n        \"trackEvidence\": {\n"
+            << "          \"trackAlias\": \""
+            << jsonEscape(track.trackAlias) << "\",\n"
+            << "          \"source\": \"" << jsonEscape(track.source)
+            << "\",\n"
+            << "          \"format\": \"" << jsonEscape(track.format)
+            << "\"";
+        if (track.hasScore)
+          out << ",\n          \"score\": " << track.score;
+        if (track.hasSignalValue)
+          out << ",\n          \"signalValue\": " << track.signalValue;
+        if (track.hasMinusLog10PValue)
+          out << ",\n          \"minusLog10PValue\": "
+              << track.minusLog10PValue;
+        if (track.hasMinusLog10QValue)
+          out << ",\n          \"minusLog10QValue\": "
+              << track.minusLog10QValue;
+        if (track.hasPeak) {
+          out << ",\n          \"peakOffset\": " << track.peakOffset
+              << ",\n          \"peakPosition\": "
+              << (r.start + track.peakOffset);
+        }
+        out << "\n        }";
+      }
       if (r.moduleEvidence.present) {
         const ModuleEvidence &module = r.moduleEvidence;
         const auto writeMember = [this,
@@ -2295,6 +2434,9 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
       break;
     case IROpCode::LOAD_ANNOT:
       executeLoadAnnot(instr);
+      break;
+    case IROpCode::LOAD_TRACK:
+      executeLoadTrack(instr);
       break;
     case IROpCode::USE_SEQUENCE:
     case IROpCode::USE_ANNOTATION:

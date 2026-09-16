@@ -1,6 +1,6 @@
 # Cis-QL regulatory example path
 
-These eight programs are a progressive analysis of one synthetic
+These nine programs are a progressive analysis of one synthetic
 anthocyanin-regulatory locus. They teach how evidence moves through the
 language; they are not biological evidence or an exhaustive grammar catalog.
 
@@ -30,12 +30,21 @@ language; they are not biological evidence or an exhaustive grammar catalog.
    promoter evidence separate, summarizes it per promoter, builds the enhancer
    module, and records its nearest gene as a deliberately provisional target
    hypothesis.
+9. `09_accessible_myb_evidence.cql` imports a synthetic narrowPeak
+   accessibility track, counts calibrated MYB sites inside every peak, retains
+   peaks with motif support, and records their nearest gene as a candidate
+   association. The emitted records preserve both quantitative track evidence
+   and the overlap count.
 
 The shared `anthocyanin_regulatory_demo` FASTA and GFF3 files contain three
 annotated genes, one candidate enhancer, two promoter-local MYB instances, and
 two enhancer-local instances. These deterministic fixtures exercise query
 semantics. They do not assert that this sequence, enhancer, or relationship
 exists in a plant.
+
+`anthocyanin_accessibility_demo.narrowPeak` is likewise synthetic. Its four
+peaks exist to exercise imported experimental-track semantics; they are not
+ATAC-seq or ChIP-seq measurements.
 
 The `MA0054.1 myb.Ph3` frequency matrix is the unmodified JASPAR CORE profile
 for *Petunia x hybrida* MYB.Ph3. Applying a related profile to a real
@@ -54,6 +63,11 @@ Interpret the outputs conservatively:
 - `DEFINE MODULE` reports pairs satisfying the stated spacing, order, and
   orientation grammar. A matching pair is not proof of cooperative binding;
   the constraints need a documented biological or benchmark rationale.
+- A narrowPeak interval represents a called enrichment peak from an upstream
+  experiment. Its presence supports accessibility or binding only when the
+  assay, sample, controls, assembly, and peak-calling provenance are suitable.
+  Cis-QL preserves the supplied statistics but does not reinterpret them as
+  proof of target-gene regulation.
 
 The removed historical examples mixed eukaryotic TF models and promoter
 assumptions with an *E. coli* fixture. Their language constructs remain covered

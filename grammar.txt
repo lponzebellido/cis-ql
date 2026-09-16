@@ -2,13 +2,13 @@ Context-Free Grammar (CFG) for Cis-QL (v3.0-dev, regulatory foundation)
 
 Terminals (Tokens):
 
-LOAD, USE, EXPORT, DEFINE, PROMOTERS, MODULE, OF, SEQUENCE, ANNOTATION, MATRIX, STRING, AS, ID, SEMICOLON, FIND, MOTIF, COUNT, WITHIN, NUM,
+LOAD, USE, EXPORT, DEFINE, PROMOTERS, MODULE, OF, SEQUENCE, ANNOTATION, TRACK, MATRIX, STRING, AS, ID, SEMICOLON, FIND, MOTIF, COUNT, WITHIN, NUM,
 FROM, WITH, GENE, PROMOTER, ENHANCER, EXON, INTRON, UTR, TSS, CDS, REGION, STRAND, POSITIVE, NEGATIVE,
 CHR, EXTRACT, WHERE, INTERSECT, UNION, EXCEPT, OVERLAPS, NEAR, AND, OR, NOT, LPAREN, RPAREN, LBRACKET, RBRACKET,
 LENGTH, SIMILARITY, GREATER, LESS, GREATER_EQ, LESS_EQ, ASSIGN, FLOAT, PERCENT, BP, KB, MB,
 UPSTREAM, DOWNSTREAM, SCAN, THRESHOLD, PVALUE, QVALUE, BACKGROUND, UNIFORM, ANALYZE, GC_CONTENT, CPG_ISLANDS, WINDOW,
 IF, THEN, ELSE, ENDIF, FOREACH, IN, DO, ENDFOR, COMMA, TO, FORMAT, BED, GFF3, TSV,
-SPACING, ORDER, ORIENTATION, ANY, SAME, OPPOSITE, AS_WRITTEN.
+SPACING, ORDER, ORIENTATION, ANY, SAME, OPPOSITE, AS_WRITTEN, NARROWPEAK.
 
 Grammar Rules:
 
@@ -18,6 +18,7 @@ StatementList      -> Statement StatementList | λ
 Statement          -> LoadStmt | UseStmt | ExportStmt | DefinePromotersStmt | DefineModuleStmt | FindStmt | ExtractStmt | SetOperationStmt | CountStmt | ScanStmt | AnalyzeStmt | IfStmt | ForeachStmt
 
 LoadStmt           -> LOAD (SEQUENCE | ANNOTATION | MATRIX) STRING AS ID SEMICOLON
+                    | LOAD TRACK STRING FORMAT (BED | NARROWPEAK) AS ID SEMICOLON
 UseStmt            -> USE (SEQUENCE | ANNOTATION) ID SEMICOLON
 ExportStmt         -> EXPORT ID TO STRING FORMAT (BED | GFF3 | TSV) SEMICOLON
 DefinePromotersStmt -> DEFINE PROMOTERS OF (GENE | TSS | ID) FROM TSS
@@ -98,3 +99,4 @@ Note on Execution Engine & Studio Integration:
 11. `NEAR query TO reference WITHIN distance` retains each query interval whose nearest same-chromosome reference has an interval gap less than or equal to the explicit limit. Overlap and adjacency have distance zero but are distinguished by recorded overlap evidence. The complete query and its motif evidence are preserved; the chosen reference, distance, limit, and overlap state are attached to JSON, GFF3, and TSV results. Equal-distance ties use deterministic reference ordering. Proximity is not interpreted as proof of regulation.
 12. `COUNT query IN containers` emits every valid container interval, including those with zero hits, and records how many query intervals overlap it under half-open coordinates. `WHERE COUNT` can select containers by the resulting non-negative integer. This is descriptive aggregation, not a statistical enrichment test.
 13. `DEFINE MODULE` pairs records on the same chromosome when their half-open interval gap falls inside the inclusive `SPACING` range. Overlap and adjacency both have spacing zero, while the observed order records overlap separately. `ORDER AS_WRITTEN` requires the first input record to have a lower reference start than the second; tied starts do not satisfy it. `ORDER ANY` accepts either direction. `ORIENTATION SAME` and `OPPOSITE` require both members to have `+` or `-` strands. Reusing one alias forms canonical unordered pairs, excluding self-pairs and duplicate mirror pairs. JSON and Studio retain nested member evidence; GFF3 and TSV expose the constraints, member identities, and core PWM statistics.
+14. `LOAD TRACK ... FORMAT BED|NARROWPEAK` imports zero-based, half-open regulatory intervals as a named region set. narrowPeak score, signalValue, -log10(p), -log10(q), and summit offset are preserved as typed track evidence. When a FASTA is active, chromosome names and interval bounds are validated and interval sequence is attached. Imported tracks can be used by the interval, count, scan, and module operators without becoming the active GFF3 annotation.
