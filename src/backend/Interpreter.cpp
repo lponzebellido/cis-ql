@@ -209,7 +209,12 @@ void Interpreter::printRegions(const std::vector<GenomicRegion> &regions,
     }
     if (r.trackEvidence.present) {
       std::cout << "      TRACK " << r.trackEvidence.trackAlias << " ("
-                << r.trackEvidence.format << ")";
+                << r.trackEvidence.format << ", "
+                << r.trackEvidence.evidenceClass << ")";
+      if (!r.trackEvidence.assay.empty())
+        std::cout << " assay:\"" << r.trackEvidence.assay << "\"";
+      if (!r.trackEvidence.sample.empty())
+        std::cout << " sample:\"" << r.trackEvidence.sample << "\"";
       if (r.trackEvidence.hasScore)
         std::cout << " score:" << r.trackEvidence.score;
       if (r.trackEvidence.hasSignalValue)
@@ -349,14 +354,23 @@ void Interpreter::executeLoadTrack(const IRInstruction &instr) {
   const std::string filename = stripQuotes(instr.arg1);
   const std::string &alias = instr.arg2;
   const std::string &format = instr.arg3;
+  const std::string &evidenceClass = instr.arg4;
+  const std::string assay = stripQuotes(instr.arg5);
+  const std::string sample = stripQuotes(instr.arg6);
   if (debugMode) {
     std::cout << "> LOAD TRACK \"" << filename << "\" FORMAT " << format
-              << " AS " << alias << std::endl;
+              << " EVIDENCE " << evidenceClass;
+    if (!assay.empty())
+      std::cout << " ASSAY \"" << assay << "\"";
+    if (!sample.empty())
+      std::cout << " SAMPLE \"" << sample << "\"";
+    std::cout << " AS " << alias << std::endl;
   }
 
   std::string error;
   std::vector<GenomicRegion> regions =
-      BEDReader::read(filename, format, alias, &error);
+      BEDReader::read(filename, format, alias, evidenceClass, assay, sample,
+                      &error);
   if (!error.empty()) {
     reportRuntimeError(error);
     return;
@@ -617,7 +631,13 @@ void Interpreter::executeExport(const IRInstruction &instr) {
         const TrackEvidence &track = region.trackEvidence;
         out << ";TrackAlias=" << gffAttributeEscape(track.trackAlias)
             << ";TrackSource=" << gffAttributeEscape(track.source)
-            << ";TrackFormat=" << gffAttributeEscape(track.format);
+            << ";TrackFormat=" << gffAttributeEscape(track.format)
+            << ";EvidenceClass="
+            << gffAttributeEscape(track.evidenceClass);
+        if (!track.assay.empty())
+          out << ";Assay=" << gffAttributeEscape(track.assay);
+        if (!track.sample.empty())
+          out << ";Sample=" << gffAttributeEscape(track.sample);
         if (track.hasScore)
           out << ";TrackScore=" << track.score;
         if (track.hasSignalValue)
@@ -659,7 +679,8 @@ void Interpreter::executeExport(const IRInstruction &instr) {
            "\tsecond_set\tsecond_chr\tsecond_start\tsecond_end"
            "\tsecond_strand\tsecond_type\tsecond_name\tsecond_matrix_id"
            "\tsecond_raw_score\tsecond_p_value\tsecond_q_value"
-           "\ttrack_alias\ttrack_source\ttrack_format\ttrack_score"
+           "\ttrack_alias\ttrack_source\ttrack_format\tevidence_class"
+           "\tassay\tsample\ttrack_score"
            "\tsignal_value\ttrack_minus_log10_p_value"
            "\ttrack_minus_log10_q_value"
            "\tpeak_offset\tpeak_position\n";
@@ -773,7 +794,10 @@ void Interpreter::executeExport(const IRInstruction &instr) {
         const TrackEvidence &track = region.trackEvidence;
         out << cleanTabularField(track.trackAlias) << '\t'
             << cleanTabularField(track.source) << '\t'
-            << cleanTabularField(track.format) << '\t';
+            << cleanTabularField(track.format) << '\t'
+            << cleanTabularField(track.evidenceClass) << '\t'
+            << cleanTabularField(track.assay) << '\t'
+            << cleanTabularField(track.sample) << '\t';
         if (track.hasScore)
           out << track.score;
         out << '\t';
@@ -792,7 +816,7 @@ void Interpreter::executeExport(const IRInstruction &instr) {
         if (track.hasPeak)
           out << region.start + track.peakOffset;
       } else {
-        for (int emptyColumn = 0; emptyColumn < 8; ++emptyColumn)
+        for (int emptyColumn = 0; emptyColumn < 11; ++emptyColumn)
           out << '\t';
       }
       out << '\n';
@@ -2207,7 +2231,15 @@ void Interpreter::dumpResultsJSON() const {
             << "          \"source\": \"" << jsonEscape(track.source)
             << "\",\n"
             << "          \"format\": \"" << jsonEscape(track.format)
-            << "\"";
+            << "\",\n"
+            << "          \"evidenceClass\": \""
+            << jsonEscape(track.evidenceClass) << "\"";
+        if (!track.assay.empty())
+          out << ",\n          \"assay\": \"" << jsonEscape(track.assay)
+              << "\"";
+        if (!track.sample.empty())
+          out << ",\n          \"sample\": \"" << jsonEscape(track.sample)
+              << "\"";
         if (track.hasScore)
           out << ",\n          \"score\": " << track.score;
         if (track.hasSignalValue)

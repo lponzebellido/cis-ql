@@ -94,7 +94,11 @@ LOAD SEQUENCE "data_examples/anthocyanin_regulatory_demo.fasta" AS genome;
 LOAD ANNOTATION "data_examples/anthocyanin_regulatory_demo.gff3" AS annotation;
 LOAD MATRIX "matrices/MA0054.1_myb.Ph3.pwm" AS myb_matrix;
 LOAD TRACK "data_examples/anthocyanin_accessibility_demo.narrowPeak"
-    FORMAT NARROWPEAK AS accessibility_peaks;
+    FORMAT NARROWPEAK
+    EVIDENCE ACCESSIBILITY
+    ASSAY "synthetic ATAC-seq-like fixture"
+    SAMPLE "synthetic anthocyanin locus"
+    AS accessibility_peaks;
 ```
 
 The example suite also includes the plant MYB profile `MA0054.1` from
@@ -108,6 +112,10 @@ validates chromosome names and interval bounds, attaches interval sequence,
 and rejects assembly-incompatible records. narrowPeak's `pValue` and `qValue`
 columns are preserved according to that format as `-log10(p)` and `-log10(q)`;
 they are not confused with the calibrated probabilities produced by `SCAN`.
+Every track must declare `EVIDENCE ACCESSIBILITY`, `BINDING`, or `OTHER`.
+Optional `ASSAY` and `SAMPLE` strings travel with derived results and exports;
+these declarations preserve provenance but do not validate experimental
+quality or biological interpretation.
 
 When multiple sequence or annotation datasets are loaded, select the active
 context explicitly:
@@ -284,7 +292,9 @@ Statement          ::= LoadStmt | UseStmt | ExportStmt | FindStmt | ExtractStmt
                      | IfStmt | ForeachStmt
 
 LoadStmt           ::= LOAD (SEQUENCE | ANNOTATION | MATRIX) STRING AS ID SEMICOLON
-                     | LOAD TRACK STRING FORMAT (BED | NARROWPEAK) AS ID SEMICOLON
+                     | LOAD TRACK STRING FORMAT (BED | NARROWPEAK)
+                       EVIDENCE (ACCESSIBILITY | BINDING | OTHER)
+                       (ASSAY STRING)? (SAMPLE STRING)? AS ID SEMICOLON
 UseStmt            ::= USE (SEQUENCE | ANNOTATION) ID SEMICOLON
 ExportStmt         ::= EXPORT ID TO STRING FORMAT (BED | GFF3 | TSV) SEMICOLON
 DefinePromotersStmt ::= DEFINE PROMOTERS OF (GENE | TSS | ID) FROM TSS

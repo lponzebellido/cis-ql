@@ -3,6 +3,9 @@ LOAD ANNOTATION "data_examples/anthocyanin_regulatory_demo.gff3" AS annotation;
 LOAD MATRIX "matrices/MA0054.1_myb.Ph3.pwm" AS myb_matrix;
 LOAD TRACK "data_examples/anthocyanin_accessibility_demo.narrowPeak"
     FORMAT NARROWPEAK
+    EVIDENCE ACCESSIBILITY
+    ASSAY "synthetic ATAC-seq-like fixture"
+    SAMPLE "synthetic anthocyanin locus"
     AS accessibility_peaks;
 
 SCAN myb_matrix

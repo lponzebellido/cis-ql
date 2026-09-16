@@ -154,6 +154,7 @@ def main() -> int:
             'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
             'LOAD MATRIX "fixture.pwm" AS matrix;\n'
             'LOAD TRACK "accessibility.narrowPeak" FORMAT NARROWPEAK '
+            'EVIDENCE ACCESSIBILITY ASSAY "ATAC-seq" SAMPLE "leaf" '
             'AS accessible;\n'
             'SCAN matrix IN accessible STRAND POSITIVE THRESHOLD 100 % '
             'AS accessible_sites;\n'
@@ -177,6 +178,9 @@ def main() -> int:
                     "trackAlias": "accessible",
                     "source": "accessibility.narrowPeak",
                     "format": "NARROWPEAK",
+                    "evidenceClass": "ACCESSIBILITY",
+                    "assay": "ATAC-seq",
+                    "sample": "leaf",
                     "score": 500,
                     "signalValue": 12.5,
                     "minusLog10PValue": 4.2,
@@ -188,6 +192,9 @@ def main() -> int:
                     "trackAlias": "accessible",
                     "source": "accessibility.narrowPeak",
                     "format": "NARROWPEAK",
+                    "evidenceClass": "ACCESSIBILITY",
+                    "assay": "ATAC-seq",
+                    "sample": "leaf",
                     "score": 200,
                     "signalValue": 7,
                 },
@@ -195,9 +202,10 @@ def main() -> int:
         track_tsv = (workspace / "accessible.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(track_tsv) == 90 and track_tsv[81:90] == [
+        require(len(track_tsv) == 93 and track_tsv[81:93] == [
                     "accessible", "accessibility.narrowPeak", "NARROWPEAK",
-                    "500", "12.5", "4.2000000000000002",
+                    "ACCESSIBILITY", "ATAC-seq", "leaf", "500", "12.5",
+                    "4.2000000000000002",
                     "3.7999999999999998", "25", "25",
                 ], "TSV export preserves typed narrowPeak evidence")
         track_gff = (workspace / "accessible.gff3").read_text(
@@ -205,6 +213,9 @@ def main() -> int:
         ).splitlines()[1]
         require("TrackAlias=accessible" in track_gff and
                 "TrackFormat=NARROWPEAK" in track_gff and
+                "EvidenceClass=ACCESSIBILITY" in track_gff and
+                "Assay=ATAC-seq" in track_gff and
+                "Sample=leaf" in track_gff and
                 "SignalValue=12.5" in track_gff and
                 "TrackMinusLog10PValue=4.2" in track_gff and
                 "PeakPosition=25" in track_gff,
@@ -214,7 +225,8 @@ def main() -> int:
             workspace,
             "load_bed_track",
             'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
-            'LOAD TRACK "candidate_regions.bed" FORMAT BED AS candidates;\n',
+            'LOAD TRACK "candidate_regions.bed" FORMAT BED '
+            'EVIDENCE OTHER AS candidates;\n',
         )
         bed_region = data["resultSets"]["candidates"][0]
         require((bed_region["start"], bed_region["end"],
@@ -224,6 +236,7 @@ def main() -> int:
                     "trackAlias": "candidates",
                     "source": "candidate_regions.bed",
                     "format": "BED",
+                    "evidenceClass": "OTHER",
                     "score": 100,
                 }, "LOAD TRACK supports BED6 and attaches genome sequence")
 
@@ -236,11 +249,21 @@ def main() -> int:
         require("Expected 'FORMAT'" in parser_error,
                 "LOAD TRACK requires an explicit input format")
 
+        parser_error = run_invalid_query(
+            workspace,
+            "track_requires_evidence_class",
+            'LOAD TRACK "candidate_regions.bed" FORMAT BED AS candidates;\n',
+            2,
+        )
+        require("Expected 'EVIDENCE'" in parser_error,
+                "LOAD TRACK requires an explicit evidence class")
+
         runtime_error = run_invalid_query(
             workspace,
             "track_checks_active_assembly",
             'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
-            'LOAD TRACK "wrong_assembly.bed" FORMAT BED AS candidates;\n',
+            'LOAD TRACK "wrong_assembly.bed" FORMAT BED '
+            'EVIDENCE OTHER AS candidates;\n',
             4,
         )
         require("absent from the active sequence dataset" in runtime_error,
@@ -451,7 +474,8 @@ def main() -> int:
                 "\tsecond_strand\tsecond_type\tsecond_name"
                 "\tsecond_matrix_id\tsecond_raw_score\tsecond_p_value"
                 "\tsecond_q_value"
-                "\ttrack_alias\ttrack_source\ttrack_format\ttrack_score"
+                "\ttrack_alias\ttrack_source\ttrack_format\tevidence_class"
+                "\tassay\tsample\ttrack_score"
                 "\tsignal_value\ttrack_minus_log10_p_value"
                 "\ttrack_minus_log10_q_value\tpeak_offset\tpeak_position",
                 "region TSV export")
@@ -626,7 +650,7 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()
         first_tsv_site = tsv_rows[1].split("\t")
-        require(len(tsv_rows) == 10 and len(first_tsv_site) == 90 and
+        require(len(tsv_rows) == 10 and len(first_tsv_site) == 93 and
                 first_tsv_site[7:11]
                 == ["matrix", "TEST", "test", "fixture.pwm"] and
                 float(first_tsv_site[11]) > 0 and
@@ -642,7 +666,7 @@ def main() -> int:
                 abs(float(first_tsv_site[31]) - 0.1) < 1e-12 and
                 first_tsv_site[32:34] == ["short_promoter", "promoter"] and
                 first_tsv_site[36] == "0" and
-                first_tsv_site[37:] == [""] * 53,
+                first_tsv_site[37:] == [""] * 56,
                 "motif TSV export retains evidence columns")
 
         data, _ = run_query(
@@ -719,10 +743,10 @@ def main() -> int:
         linked_tsv = (workspace / "linked.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(linked_tsv) == 90 and linked_tsv[37:48] == [
+        require(len(linked_tsv) == 93 and linked_tsv[37:48] == [
                     "NEAR", "GENE", "chr1", "0", "1200", "+", "gene",
                     "short", "0", "0", "true",
-                ] and linked_tsv[48:] == [""] * 42,
+                ] and linked_tsv[48:] == [""] * 45,
                 "TSV export retains typed nearest-reference evidence")
 
         data, _ = run_query(
@@ -766,9 +790,9 @@ def main() -> int:
         count_tsv = (workspace / "counts.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(count_tsv) == 90 and count_tsv[48:52] == [
+        require(len(count_tsv) == 93 and count_tsv[48:52] == [
                     "OVERLAPS", "sites", "promoters", "20",
-                ] and count_tsv[52:] == [""] * 38,
+                ] and count_tsv[52:] == [""] * 41,
                 "TSV export retains count provenance")
 
         data, _ = run_query(
@@ -828,7 +852,7 @@ def main() -> int:
         module_tsv = (workspace / "modules.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(module_tsv) == 90 and
+        require(len(module_tsv) == 93 and
                 module_tsv[52:59] == [
                     "2", "2", "2", "ANY", "FIRST_BEFORE_SECOND",
                     "SAME", "SAME",
@@ -1028,12 +1052,20 @@ def main() -> int:
         ]
         require([peak["countEvidence"]["count"] for peak in peak_counts]
                 == [1, 2, 1, 0] and
-                all("trackEvidence" in peak for peak in peak_counts) and
+                all(peak.get("trackEvidence", {}).get("evidenceClass")
+                    == "ACCESSIBILITY" and
+                    peak["trackEvidence"].get("assay")
+                    == "synthetic ATAC-seq-like fixture" and
+                    peak["trackEvidence"].get("sample")
+                    == "synthetic anthocyanin locus"
+                    for peak in peak_counts) and
                 [peak["name"] for peak in candidate_links] == [
                     "anthocyanin_promoter_accessible",
                     "distal_enhancer_accessible",
                     "transporter_promoter_accessible",
                 ] and
+                all(link.get("trackEvidence", {}).get("evidenceClass")
+                    == "ACCESSIBILITY" for link in candidate_links) and
                 [peak["spatialRelation"]["distance"]
                  for peak in candidate_links] == [25, 60, 20],
                 "accessibility example combines track, motif-count, and proximity evidence")

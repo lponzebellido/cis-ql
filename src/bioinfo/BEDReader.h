@@ -10,6 +10,9 @@ public:
   static std::vector<GenomicRegion> read(const std::string &filename,
                                          const std::string &format,
                                          const std::string &trackAlias,
+                                         const std::string &evidenceClass,
+                                         const std::string &assay,
+                                         const std::string &sample,
                                          std::string *error = nullptr);
 };
 

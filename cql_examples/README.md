@@ -43,8 +43,9 @@ semantics. They do not assert that this sequence, enhancer, or relationship
 exists in a plant.
 
 `anthocyanin_accessibility_demo.narrowPeak` is likewise synthetic. Its four
-peaks exist to exercise imported experimental-track semantics; they are not
-ATAC-seq or ChIP-seq measurements.
+peaks exist to exercise imported experimental-track semantics. The example's
+`EVIDENCE`, `ASSAY`, and `SAMPLE` values are deliberately marked as synthetic;
+they do not turn the fixture into an ATAC-seq or ChIP-seq measurement.
 
 The `MA0054.1 myb.Ph3` frequency matrix is the unmodified JASPAR CORE profile
 for *Petunia x hybrida* MYB.Ph3. Applying a related profile to a real

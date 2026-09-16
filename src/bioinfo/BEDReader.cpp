@@ -41,6 +41,9 @@ bool parseDouble(const std::string &text, double &value) {
 std::vector<GenomicRegion> BEDReader::read(const std::string &filename,
                                            const std::string &format,
                                            const std::string &trackAlias,
+                                           const std::string &evidenceClass,
+                                           const std::string &assay,
+                                           const std::string &sample,
                                            std::string *error) {
   std::vector<GenomicRegion> regions;
   std::ifstream file(filename);
@@ -93,6 +96,9 @@ std::vector<GenomicRegion> BEDReader::read(const std::string &filename,
     region.trackEvidence.trackAlias = trackAlias;
     region.trackEvidence.source = filename;
     region.trackEvidence.format = format;
+    region.trackEvidence.evidenceClass = evidenceClass;
+    region.trackEvidence.assay = assay;
+    region.trackEvidence.sample = sample;
 
     if (fields.size() >= 5) {
       if (!parseDouble(fields[4], region.trackEvidence.score) ||

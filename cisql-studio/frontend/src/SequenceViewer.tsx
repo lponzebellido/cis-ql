@@ -66,6 +66,9 @@ interface TrackEvidence {
   trackAlias: string;
   source: string;
   format: string;
+  evidenceClass: string;
+  assay?: string;
+  sample?: string;
   score?: number;
   signalValue?: number;
   minusLog10PValue?: number;
@@ -353,6 +356,7 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
                               {region.trackEvidence && (
                                 <>
                                   <span>Track: {region.trackEvidence.trackAlias} ({region.trackEvidence.format})</span>
+                                  <span>Evidence: {region.trackEvidence.evidenceClass}{region.trackEvidence.assay ? `; assay ${region.trackEvidence.assay}` : ''}{region.trackEvidence.sample ? `; sample ${region.trackEvidence.sample}` : ''}</span>
                                   {(region.trackEvidence.score !== undefined || region.trackEvidence.signalValue !== undefined) && <span>Track score: {region.trackEvidence.score ?? 'N/A'}{region.trackEvidence.signalValue !== undefined ? `; signal ${region.trackEvidence.signalValue}` : ''}</span>}
                                   {region.trackEvidence.peakPosition !== undefined && <span>Peak summit: {region.trackEvidence.peakPosition.toLocaleString()}</span>}
                                 </>

@@ -66,6 +66,9 @@ interface TrackEvidence {
   trackAlias: string;
   source: string;
   format: string;
+  evidenceClass: string;
+  assay?: string;
+  sample?: string;
   score?: number;
   signalValue?: number;
   minusLog10PValue?: number;
@@ -661,6 +664,9 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
               {hoveredRegion.trackEvidence && (
                 <>
                   <br /><span className="tt-label">Track:</span> {hoveredRegion.trackEvidence.trackAlias} ({hoveredRegion.trackEvidence.format})
+                  <br /><span className="tt-label">Evidence:</span> {hoveredRegion.trackEvidence.evidenceClass}
+                  {hoveredRegion.trackEvidence.assay && <><br /><span className="tt-label">Assay:</span> {hoveredRegion.trackEvidence.assay}</>}
+                  {hoveredRegion.trackEvidence.sample && <><br /><span className="tt-label">Sample:</span> {hoveredRegion.trackEvidence.sample}</>}
                   {hoveredRegion.trackEvidence.score !== undefined && <><br /><span className="tt-label">Track score:</span> {hoveredRegion.trackEvidence.score}</>}
                   {hoveredRegion.trackEvidence.signalValue !== undefined && <><br /><span className="tt-label">Signal:</span> {hoveredRegion.trackEvidence.signalValue}</>}
                   {hoveredRegion.trackEvidence.peakPosition !== undefined && <><br /><span className="tt-label">Summit:</span> {hoveredRegion.trackEvidence.peakPosition.toLocaleString()}</>}
@@ -785,7 +791,10 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                     <span className="detail-label">Imported track</span>
                     <span className="detail-value">
                       {selectedRegion.trackEvidence.trackAlias} · {selectedRegion.trackEvidence.format}<br />
-                      {selectedRegion.trackEvidence.source}
+                      {selectedRegion.trackEvidence.source}<br />
+                      {selectedRegion.trackEvidence.evidenceClass}
+                      {selectedRegion.trackEvidence.assay ? ` · ${selectedRegion.trackEvidence.assay}` : ''}
+                      {selectedRegion.trackEvidence.sample ? ` · ${selectedRegion.trackEvidence.sample}` : ''}
                     </span>
                   </div>
                   <div className="detail-field">

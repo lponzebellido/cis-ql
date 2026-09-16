@@ -117,6 +117,9 @@ void IRGenerator::visit(LoadStmtNode* node) {
   instr.arg1 = node->filename;
   instr.arg2 = node->alias;
   instr.arg3 = node->format;
+  instr.arg4 = node->evidenceClass;
+  instr.arg5 = node->assay;
+  instr.arg6 = node->sample;
   instructions.push_back(instr);
 }
 

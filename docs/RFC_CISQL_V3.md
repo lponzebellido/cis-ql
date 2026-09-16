@@ -355,6 +355,9 @@ Implemented syntax:
 ```cql
 LOAD TRACK "sample_accessibility.narrowPeak"
   FORMAT NARROWPEAK
+  EVIDENCE ACCESSIBILITY
+  ASSAY "ATAC-seq"
+  SAMPLE "pigmented petal"
   AS accessibility_peaks;
 ```
 
@@ -363,8 +366,10 @@ replacing the active GFF3 annotation. Coordinates remain zero-based and
 half-open. BED name, score, and strand are retained; narrowPeak additionally
 retains signalValue, the supplied `-log10(p)` and `-log10(q)` values, and the
 summit offset and absolute summit position. The file path, declared format,
-and query alias are recorded as typed `trackEvidence` in JSON, GFF3, TSV, and
-Studio.
+query alias, required evidence class (`ACCESSIBILITY`, `BINDING`, or `OTHER`),
+and optional assay and sample labels are recorded as typed `trackEvidence` in
+JSON, GFF3, TSV, and Studio. The class is an explicit user declaration, not an
+inference from the filename or an assertion that the experiment is valid.
 
 When a FASTA is active, every track chromosome and interval bound is checked
 against it and interval sequence is attached. A track loaded before its genome
@@ -375,7 +380,7 @@ not infer assay type, quality, or biological validity from a filename.
 
 Still planned:
 
-- explicit assay/sample metadata and replicate/condition identity;
+- structured replicate, condition, control, and genome-assembly identity;
 - tabular expression/coexpression inputs;
 - Accessibility, DAP/ChIP, expression, coexpression, and literature evidence.
 - CRE-to-gene linking by promoter, distance, or an imported relationship.

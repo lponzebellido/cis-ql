@@ -9,6 +9,9 @@ struct TrackEvidence {
   std::string trackAlias;
   std::string source;
   std::string format;
+  std::string evidenceClass;
+  std::string assay;
+  std::string sample;
   bool hasScore = false;
   double score = 0.0;
   bool hasSignalValue = false;

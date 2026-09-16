@@ -45,6 +45,12 @@ void Lexer::initKeywords() {
     keywords["SAME"] = TokenType::SAME;
     keywords["OPPOSITE"] = TokenType::OPPOSITE;
     keywords["AS_WRITTEN"] = TokenType::AS_WRITTEN;
+    keywords["EVIDENCE"] = TokenType::EVIDENCE;
+    keywords["ACCESSIBILITY"] = TokenType::ACCESSIBILITY;
+    keywords["BINDING"] = TokenType::BINDING;
+    keywords["OTHER"] = TokenType::OTHER;
+    keywords["ASSAY"] = TokenType::ASSAY;
+    keywords["SAMPLE"] = TokenType::SAMPLE;
     keywords["BED"] = TokenType::BED;
     keywords["NARROWPEAK"] = TokenType::NARROWPEAK;
     keywords["GFF3"] = TokenType::GFF3;
@@ -389,6 +395,12 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::SAME: return "SAME";
         case TokenType::OPPOSITE: return "OPPOSITE";
         case TokenType::AS_WRITTEN: return "AS_WRITTEN";
+        case TokenType::EVIDENCE: return "EVIDENCE";
+        case TokenType::ACCESSIBILITY: return "ACCESSIBILITY";
+        case TokenType::BINDING: return "BINDING";
+        case TokenType::OTHER: return "OTHER";
+        case TokenType::ASSAY: return "ASSAY";
+        case TokenType::SAMPLE: return "SAMPLE";
         case TokenType::BED: return "BED";
         case TokenType::NARROWPEAK: return "NARROWPEAK";
         case TokenType::GFF3: return "GFF3";

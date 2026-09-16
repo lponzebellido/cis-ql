@@ -317,6 +317,9 @@ std::unique_ptr<LoadStmtNode> Parser::parseLoad() {
   consume(TokenType::STRING, "Expected a file name (string).");
   std::string file = previous().lexeme;
   std::string format;
+  std::string evidenceClass;
+  std::string assay;
+  std::string sample;
   if (loadType == "TRACK") {
     consume(TokenType::FORMAT, "Expected 'FORMAT' after the track file name.");
     if (match(TokenType::BED) || match(TokenType::NARROWPEAK)) {
@@ -325,6 +328,24 @@ std::unique_ptr<LoadStmtNode> Parser::parseLoad() {
       reportError(peek(), "Expected BED or NARROWPEAK after FORMAT.");
       throw std::runtime_error("Parse error");
     }
+    consume(TokenType::EVIDENCE,
+            "Expected 'EVIDENCE' after the track input format.");
+    if (match(TokenType::ACCESSIBILITY) || match(TokenType::BINDING) ||
+        match(TokenType::OTHER)) {
+      evidenceClass = previous().lexeme;
+    } else {
+      reportError(peek(),
+                  "Expected ACCESSIBILITY, BINDING, or OTHER after EVIDENCE.");
+      throw std::runtime_error("Parse error");
+    }
+    if (match(TokenType::ASSAY)) {
+      consume(TokenType::STRING, "Expected an assay description string.");
+      assay = previous().lexeme;
+    }
+    if (match(TokenType::SAMPLE)) {
+      consume(TokenType::STRING, "Expected a sample description string.");
+      sample = previous().lexeme;
+    }
   }
   consume(TokenType::AS, "Expected 'AS' after the file name.");
   consume(TokenType::ID, "Expected an alias identifier.");
@@ -332,7 +353,8 @@ std::unique_ptr<LoadStmtNode> Parser::parseLoad() {
   consume(TokenType::SEMICOLON,
           "Expected ';' at the end of the LOAD statement.");
   return std::unique_ptr<LoadStmtNode>(
-      new LoadStmtNode(loadType, file, format, alias));
+      new LoadStmtNode(loadType, file, format, evidenceClass, assay, sample,
+                       alias));
 }
 
 std::unique_ptr<FindStmtNode> Parser::parseFind() {
