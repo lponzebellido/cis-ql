@@ -155,6 +155,7 @@ std::vector<GenomicRegion> BEDReader::read(const std::string &filename,
         }
         region.trackEvidence.hasPeak = true;
         region.trackEvidence.peakOffset = peak;
+        region.trackEvidence.peakPosition = region.start + peak;
       }
     }
     regions.push_back(region);

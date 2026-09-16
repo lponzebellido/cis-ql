@@ -22,6 +22,7 @@ struct TrackEvidence {
   double minusLog10QValue = 0.0;
   bool hasPeak = false;
   size_t peakOffset = 0;
+  size_t peakPosition = 0;
 };
 
 #endif

@@ -115,13 +115,71 @@ int main() {
   supportedSite.motifEvidence.matrixId = "TEST";
   const auto supportedSites = SetOperations::selectOverlapping(
       {supportedSite, region(20, 30), region(5, 10, "chr2")},
-      {region(3, 6), region(4, 8), region(10, 20)});
+      {region(3, 6), region(4, 8), region(10, 20)}, "references");
   require(supportedSites.size() == 1 &&
               supportedSites[0].start == 0 && supportedSites[0].end == 10 &&
               supportedSites[0].sequence == "AAAAAAAAAA" &&
               supportedSites[0].motifEvidence.present &&
-              supportedSites[0].motifEvidence.matrixId == "TEST",
-          "overlap semi-join preserves each supported query interval once");
+              supportedSites[0].motifEvidence.matrixId == "TEST" &&
+              supportedSites[0].overlapEvidence.size() == 2 &&
+              supportedSites[0].overlapEvidence[0].referenceSet ==
+                  "references" &&
+              supportedSites[0].overlapEvidence[0].referenceStart == 3 &&
+              supportedSites[0].overlapEvidence[1].referenceStart == 4,
+          "overlap semi-join preserves one query and every matching reference");
+
+  std::vector<GenomicRegion> indexedReferences;
+  std::vector<GenomicRegion> indexedQueries;
+  for (size_t index = 0; index < 250; ++index) {
+    const size_t start = sequenceGenerator() % 2000;
+    GenomicRegion referenceRegion =
+        region(start, start + 1 + sequenceGenerator() % 80,
+               index % 3 == 0 ? "chr2" : "chr1");
+    referenceRegion.name = "reference_" + std::to_string(index);
+    indexedReferences.push_back(referenceRegion);
+  }
+  for (size_t index = 0; index < 200; ++index) {
+    const size_t start = sequenceGenerator() % 2000;
+    GenomicRegion queryRegion =
+        region(start, start + 1 + sequenceGenerator() % 100,
+               index % 4 == 0 ? "chr2" : "chr1");
+    queryRegion.name = "query_" + std::to_string(index);
+    indexedQueries.push_back(queryRegion);
+  }
+  const auto indexedOverlaps = SetOperations::selectOverlapping(
+      indexedQueries, indexedReferences, "random_references");
+  std::unordered_map<std::string, const GenomicRegion *> observedByName;
+  for (const auto &queryRegion : indexedOverlaps)
+    observedByName[queryRegion.name] = &queryRegion;
+  const auto expectedOrder = [](const GenomicRegion *left,
+                                const GenomicRegion *right) {
+    if (left->start != right->start)
+      return left->start < right->start;
+    if (left->end != right->end)
+      return left->end < right->end;
+    return left->name < right->name;
+  };
+  for (const auto &queryRegion : indexedQueries) {
+    std::vector<const GenomicRegion *> expected;
+    for (const auto &referenceRegion : indexedReferences) {
+      if (queryRegion.overlaps(referenceRegion))
+        expected.push_back(&referenceRegion);
+    }
+    std::sort(expected.begin(), expected.end(), expectedOrder);
+    const auto observed = observedByName.find(queryRegion.name);
+    require((expected.empty() && observed == observedByName.end()) ||
+                (!expected.empty() && observed != observedByName.end()),
+            "interval-tree overlap support matches brute-force membership");
+    if (expected.empty())
+      continue;
+    require(observed->second->overlapEvidence.size() == expected.size(),
+            "interval-tree overlap support matches brute-force count");
+    for (size_t index = 0; index < expected.size(); ++index) {
+      require(observed->second->overlapEvidence[index].referenceName ==
+                  expected[index]->name,
+              "interval-tree overlap support has deterministic reference order");
+    }
+  }
 
   GenomicRegion nearQuery = region(10, 20);
   nearQuery.sequence = "AAAAAAAAAA";

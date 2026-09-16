@@ -77,6 +77,19 @@ interface TrackEvidence {
   peakPosition?: number;
 }
 
+interface OverlapEvidence {
+  referenceSet: string;
+  reference: {
+    chr: string;
+    start: number;
+    end: number;
+    strand: string;
+    type: string;
+    name: string;
+  };
+  trackEvidence?: TrackEvidence;
+}
+
 interface ModuleMemberEvidence {
   sourceSet: string;
   chr: string;
@@ -108,6 +121,7 @@ interface GenomicRegion {
   countEvidence?: CountEvidence;
   moduleEvidence?: ModuleEvidence;
   trackEvidence?: TrackEvidence;
+  overlapEvidence?: OverlapEvidence[];
 }
 
 interface SequenceViewerProps {
@@ -360,6 +374,9 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
                                   {(region.trackEvidence.score !== undefined || region.trackEvidence.signalValue !== undefined) && <span>Track score: {region.trackEvidence.score ?? 'N/A'}{region.trackEvidence.signalValue !== undefined ? `; signal ${region.trackEvidence.signalValue}` : ''}</span>}
                                   {region.trackEvidence.peakPosition !== undefined && <span>Peak summit: {region.trackEvidence.peakPosition.toLocaleString()}</span>}
                                 </>
+                              )}
+                              {region.overlapEvidence && region.overlapEvidence.length > 0 && (
+                                <span>Overlap support: {region.overlapEvidence.map(item => `${item.referenceSet}:${item.reference.name || item.reference.type}${item.trackEvidence ? ` [${item.trackEvidence.evidenceClass}]` : ''}`).join(', ')}</span>
                               )}
                               {region.moduleEvidence && (
                                 <>

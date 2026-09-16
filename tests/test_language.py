@@ -115,6 +115,11 @@ def main() -> int:
             "chr1\t1250\t1350\topen_gene_edge\t200\t+\t7\t-1\t-1\t-1\n",
             encoding="utf-8",
         )
+        (workspace / "binding.narrowPeak").write_text(
+            "chr1\t10\t30\tbound_promoter\t800\t.\t18\t7\t5\t5\n"
+            "chr1\t1260\t1280\tbound_gene_edge\t600\t.\t11\t5\t3\t10\n",
+            encoding="utf-8",
+        )
         (workspace / "candidate_regions.bed").write_text(
             "chr1\t10\t20\tcandidate_a\t100\t-\n",
             encoding="utf-8",
@@ -156,20 +161,30 @@ def main() -> int:
             'LOAD TRACK "accessibility.narrowPeak" FORMAT NARROWPEAK '
             'EVIDENCE ACCESSIBILITY ASSAY "ATAC-seq" SAMPLE "leaf" '
             'AS accessible;\n'
+            'LOAD TRACK "binding.narrowPeak" FORMAT NARROWPEAK '
+            'EVIDENCE BINDING ASSAY "DAP-seq" SAMPLE "leaf" AS bound;\n'
             'SCAN matrix IN accessible STRAND POSITIVE THRESHOLD 100 % '
             'AS accessible_sites;\n'
+            'OVERLAPS accessible WITH bound AS accessible_and_bound;\n'
             'OVERLAPS accessible WITH GENE AS gene_accessible_peaks;\n'
             'INTERSECT accessible AND GENE AS clipped_accessible;\n'
             'EXPORT accessible TO "accessible.tsv" FORMAT TSV;\n'
-            'EXPORT accessible TO "accessible.gff3" FORMAT GFF3;\n',
+            'EXPORT accessible TO "accessible.gff3" FORMAT GFF3;\n'
+            'EXPORT accessible_and_bound TO "accessible_bound.tsv" '
+            'FORMAT TSV;\n'
+            'EXPORT accessible_and_bound TO "accessible_bound.gff3" '
+            'FORMAT GFF3;\n',
         )
         accessible = data["resultSets"]["accessible"]
         accessible_sites = data["resultSets"]["accessible_sites"]
+        accessible_and_bound = data["resultSets"]["accessible_and_bound"]
         clipped_accessible = data["resultSets"]["clipped_accessible"]
         require(len(accessible) == 2 and
                 len(data["resultSets"]["gene_accessible_peaks"]) == 2 and
                 len(accessible_sites) == 49 and
                 all(site["trackEvidence"]["trackAlias"] == "accessible"
+                    for site in accessible_sites) and
+                all(site["trackEvidence"].get("peakPosition") == 25
                     for site in accessible_sites) and
                 "trackEvidence" in clipped_accessible[0] and
                 "trackEvidence" not in clipped_accessible[1] and
@@ -199,15 +214,40 @@ def main() -> int:
                     "signalValue": 7,
                 },
                 "LOAD TRACK preserves narrowPeak evidence and is queryable")
+        require(
+            len(accessible_and_bound) == 2 and
+            all(region["trackEvidence"]["evidenceClass"]
+                == "ACCESSIBILITY" for region in accessible_and_bound) and
+            [item["reference"]["name"] for item in
+             accessible_and_bound[0]["overlapEvidence"]]
+            == ["bound_promoter"] and
+            accessible_and_bound[0]["overlapEvidence"][0]
+                ["referenceSet"] == "bound" and
+            accessible_and_bound[0]["overlapEvidence"][0]
+                ["trackEvidence"]["evidenceClass"] == "BINDING" and
+            accessible_and_bound[0]["overlapEvidence"][0]
+                ["trackEvidence"]["peakPosition"] == 15,
+            "OVERLAPS retains query and reference regulatory evidence",
+        )
         track_tsv = (workspace / "accessible.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(track_tsv) == 93 and track_tsv[81:93] == [
+        require(len(track_tsv) == 94 and track_tsv[81:93] == [
                     "accessible", "accessibility.narrowPeak", "NARROWPEAK",
                     "ACCESSIBILITY", "ATAC-seq", "leaf", "500", "12.5",
                     "4.2000000000000002",
                     "3.7999999999999998", "25", "25",
                 ], "TSV export preserves typed narrowPeak evidence")
+        combined_tsv = (workspace / "accessible_bound.tsv").read_text(
+            encoding="utf-8"
+        ).splitlines()[1].split("\t")
+        combined_overlap = json.loads(combined_tsv[93])
+        require(len(combined_tsv) == 94 and
+                combined_overlap[0]["referenceSet"] == "bound" and
+                combined_overlap[0]["trackEvidence"]["evidenceClass"]
+                == "BINDING" and
+                combined_overlap[0]["trackEvidence"]["peakPosition"] == 15,
+                "TSV export preserves overlap evidence as structured JSON")
         track_gff = (workspace / "accessible.gff3").read_text(
             encoding="utf-8"
         ).splitlines()[1]
@@ -220,6 +260,13 @@ def main() -> int:
                 "TrackMinusLog10PValue=4.2" in track_gff and
                 "PeakPosition=25" in track_gff,
                 "GFF3 export preserves narrowPeak evidence")
+        combined_gff = (workspace / "accessible_bound.gff3").read_text(
+            encoding="utf-8"
+        ).splitlines()[1]
+        require("OverlapEvidenceCount=1" in combined_gff and
+                "OverlapEvidenceJSON=" in combined_gff and
+                "BINDING" in combined_gff,
+                "GFF3 export preserves overlapping track evidence")
 
         data, _ = run_query(
             workspace,
@@ -477,7 +524,8 @@ def main() -> int:
                 "\ttrack_alias\ttrack_source\ttrack_format\tevidence_class"
                 "\tassay\tsample\ttrack_score"
                 "\tsignal_value\ttrack_minus_log10_p_value"
-                "\ttrack_minus_log10_q_value\tpeak_offset\tpeak_position",
+                "\ttrack_minus_log10_q_value\tpeak_offset\tpeak_position"
+                "\toverlap_evidence_json",
                 "region TSV export")
         profile_lines = (workspace / "profile.tsv").read_text(
             encoding="utf-8"
@@ -650,7 +698,7 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()
         first_tsv_site = tsv_rows[1].split("\t")
-        require(len(tsv_rows) == 10 and len(first_tsv_site) == 93 and
+        require(len(tsv_rows) == 10 and len(first_tsv_site) == 94 and
                 first_tsv_site[7:11]
                 == ["matrix", "TEST", "test", "fixture.pwm"] and
                 float(first_tsv_site[11]) > 0 and
@@ -666,7 +714,7 @@ def main() -> int:
                 abs(float(first_tsv_site[31]) - 0.1) < 1e-12 and
                 first_tsv_site[32:34] == ["short_promoter", "promoter"] and
                 first_tsv_site[36] == "0" and
-                first_tsv_site[37:] == [""] * 56,
+                first_tsv_site[37:] == [""] * 57,
                 "motif TSV export retains evidence columns")
 
         data, _ = run_query(
@@ -680,7 +728,8 @@ def main() -> int:
             "UPSTREAM 0 BP DOWNSTREAM 10 BP AS promoters;\n"
             "SCAN matrix STRAND POSITIVE THRESHOLD 100 % AS sites;\n"
             "OVERLAPS sites WITH promoters AS promoter_sites;\n"
-            "OVERLAPS promoters WITH sites AS supported_promoters;\n",
+            "OVERLAPS promoters WITH sites AS supported_promoters;\n"
+            'EXPORT promoter_sites TO "promoter_sites.tsv" FORMAT TSV;\n',
         )
         promoter_sites = data["resultSets"]["promoter_sites"]
         require(len(promoter_sites) == 10 and
@@ -688,13 +737,25 @@ def main() -> int:
                 == list(range(10)) and
                 promoter_sites[-1]["end"] == 11 and
                 all(site["motifEvidence"]["matrixId"] == "TEST"
-                    for site in promoter_sites),
+                    for site in promoter_sites) and
+                all(site["overlapEvidence"][0]["referenceSet"]
+                    == "promoters" for site in promoter_sites),
                 "OVERLAPS retains complete query intervals and PWM evidence")
         supported_promoters = data["resultSets"]["supported_promoters"]
         require(len(supported_promoters) == 1 and
                 supported_promoters[0]["start"] == 0 and
-                supported_promoters[0]["end"] == 10,
+                supported_promoters[0]["end"] == 10 and
+                len(supported_promoters[0]["overlapEvidence"]) == 10 and
+                all(item["referenceSet"] == "sites" for item in
+                    supported_promoters[0]["overlapEvidence"]),
                 "OVERLAPS emits a supported query once despite multiple hits")
+        promoter_overlap_tsv = (workspace / "promoter_sites.tsv").read_text(
+            encoding="utf-8"
+        ).splitlines()[1].split("\t")
+        require(len(promoter_overlap_tsv) == 94 and
+                json.loads(promoter_overlap_tsv[93])[0]["reference"]
+                    ["name"] == "short_promoter",
+                "OVERLAPS TSV evidence identifies the matching reference")
 
         parser_error = run_invalid_query(
             workspace,
@@ -743,10 +804,10 @@ def main() -> int:
         linked_tsv = (workspace / "linked.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(linked_tsv) == 93 and linked_tsv[37:48] == [
+        require(len(linked_tsv) == 94 and linked_tsv[37:48] == [
                     "NEAR", "GENE", "chr1", "0", "1200", "+", "gene",
                     "short", "0", "0", "true",
-                ] and linked_tsv[48:] == [""] * 45,
+                ] and linked_tsv[48:] == [""] * 46,
                 "TSV export retains typed nearest-reference evidence")
 
         data, _ = run_query(
@@ -790,9 +851,9 @@ def main() -> int:
         count_tsv = (workspace / "counts.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(count_tsv) == 93 and count_tsv[48:52] == [
+        require(len(count_tsv) == 94 and count_tsv[48:52] == [
                     "OVERLAPS", "sites", "promoters", "20",
-                ] and count_tsv[52:] == [""] * 41,
+                ] and count_tsv[52:] == [""] * 42,
                 "TSV export retains count provenance")
 
         data, _ = run_query(
@@ -852,7 +913,7 @@ def main() -> int:
         module_tsv = (workspace / "modules.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(module_tsv) == 93 and
+        require(len(module_tsv) == 94 and
                 module_tsv[52:59] == [
                     "2", "2", "2", "ANY", "FIRST_BEFORE_SECOND",
                     "SAME", "SAME",
@@ -1069,6 +1130,41 @@ def main() -> int:
                 [peak["spatialRelation"]["distance"]
                  for peak in candidate_links] == [25, 60, 20],
                 "accessibility example combines track, motif-count, and proximity evidence")
+
+        multi_evidence_example = (
+            ROOT / "cql_examples" /
+            "10_accessible_bound_myb_candidates.cql"
+        ).read_text(encoding="utf-8")
+        data, _ = run_query(
+            workspace, "anthocyanin_multi_track_evidence",
+            multi_evidence_example
+        )
+        combined_peaks = data["resultSets"]["accessible_bound_peaks"]
+        combined_counts = data["resultSets"][
+            "accessible_bound_peak_myb_counts"
+        ]
+        combined_links = data["resultSets"][
+            "multi_evidence_gene_hypotheses"
+        ]
+        require(
+            len(combined_peaks) == 3 and
+            [peak["countEvidence"]["count"] for peak in combined_counts]
+            == [1, 2, 1] and
+            all(peak["trackEvidence"]["evidenceClass"] == "ACCESSIBILITY"
+                for peak in combined_counts) and
+            all(len(peak["overlapEvidence"]) == 1 and
+                peak["overlapEvidence"][0]["trackEvidence"]
+                    ["evidenceClass"] == "BINDING"
+                for peak in combined_counts) and
+            combined_counts[0]["overlapEvidence"][0]["trackEvidence"]
+                ["peakPosition"] == 160 and
+            all(link["overlapEvidence"][0]["trackEvidence"]
+                    ["evidenceClass"] == "BINDING"
+                for link in combined_links) and
+            [link["spatialRelation"]["distance"] for link in combined_links]
+            == [25, 60, 20],
+            "multi-track example retains accessibility, binding, motif, and proximity evidence",
+        )
 
         nearest_example = (
             ROOT / "cql_examples" / "06_nearest_gene_candidates.cql"

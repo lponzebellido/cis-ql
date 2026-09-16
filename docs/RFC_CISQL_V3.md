@@ -211,14 +211,19 @@ OVERLAPS significant_myb_sites WITH proximal_promoters
 This is an interval semi-join rather than a geometric intersection. It emits
 each interval from the left/query set at most once when any interval in the
 right/reference set overlaps it. The query interval is not clipped, so its
-coordinates, sequence, and motif evidence remain auditable. Intervals use the
+coordinates, sequence, and motif evidence remain auditable. Every matching
+reference is recorded in an `overlapEvidence` array with its source-set alias,
+coordinates, identity, and imported `trackEvidence` when present. This allows
+an accessibility interval to retain independent binding support without
+overwriting either observation. Intervals use the
 same zero-based, half-open contract as the rest of the engine; touching
 boundaries do not overlap. `INTERSECT` remains available when overlap segments
 themselves are the intended result.
 
-The reference side is indexed per chromosome by sorted starts and prefix
-maximum ends. After index construction, each query is evaluated in logarithmic
-time without enumerating every overlapping pair.
+The reference side is indexed per chromosome with an interval tree. Matching
+references are enumerated in deterministic coordinate order, so the semi-join
+remains output-sensitive and emits the query once while retaining all of its
+supporting records.
 
 #### Part 3B: bounded nearest-reference selection
 
@@ -370,6 +375,11 @@ query alias, required evidence class (`ACCESSIBILITY`, `BINDING`, or `OTHER`),
 and optional assay and sample labels are recorded as typed `trackEvidence` in
 JSON, GFF3, TSV, and Studio. The class is an explicit user declaration, not an
 inference from the filename or an assertion that the experiment is valid.
+When `OVERLAPS` combines two tracks, the left/query observation stays in
+`trackEvidence` and all matching right/reference observations are stored in
+`overlapEvidence`. JSON and Studio expose the structured records directly;
+TSV stores the array as JSON in `overlap_evidence_json`, and GFF3 stores a
+count plus a percent-encoded JSON attribute.
 
 When a FASTA is active, every track chromosome and interval bound is checked
 against it and interval sequence is attached. A track loaded before its genome

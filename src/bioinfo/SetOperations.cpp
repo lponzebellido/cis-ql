@@ -1,6 +1,8 @@
 #include "SetOperations.h"
 #include <algorithm>
+#include <functional>
 #include <limits>
+#include <memory>
 #include <unordered_map>
 #include <utility>
 
@@ -45,6 +47,8 @@ SetOperations::intersect(std::vector<GenomicRegion> a,
         overlap.moduleEvidence = ModuleEvidence();
       if (start != a[i].start || end != a[i].end)
         overlap.trackEvidence = TrackEvidence();
+      if (start != a[i].start || end != a[i].end)
+        overlap.overlapEvidence.clear();
       result.push_back(std::move(overlap));
     }
 
@@ -83,6 +87,7 @@ std::vector<GenomicRegion> SetOperations::unite(std::vector<GenomicRegion> a,
       last.countEvidence = CountEvidence();
       last.moduleEvidence = ModuleEvidence();
       last.trackEvidence = TrackEvidence();
+      last.overlapEvidence.clear();
     } else {
       result.push_back(all[i]);
     }
@@ -126,6 +131,7 @@ std::vector<GenomicRegion> SetOperations::except(std::vector<GenomicRegion> a,
         fragment.countEvidence = CountEvidence();
         fragment.moduleEvidence = ModuleEvidence();
         fragment.trackEvidence = TrackEvidence();
+        fragment.overlapEvidence.clear();
         result.push_back(std::move(fragment));
       }
       cursor = std::max(cursor, b[k].end);
@@ -152,6 +158,8 @@ std::vector<GenomicRegion> SetOperations::except(std::vector<GenomicRegion> a,
         fragment.moduleEvidence = ModuleEvidence();
       if (fragment.start != region.start || fragment.end != region.end)
         fragment.trackEvidence = TrackEvidence();
+      if (fragment.start != region.start || fragment.end != region.end)
+        fragment.overlapEvidence.clear();
       result.push_back(std::move(fragment));
     }
   }
@@ -270,29 +278,104 @@ std::vector<GenomicRegion> SetOperations::selectNear(
 
 std::vector<GenomicRegion> SetOperations::selectOverlapping(
     const std::vector<GenomicRegion> &query,
-    const std::vector<GenomicRegion> &reference) {
-  struct ChromosomeIndex {
-    std::vector<size_t> starts;
-    std::vector<size_t> maximumEnds;
+    const std::vector<GenomicRegion> &reference,
+    const std::string &referenceSet) {
+  const auto referenceOrder = [](const GenomicRegion *left,
+                                 const GenomicRegion *right) {
+    if (left->start != right->start)
+      return left->start < right->start;
+    if (left->end != right->end)
+      return left->end < right->end;
+    if (left->name != right->name)
+      return left->name < right->name;
+    if (left->type != right->type)
+      return left->type < right->type;
+    return left->strand < right->strand;
   };
 
-  typedef std::pair<size_t, size_t> Interval;
-  std::unordered_map<std::string, std::vector<Interval>> byChromosome;
-  for (const auto &region : reference)
-    byChromosome[region.chr].push_back(
-        std::make_pair(region.start, region.end));
-
-  std::unordered_map<std::string, ChromosomeIndex> indexes;
-  for (auto &entry : byChromosome) {
-    std::sort(entry.second.begin(), entry.second.end());
-    ChromosomeIndex &index = indexes[entry.first];
-    size_t maximumEnd = 0;
-    for (const auto &interval : entry.second) {
-      index.starts.push_back(interval.first);
-      maximumEnd = std::max(maximumEnd, interval.second);
-      index.maximumEnds.push_back(maximumEnd);
+  struct IntervalNode {
+    size_t center = 0;
+    std::vector<const GenomicRegion *> spanningByStart;
+    std::vector<const GenomicRegion *> spanningByEnd;
+    std::unique_ptr<IntervalNode> left;
+    std::unique_ptr<IntervalNode> right;
+  };
+  std::function<std::unique_ptr<IntervalNode>(
+      std::vector<const GenomicRegion *>)>
+      buildIndex;
+  buildIndex = [&buildIndex, &referenceOrder](
+                   std::vector<const GenomicRegion *> regions) {
+    if (regions.empty())
+      return std::unique_ptr<IntervalNode>();
+    std::sort(regions.begin(), regions.end(), referenceOrder);
+    std::unique_ptr<IntervalNode> node(new IntervalNode());
+    node->center = regions[regions.size() / 2]->start;
+    std::vector<const GenomicRegion *> left;
+    std::vector<const GenomicRegion *> right;
+    for (const auto *region : regions) {
+      if (region->end <= node->center)
+        left.push_back(region);
+      else if (region->start > node->center)
+        right.push_back(region);
+      else
+        node->spanningByStart.push_back(region);
     }
+    std::sort(node->spanningByStart.begin(), node->spanningByStart.end(),
+              referenceOrder);
+    node->spanningByEnd = node->spanningByStart;
+    std::sort(node->spanningByEnd.begin(), node->spanningByEnd.end(),
+              [&referenceOrder](const GenomicRegion *leftRegion,
+                                const GenomicRegion *rightRegion) {
+                if (leftRegion->end != rightRegion->end)
+                  return leftRegion->end > rightRegion->end;
+                return referenceOrder(leftRegion, rightRegion);
+              });
+    node->left = buildIndex(std::move(left));
+    node->right = buildIndex(std::move(right));
+    return node;
+  };
+
+  std::unordered_map<std::string, std::vector<const GenomicRegion *>> grouped;
+  for (const auto &region : reference) {
+    if (region.start < region.end)
+      grouped[region.chr].push_back(&region);
   }
+  std::unordered_map<std::string, std::unique_ptr<IntervalNode>> indexes;
+  for (auto &entry : grouped)
+    indexes[entry.first] = buildIndex(std::move(entry.second));
+
+  std::function<void(const IntervalNode *, size_t, size_t,
+                     std::vector<const GenomicRegion *> &)>
+      collectOverlaps;
+  collectOverlaps = [&collectOverlaps](
+                        const IntervalNode *node, size_t queryStart,
+                        size_t queryEnd,
+                        std::vector<const GenomicRegion *> &matches) {
+    if (!node)
+      return;
+    if (queryEnd <= node->center) {
+      for (const auto *region : node->spanningByStart) {
+        if (region->start >= queryEnd)
+          break;
+        matches.push_back(region);
+      }
+      collectOverlaps(node->left.get(), queryStart, queryEnd, matches);
+      return;
+    }
+    if (queryStart >= node->center) {
+      for (const auto *region : node->spanningByEnd) {
+        if (region->end <= queryStart)
+          break;
+        matches.push_back(region);
+      }
+      collectOverlaps(node->right.get(), queryStart, queryEnd, matches);
+      return;
+    }
+    matches.insert(matches.end(), node->spanningByStart.begin(),
+                   node->spanningByStart.end());
+    collectOverlaps(node->left.get(), queryStart, queryEnd, matches);
+    collectOverlaps(node->right.get(), queryStart, queryEnd, matches);
+  };
 
   std::vector<GenomicRegion> result;
   for (const auto &region : query) {
@@ -301,15 +384,26 @@ std::vector<GenomicRegion> SetOperations::selectOverlapping(
     const auto chromosome = indexes.find(region.chr);
     if (chromosome == indexes.end())
       continue;
-    const ChromosomeIndex &index = chromosome->second;
-    const auto firstTooLate =
-        std::lower_bound(index.starts.begin(), index.starts.end(), region.end);
-    const size_t candidateCount = static_cast<size_t>(
-        std::distance(index.starts.begin(), firstTooLate));
-    if (candidateCount > 0 &&
-        index.maximumEnds[candidateCount - 1] > region.start) {
-      result.push_back(region);
+    std::vector<const GenomicRegion *> matches;
+    collectOverlaps(chromosome->second.get(), region.start, region.end,
+                    matches);
+    std::sort(matches.begin(), matches.end(), referenceOrder);
+    GenomicRegion selected = region;
+    for (const auto *candidate : matches) {
+      const GenomicRegion &referenceRegion = *candidate;
+      OverlapEvidence evidence;
+      evidence.referenceSet = referenceSet;
+      evidence.referenceChr = referenceRegion.chr;
+      evidence.referenceStart = referenceRegion.start;
+      evidence.referenceEnd = referenceRegion.end;
+      evidence.referenceStrand = referenceRegion.strand;
+      evidence.referenceType = referenceRegion.type;
+      evidence.referenceName = referenceRegion.name;
+      evidence.trackEvidence = referenceRegion.trackEvidence;
+      selected.overlapEvidence.push_back(std::move(evidence));
     }
+    if (!matches.empty())
+      result.push_back(std::move(selected));
   }
   return result;
 }

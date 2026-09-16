@@ -5,9 +5,11 @@
 #include "SpatialRelationEvidence.h"
 #include "CountEvidence.h"
 #include "ModuleEvidence.h"
+#include "OverlapEvidence.h"
 #include "TrackEvidence.h"
 #include <string>
 #include <algorithm>
+#include <vector>
 
 struct GenomicRegion {
   std::string chr;
@@ -22,6 +24,7 @@ struct GenomicRegion {
   CountEvidence countEvidence;
   ModuleEvidence moduleEvidence;
   TrackEvidence trackEvidence;
+  std::vector<OverlapEvidence> overlapEvidence;
 
   size_t length() const { return end - start; }
 

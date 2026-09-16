@@ -177,7 +177,9 @@ EXTRACT promoter_site_counts AS supported_promoters WHERE COUNT >= 1;
 `INTERSECT` emits the clipped overlap geometry. `OVERLAPS query WITH reference`
 instead performs a directional semi-join: each query interval is retained once
 if any reference interval overlaps it. This preserves the query coordinates,
-sequence, and motif evidence.
+sequence, and motif evidence. Every matching reference is recorded in the
+result's `overlapEvidence`; when a reference came from `LOAD TRACK`, its
+evidence class, assay, sample, score, signal, and summit remain attached.
 
 `NEAR query TO reference WITHIN distance` also preserves each complete query
 record, but retains it only when its nearest same-chromosome reference is no
@@ -395,7 +397,7 @@ requirements needed before reporting external benchmark results.
 
 ## Curated Examples Suite (`cql_examples/`)
 
-The repository includes nine `.cql` analyses forming one coherent,
+The repository includes ten `.cql` analyses forming one coherent,
 synthetic anthocyanin-regulation path. Compiler feature coverage belongs in
 the automated tests; these programs are examples of scientific questions.
 
@@ -413,6 +415,7 @@ The regulatory progression and its expected outputs are described in
 | `07_enhancer_myb_module.cql` | Detect a constrained homotypic MYB module | spacing, order, orientation, two-member evidence |
 | `08_integrated_anthocyanin_query.cql` | Connect the complete evidence path | promoters, calibrated sites, modules, counts, candidate links |
 | `09_accessible_myb_evidence.cql` | Combine imported accessibility peaks with motif support | narrowPeak provenance, `COUNT`, `NEAR` |
+| `10_accessible_bound_myb_candidates.cql` | Combine accessibility, binding, motif, and proximity | multi-track `overlapEvidence`, `COUNT`, `NEAR` |
 
 ---
 

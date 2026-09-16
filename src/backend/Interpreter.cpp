@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <iostream>
 #include <set>
+#include <sstream>
 #include <thread>
 
 namespace {
@@ -125,6 +126,58 @@ std::string Interpreter::jsonEscape(const std::string &s) const {
   return escaped;
 }
 
+std::string
+Interpreter::serializeTrackEvidenceJSON(const TrackEvidence &track) const {
+  std::ostringstream out;
+  out << std::setprecision(17)
+      << "{\"trackAlias\":\"" << jsonEscape(track.trackAlias)
+      << "\",\"source\":\"" << jsonEscape(track.source)
+      << "\",\"format\":\"" << jsonEscape(track.format)
+      << "\",\"evidenceClass\":\"" << jsonEscape(track.evidenceClass)
+      << "\"";
+  if (!track.assay.empty())
+    out << ",\"assay\":\"" << jsonEscape(track.assay) << "\"";
+  if (!track.sample.empty())
+    out << ",\"sample\":\"" << jsonEscape(track.sample) << "\"";
+  if (track.hasScore)
+    out << ",\"score\":" << track.score;
+  if (track.hasSignalValue)
+    out << ",\"signalValue\":" << track.signalValue;
+  if (track.hasMinusLog10PValue)
+    out << ",\"minusLog10PValue\":" << track.minusLog10PValue;
+  if (track.hasMinusLog10QValue)
+    out << ",\"minusLog10QValue\":" << track.minusLog10QValue;
+  if (track.hasPeak)
+    out << ",\"peakOffset\":" << track.peakOffset
+        << ",\"peakPosition\":" << track.peakPosition;
+  out << '}';
+  return out.str();
+}
+
+std::string Interpreter::serializeOverlapEvidenceJSON(
+    const std::vector<OverlapEvidence> &evidence) const {
+  std::ostringstream out;
+  out << '[';
+  for (size_t index = 0; index < evidence.size(); ++index) {
+    if (index > 0)
+      out << ',';
+    const OverlapEvidence &item = evidence[index];
+    out << "{\"referenceSet\":\"" << jsonEscape(item.referenceSet)
+        << "\",\"reference\":{\"chr\":\""
+        << jsonEscape(item.referenceChr) << "\",\"start\":"
+        << item.referenceStart << ",\"end\":" << item.referenceEnd
+        << ",\"strand\":\"" << jsonEscape(item.referenceStrand)
+        << "\",\"type\":\"" << jsonEscape(item.referenceType)
+        << "\",\"name\":\"" << jsonEscape(item.referenceName) << "\"}";
+    if (item.trackEvidence.present)
+      out << ",\"trackEvidence\":"
+          << serializeTrackEvidenceJSON(item.trackEvidence);
+    out << '}';
+  }
+  out << ']';
+  return out.str();
+}
+
 void Interpreter::reportRuntimeError(const std::string &message) {
   runtimeError = true;
   std::cerr << "Runtime Error: " << message << std::endl;
@@ -220,8 +273,12 @@ void Interpreter::printRegions(const std::vector<GenomicRegion> &regions,
       if (r.trackEvidence.hasSignalValue)
         std::cout << " signal:" << r.trackEvidence.signalValue;
       if (r.trackEvidence.hasPeak)
-        std::cout << " summit:" << (r.start + r.trackEvidence.peakOffset);
+        std::cout << " summit:" << r.trackEvidence.peakPosition;
       std::cout << std::endl;
+    }
+    if (!r.overlapEvidence.empty()) {
+      std::cout << "      OVERLAP EVIDENCE " << r.overlapEvidence.size()
+                << " reference(s)" << std::endl;
     }
     if (r.moduleEvidence.present) {
       std::cout << "      MODULE spacing:" << r.moduleEvidence.observedSpacing
@@ -648,7 +705,13 @@ void Interpreter::executeExport(const IRInstruction &instr) {
           out << ";TrackMinusLog10QValue=" << track.minusLog10QValue;
         if (track.hasPeak)
           out << ";PeakOffset=" << track.peakOffset
-              << ";PeakPosition=" << (region.start + track.peakOffset);
+              << ";PeakPosition=" << track.peakPosition;
+      }
+      if (!region.overlapEvidence.empty()) {
+        out << ";OverlapEvidenceCount=" << region.overlapEvidence.size()
+            << ";OverlapEvidenceJSON="
+            << gffAttributeEscape(
+                   serializeOverlapEvidenceJSON(region.overlapEvidence));
       }
       out << '\n';
     }
@@ -683,7 +746,7 @@ void Interpreter::executeExport(const IRInstruction &instr) {
            "\tassay\tsample\ttrack_score"
            "\tsignal_value\ttrack_minus_log10_p_value"
            "\ttrack_minus_log10_q_value"
-           "\tpeak_offset\tpeak_position\n";
+           "\tpeak_offset\tpeak_position\toverlap_evidence_json\n";
     for (const auto &region : regionsIt->second) {
       out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
           << region.end << '\t' << cleanTabularField(region.strand) << '\t'
@@ -814,11 +877,15 @@ void Interpreter::executeExport(const IRInstruction &instr) {
           out << track.peakOffset;
         out << '\t';
         if (track.hasPeak)
-          out << region.start + track.peakOffset;
+          out << track.peakPosition;
       } else {
         for (int emptyColumn = 0; emptyColumn < 11; ++emptyColumn)
           out << '\t';
       }
+      out << '\t';
+      if (!region.overlapEvidence.empty())
+        out << cleanTabularField(
+            serializeOverlapEvidenceJSON(region.overlapEvidence));
       out << '\n';
     }
   }
@@ -1602,7 +1669,7 @@ void Interpreter::executeSetOp(const IRInstruction &instr) {
     if (debugMode) {
       std::cout << "> OVERLAPS " << entity1 << " WITH " << entity2 << std::endl;
     }
-    result = SetOperations::selectOverlapping(regions1, regions2);
+    result = SetOperations::selectOverlapping(regions1, regions2, entity2);
   } else {
     const size_t maximumDistance =
         toBasePairs(std::strtod(instr.arg4.c_str(), nullptr), instr.arg5);
@@ -2224,38 +2291,12 @@ void Interpreter::dumpResultsJSON() const {
             << "        }";
       }
       if (r.trackEvidence.present) {
-        const TrackEvidence &track = r.trackEvidence;
-        out << ",\n        \"trackEvidence\": {\n"
-            << "          \"trackAlias\": \""
-            << jsonEscape(track.trackAlias) << "\",\n"
-            << "          \"source\": \"" << jsonEscape(track.source)
-            << "\",\n"
-            << "          \"format\": \"" << jsonEscape(track.format)
-            << "\",\n"
-            << "          \"evidenceClass\": \""
-            << jsonEscape(track.evidenceClass) << "\"";
-        if (!track.assay.empty())
-          out << ",\n          \"assay\": \"" << jsonEscape(track.assay)
-              << "\"";
-        if (!track.sample.empty())
-          out << ",\n          \"sample\": \"" << jsonEscape(track.sample)
-              << "\"";
-        if (track.hasScore)
-          out << ",\n          \"score\": " << track.score;
-        if (track.hasSignalValue)
-          out << ",\n          \"signalValue\": " << track.signalValue;
-        if (track.hasMinusLog10PValue)
-          out << ",\n          \"minusLog10PValue\": "
-              << track.minusLog10PValue;
-        if (track.hasMinusLog10QValue)
-          out << ",\n          \"minusLog10QValue\": "
-              << track.minusLog10QValue;
-        if (track.hasPeak) {
-          out << ",\n          \"peakOffset\": " << track.peakOffset
-              << ",\n          \"peakPosition\": "
-              << (r.start + track.peakOffset);
-        }
-        out << "\n        }";
+        out << ",\n        \"trackEvidence\": "
+            << serializeTrackEvidenceJSON(r.trackEvidence);
+      }
+      if (!r.overlapEvidence.empty()) {
+        out << ",\n        \"overlapEvidence\": "
+            << serializeOverlapEvidenceJSON(r.overlapEvidence);
       }
       if (r.moduleEvidence.present) {
         const ModuleEvidence &module = r.moduleEvidence;

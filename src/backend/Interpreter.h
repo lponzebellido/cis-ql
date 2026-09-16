@@ -62,6 +62,9 @@ private:
 
   std::string stripQuotes(const std::string &s) const;
   std::string jsonEscape(const std::string &s) const;
+  std::string serializeTrackEvidenceJSON(const TrackEvidence &track) const;
+  std::string serializeOverlapEvidenceJSON(
+      const std::vector<OverlapEvidence> &evidence) const;
   void reportRuntimeError(const std::string &message);
   size_t toBasePairs(double value, const std::string &unit);
   std::vector<GenomicRegion> resolveEntity(const std::string &entity);

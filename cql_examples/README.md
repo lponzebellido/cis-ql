@@ -1,6 +1,6 @@
 # Cis-QL regulatory example path
 
-These nine programs are a progressive analysis of one synthetic
+These ten programs are a progressive analysis of one synthetic
 anthocyanin-regulatory locus. They teach how evidence moves through the
 language; they are not biological evidence or an exhaustive grammar catalog.
 
@@ -35,6 +35,11 @@ language; they are not biological evidence or an exhaustive grammar catalog.
    peaks with motif support, and records their nearest gene as a candidate
    association. The emitted records preserve both quantitative track evidence
    and the overlap count.
+10. `10_accessible_bound_myb_candidates.cql` retains accessible peaks where a
+    separately declared MYB-binding track overlaps, counts calibrated motif
+    support, and forms bounded nearest-gene hypotheses. The accessibility
+    record remains the primary `trackEvidence`; every matching binding record
+    is retained in `overlapEvidence`.
 
 The shared `anthocyanin_regulatory_demo` FASTA and GFF3 files contain three
 annotated genes, one candidate enhancer, two promoter-local MYB instances, and
@@ -46,6 +51,9 @@ exists in a plant.
 peaks exist to exercise imported experimental-track semantics. The example's
 `EVIDENCE`, `ASSAY`, and `SAMPLE` values are deliberately marked as synthetic;
 they do not turn the fixture into an ATAC-seq or ChIP-seq measurement.
+`anthocyanin_myb_binding_demo.narrowPeak` is also synthetic and exists only to
+exercise multi-track evidence retention. Its `BINDING` declaration is not an
+experimental claim.
 
 The `MA0054.1 myb.Ph3` frequency matrix is the unmodified JASPAR CORE profile
 for *Petunia x hybrida* MYB.Ph3. Applying a related profile to a real

@@ -77,6 +77,19 @@ interface TrackEvidence {
   peakPosition?: number;
 }
 
+interface OverlapEvidence {
+  referenceSet: string;
+  reference: {
+    chr: string;
+    start: number;
+    end: number;
+    strand: string;
+    type: string;
+    name: string;
+  };
+  trackEvidence?: TrackEvidence;
+}
+
 interface ModuleMemberEvidence {
   sourceSet: string;
   chr: string;
@@ -108,6 +121,7 @@ interface GenomicRegion {
   countEvidence?: CountEvidence;
   moduleEvidence?: ModuleEvidence;
   trackEvidence?: TrackEvidence;
+  overlapEvidence?: OverlapEvidence[];
 }
 
 interface TrackViewerProps {
@@ -672,6 +686,12 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                   {hoveredRegion.trackEvidence.peakPosition !== undefined && <><br /><span className="tt-label">Summit:</span> {hoveredRegion.trackEvidence.peakPosition.toLocaleString()}</>}
                 </>
               )}
+              {hoveredRegion.overlapEvidence && hoveredRegion.overlapEvidence.length > 0 && (
+                <>
+                  <br /><span className="tt-label">Overlap support:</span> {hoveredRegion.overlapEvidence.length} reference{hoveredRegion.overlapEvidence.length === 1 ? '' : 's'}
+                  <br /><span className="tt-label">Matched:</span> {hoveredRegion.overlapEvidence.map(item => `${item.reference.name || item.reference.type}${item.trackEvidence ? ` [${item.trackEvidence.evidenceClass}]` : ''}`).join(', ')}
+                </>
+              )}
               {hoveredRegion.moduleEvidence && (
                 <>
                   <br /><span className="tt-label">Module spacing:</span> {formatBp(hoveredRegion.moduleEvidence.spacing.observed)} ({formatBp(hoveredRegion.moduleEvidence.spacing.minimum)}-{formatBp(hoveredRegion.moduleEvidence.spacing.maximum)})
@@ -808,6 +828,19 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                     </span>
                   </div>
                 </>
+              )}
+              {selectedRegion.overlapEvidence && selectedRegion.overlapEvidence.length > 0 && (
+                <div className="detail-field">
+                  <span className="detail-label">Overlap evidence</span>
+                  <span className="detail-value">
+                    {selectedRegion.overlapEvidence.map((item, index) => (
+                      <span key={`${item.referenceSet}-${item.reference.chr}-${item.reference.start}-${index}`} style={{ display: 'block' }}>
+                        {item.referenceSet}: {item.reference.name || item.reference.type} · {item.reference.chr}:{item.reference.start.toLocaleString()}-{item.reference.end.toLocaleString()}
+                        {item.trackEvidence ? ` · ${item.trackEvidence.evidenceClass}${item.trackEvidence.assay ? ` (${item.trackEvidence.assay})` : ''}` : ''}
+                      </span>
+                    ))}
+                  </span>
+                </div>
               )}
               {selectedRegion.moduleEvidence && (
                 <>
