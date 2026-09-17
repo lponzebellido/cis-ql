@@ -36,10 +36,11 @@ language; they are not biological evidence or an exhaustive grammar catalog.
    association. The emitted records preserve both quantitative track evidence
    and the overlap count.
 10. `10_accessible_bound_myb_candidates.cql` retains accessible peaks where a
-    separately declared MYB-binding track overlaps, counts calibrated motif
-    support, and forms bounded nearest-gene hypotheses. The accessibility
-    record remains the primary `trackEvidence`; every matching binding record
-    is retained in `overlapEvidence`.
+    separately declared, quantitatively filtered MYB-binding track overlaps a
+    filtered accessibility track, counts calibrated motif support, and forms
+    bounded nearest-gene hypotheses. The accessibility record remains the
+    primary `trackEvidence`; every matching binding record is retained in
+    `overlapEvidence`.
 
 The shared `anthocyanin_regulatory_demo` FASTA and GFF3 files contain three
 annotated genes, one candidate enhancer, two promoter-local MYB instances, and

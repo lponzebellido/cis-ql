@@ -165,6 +165,16 @@ def main() -> int:
             'EVIDENCE BINDING ASSAY "DAP-seq" SAMPLE "leaf" AS bound;\n'
             'SCAN matrix IN accessible STRAND POSITIVE THRESHOLD 100 % '
             'AS accessible_sites;\n'
+            'EXTRACT accessible AS strong_accessibility '
+            'WHERE TRACK_SCORE >= 500 AND SIGNAL_VALUE >= 10;\n'
+            'EXTRACT accessible AS statistically_annotated_accessibility '
+            'WHERE MINUS_LOG10_PVALUE >= 4 '
+            'AND MINUS_LOG10_QVALUE >= 3;\n'
+            'EXTRACT accessible AS leaf_accessibility '
+            'WHERE EVIDENCE_CLASS = "ACCESSIBILITY" '
+            'AND ASSAY = "ATAC-seq" AND SAMPLE = "leaf";\n'
+            'EXTRACT GENE AS genes_with_track_score '
+            'WHERE TRACK_SCORE >= 0;\n'
             'OVERLAPS accessible WITH bound AS accessible_and_bound;\n'
             'OVERLAPS accessible WITH GENE AS gene_accessible_peaks;\n'
             'INTERSECT accessible AND GENE AS clipped_accessible;\n'
@@ -214,6 +224,17 @@ def main() -> int:
                     "signalValue": 7,
                 },
                 "LOAD TRACK preserves narrowPeak evidence and is queryable")
+        require(
+            [region["name"] for region in
+             data["resultSets"]["strong_accessibility"]]
+            == ["open_promoter"] and
+            [region["name"] for region in data["resultSets"]
+             ["statistically_annotated_accessibility"]]
+            == ["open_promoter"] and
+            len(data["resultSets"]["leaf_accessibility"]) == 2 and
+            data["resultSets"]["genes_with_track_score"] == [],
+            "track evidence properties are executable WHERE filters",
+        )
         require(
             len(accessible_and_bound) == 2 and
             all(region["trackEvidence"]["evidenceClass"]
@@ -315,6 +336,41 @@ def main() -> int:
         )
         require("absent from the active sequence dataset" in runtime_error,
                 "LOAD TRACK rejects chromosome mismatches against active FASTA")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "track_score_requires_number",
+            'LOAD TRACK "candidate_regions.bed" FORMAT BED '
+            'EVIDENCE OTHER AS candidates;\n'
+            'EXTRACT candidates AS invalid WHERE TRACK_SCORE >= "high";\n',
+            3,
+        )
+        require("TRACK_SCORE must be compared with a finite" in semantic_error,
+                "track scores reject string thresholds")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "track_signal_rejects_units",
+            'LOAD TRACK "candidate_regions.bed" FORMAT BED '
+            'EVIDENCE OTHER AS candidates;\n'
+            'EXTRACT candidates AS invalid WHERE SIGNAL_VALUE >= 1 BP;\n',
+            3,
+        )
+        require("SIGNAL_VALUE must be compared with a finite"
+                in semantic_error,
+                "track evidence thresholds reject genomic units")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "track_metadata_requires_equality",
+            'LOAD TRACK "candidate_regions.bed" FORMAT BED '
+            'EVIDENCE OTHER AS candidates;\n'
+            'EXTRACT candidates AS invalid '
+            'WHERE EVIDENCE_CLASS >= "OTHER";\n',
+            3,
+        )
+        require("EVIDENCE_CLASS supports only equality" in semantic_error,
+                "track metadata uses exact string equality")
 
         data, _ = run_query(
             workspace,
@@ -1147,9 +1203,9 @@ def main() -> int:
             "multi_evidence_gene_hypotheses"
         ]
         require(
-            len(combined_peaks) == 3 and
+            len(combined_peaks) == 2 and
             [peak["countEvidence"]["count"] for peak in combined_counts]
-            == [1, 2, 1] and
+            == [1, 2] and
             all(peak["trackEvidence"]["evidenceClass"] == "ACCESSIBILITY"
                 for peak in combined_counts) and
             all(len(peak["overlapEvidence"]) == 1 and
@@ -1162,7 +1218,7 @@ def main() -> int:
                     ["evidenceClass"] == "BINDING"
                 for link in combined_links) and
             [link["spatialRelation"]["distance"] for link in combined_links]
-            == [25, 60, 20],
+            == [25, 60],
             "multi-track example retains accessibility, binding, motif, and proximity evidence",
         )
 

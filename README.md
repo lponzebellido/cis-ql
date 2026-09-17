@@ -236,13 +236,27 @@ EXTRACT GENE AS reference_gene WHERE ID = "geneA";
 EXTRACT GENE AS homologous_genes
     WHERE LENGTH > 1 KB
       AND SIMILARITY TO reference_gene > 70 %;
+
+EXTRACT accessibility_peaks AS strong_accessibility
+    WHERE TRACK_SCORE >= 600
+      AND SIGNAL_VALUE >= 10
+      AND EVIDENCE_CLASS = "ACCESSIBILITY";
 ```
 
 Condition properties are result-specific: region sets support `LENGTH`,
 `SIMILARITY`, `GC_CONTENT`, and `ID`, plus `COUNT` when count evidence is
-attached; motif results support `LENGTH` and `GC_CONTENT`; GC profiles support
-`GC_CONTENT`. `IF` currently evaluates the GC content of the active sequence
-dataset.
+attached. Track-backed regions additionally support `TRACK_SCORE`,
+`SIGNAL_VALUE`, `MINUS_LOG10_PVALUE`, `MINUS_LOG10_QVALUE`,
+`EVIDENCE_CLASS`, `ASSAY`, and `SAMPLE`. Missing optional narrowPeak values do
+not satisfy a numeric condition. These properties filter the primary track;
+filter a reference track before combining it with `OVERLAPS`. Motif results
+support `LENGTH` and `GC_CONTENT`; GC profiles support `GC_CONTENT`. `IF`
+currently evaluates the GC content of the active sequence dataset.
+
+These filters do not calibrate experimental evidence. BED/narrowPeak scores
+and `signalValue` remain upstream-tool-specific, so thresholds require an
+assay-appropriate justification and should not be compared across experiments
+as if they shared a universal scale.
 
 An explicit similarity reference must be a named result set containing exactly
 one region. Similarity percentages are normalized local-alignment scores, not
@@ -351,6 +365,9 @@ Factor             ::= NOT Factor | SimpleCondition | "(" Condition ")"
 SimpleCondition    ::= Property RelOp Value
                      | SIMILARITY SimilarityRefOpt RelOp Value
 Property           ::= LENGTH | GC_CONTENT | COUNT | ID | NAME
+                     | TRACK_SCORE | SIGNAL_VALUE
+                     | MINUS_LOG10_PVALUE | MINUS_LOG10_QVALUE
+                     | EVIDENCE_CLASS | ASSAY | SAMPLE
 SimilarityRefOpt   ::= TO ID | λ
 RelOp              ::= ">" | "<" | ">=" | "<=" | "="
 Value              ::= (NUM | FLOAT) Unit | (NUM | FLOAT) PERCENT | NUM | FLOAT | STRING
@@ -415,7 +432,7 @@ The regulatory progression and its expected outputs are described in
 | `07_enhancer_myb_module.cql` | Detect a constrained homotypic MYB module | spacing, order, orientation, two-member evidence |
 | `08_integrated_anthocyanin_query.cql` | Connect the complete evidence path | promoters, calibrated sites, modules, counts, candidate links |
 | `09_accessible_myb_evidence.cql` | Combine imported accessibility peaks with motif support | narrowPeak provenance, `COUNT`, `NEAR` |
-| `10_accessible_bound_myb_candidates.cql` | Combine accessibility, binding, motif, and proximity | multi-track `overlapEvidence`, `COUNT`, `NEAR` |
+| `10_accessible_bound_myb_candidates.cql` | Combine filtered accessibility, binding, motif, and proximity | track-evidence `WHERE`, multi-track `overlapEvidence`, `COUNT`, `NEAR` |
 
 ---
 

@@ -16,7 +16,15 @@ LOAD TRACK "data_examples/anthocyanin_myb_binding_demo.narrowPeak"
     SAMPLE "synthetic anthocyanin locus"
     AS myb_binding_peaks;
 
-OVERLAPS accessibility_peaks WITH myb_binding_peaks
+EXTRACT accessibility_peaks
+    AS strong_accessibility_peaks
+    WHERE TRACK_SCORE >= 600 AND SIGNAL_VALUE >= 10;
+
+EXTRACT myb_binding_peaks
+    AS strong_myb_binding_peaks
+    WHERE TRACK_SCORE >= 800 AND SIGNAL_VALUE >= 18;
+
+OVERLAPS strong_accessibility_peaks WITH strong_myb_binding_peaks
     AS accessible_bound_peaks;
 
 SCAN myb_matrix

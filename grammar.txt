@@ -9,7 +9,8 @@ LENGTH, SIMILARITY, GREATER, LESS, GREATER_EQ, LESS_EQ, ASSIGN, FLOAT, PERCENT, 
 UPSTREAM, DOWNSTREAM, SCAN, THRESHOLD, PVALUE, QVALUE, BACKGROUND, UNIFORM, ANALYZE, GC_CONTENT, CPG_ISLANDS, WINDOW,
 IF, THEN, ELSE, ENDIF, FOREACH, IN, DO, ENDFOR, COMMA, TO, FORMAT, BED, GFF3, TSV,
 SPACING, ORDER, ORIENTATION, ANY, SAME, OPPOSITE, AS_WRITTEN, NARROWPEAK,
-EVIDENCE, ACCESSIBILITY, BINDING, OTHER, ASSAY, SAMPLE.
+EVIDENCE, ACCESSIBILITY, BINDING, OTHER, ASSAY, SAMPLE, TRACK_SCORE,
+SIGNAL_VALUE, MINUS_LOG10_PVALUE, MINUS_LOG10_QVALUE, EVIDENCE_CLASS.
 
 Grammar Rules:
 
@@ -74,6 +75,9 @@ Factor             -> NOT Factor | SimpleCondition | LPAREN Condition RPAREN
 
 SimpleCondition    -> Property RelOp Value | SIMILARITY SimilarityRefOpt RelOp Value
 Property           -> LENGTH | GC_CONTENT | COUNT | ID
+                    | TRACK_SCORE | SIGNAL_VALUE
+                    | MINUS_LOG10_PVALUE | MINUS_LOG10_QVALUE
+                    | EVIDENCE_CLASS | ASSAY | SAMPLE
 SimilarityRefOpt   -> TO ID | λ
 RelOp              -> GREATER | LESS | GREATER_EQ | LESS_EQ | ASSIGN
 Value              -> (NUM | FLOAT) Unit | (NUM | FLOAT) PERCENT | NUM | FLOAT | STRING
@@ -103,3 +107,4 @@ Note on Execution Engine & Studio Integration:
 12. `COUNT query IN containers` emits every valid container interval, including those with zero hits, and records how many query intervals overlap it under half-open coordinates. `WHERE COUNT` can select containers by the resulting non-negative integer. This is descriptive aggregation, not a statistical enrichment test.
 13. `DEFINE MODULE` pairs records on the same chromosome when their half-open interval gap falls inside the inclusive `SPACING` range. Overlap and adjacency both have spacing zero, while the observed order records overlap separately. `ORDER AS_WRITTEN` requires the first input record to have a lower reference start than the second; tied starts do not satisfy it. `ORDER ANY` accepts either direction. `ORIENTATION SAME` and `OPPOSITE` require both members to have `+` or `-` strands. Reusing one alias forms canonical unordered pairs, excluding self-pairs and duplicate mirror pairs. JSON and Studio retain nested member evidence; GFF3 and TSV expose the constraints, member identities, and core PWM statistics.
 14. `LOAD TRACK ... FORMAT BED|NARROWPEAK EVIDENCE ACCESSIBILITY|BINDING|OTHER` imports zero-based, half-open regulatory intervals as a named region set. The required evidence class records the user's declared interpretation; optional `ASSAY` and `SAMPLE` strings preserve experimental context. narrowPeak score, signalValue, -log10(p), -log10(q), and summit offset are preserved as typed track evidence. When a FASTA is active, chromosome names and interval bounds are validated and interval sequence is attached. Imported tracks can be used by the interval, count, scan, and module operators without becoming the active GFF3 annotation.
+15. Track-backed region sets can be filtered by `TRACK_SCORE`, `SIGNAL_VALUE`, `MINUS_LOG10_PVALUE`, `MINUS_LOG10_QVALUE`, `EVIDENCE_CLASS`, `ASSAY`, and `SAMPLE`. Numeric properties require finite non-negative values without units; absent optional narrowPeak values do not match. Metadata uses exact string equality. These properties address the primary `trackEvidence`, so reference tracks should be filtered before `OVERLAPS`.

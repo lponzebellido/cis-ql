@@ -743,11 +743,15 @@ std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
   std::string prop;
   if (match(TokenType::LENGTH) || match(TokenType::SIMILARITY) ||
       match(TokenType::GC_CONTENT) || match(TokenType::COUNT) ||
+      match(TokenType::TRACK_SCORE) || match(TokenType::SIGNAL_VALUE) ||
+      match(TokenType::MINUS_LOG10_PVALUE) ||
+      match(TokenType::MINUS_LOG10_QVALUE) ||
+      match(TokenType::EVIDENCE_CLASS) || match(TokenType::ASSAY) ||
+      match(TokenType::SAMPLE) ||
       match(TokenType::ID)) {
     prop = previous().lexeme;
   } else {
-    reportError(peek(), "Expected property name ('LENGTH', 'SIMILARITY', "
-                        "'GC_CONTENT', 'COUNT', or identifier).");
+    reportError(peek(), "Expected a supported condition property.");
     throw std::runtime_error("Parse error");
   }
 

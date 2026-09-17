@@ -363,7 +363,9 @@ void SemanticAnalyzer::visit(NotConditionNode *node) {
 
 void SemanticAnalyzer::visit(SimpleConditionNode *node) {
   static const std::set<std::string> supportedProperties = {
-      "LENGTH", "SIMILARITY", "GC_CONTENT", "COUNT", "ID", "NAME"};
+      "LENGTH", "SIMILARITY", "GC_CONTENT", "COUNT", "ID", "NAME",
+      "TRACK_SCORE", "SIGNAL_VALUE", "MINUS_LOG10_PVALUE",
+      "MINUS_LOG10_QVALUE", "EVIDENCE_CLASS", "ASSAY", "SAMPLE"};
   if (!supportedProperties.count(node->property)) {
     reportError("Unsupported condition property '" + node->property + "'.");
     return;
@@ -405,6 +407,27 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
         (!node->value.empty() && node->value.front() == '"')) {
       reportError("COUNT must be compared with a finite, non-negative whole "
                   "number without a unit.");
+    }
+  } else if (node->property == "TRACK_SCORE" ||
+             node->property == "SIGNAL_VALUE" ||
+             node->property == "MINUS_LOG10_PVALUE" ||
+             node->property == "MINUS_LOG10_QVALUE") {
+    const double value = parseValue(node->value);
+    if (!std::isfinite(value) || value < 0.0 ||
+        node->value.find(' ') != std::string::npos ||
+        (!node->value.empty() && node->value.front() == '"')) {
+      reportError(node->property +
+                  " must be compared with a finite, non-negative number "
+                  "without a unit.");
+    }
+  } else if (node->property == "EVIDENCE_CLASS" ||
+             node->property == "ASSAY" || node->property == "SAMPLE") {
+    if (node->value.size() < 2 || node->value.front() != '"' ||
+        node->value.back() != '"') {
+      reportError(node->property + " must be compared with a string value.");
+    }
+    if (node->op != "=" && node->op != "==") {
+      reportError(node->property + " supports only equality comparison.");
     }
   } else if ((node->property == "ID" || node->property == "NAME") &&
              (node->value.size() < 2 || node->value.front() != '"' ||

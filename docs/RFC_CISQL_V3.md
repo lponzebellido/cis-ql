@@ -381,6 +381,26 @@ When `OVERLAPS` combines two tracks, the left/query observation stays in
 TSV stores the array as JSON in `overlap_evidence_json`, and GFF3 stores a
 count plus a percent-encoded JSON attribute.
 
+Track evidence is executable in `WHERE` filters:
+
+```cql
+EXTRACT accessibility_peaks AS strong_accessibility
+  WHERE TRACK_SCORE >= 600
+    AND SIGNAL_VALUE >= 10
+    AND EVIDENCE_CLASS = "ACCESSIBILITY";
+```
+
+`TRACK_SCORE`, `SIGNAL_VALUE`, `MINUS_LOG10_PVALUE`, and
+`MINUS_LOG10_QVALUE` use finite non-negative thresholds without genomic or
+percentage units. Missing optional narrowPeak values fail the corresponding
+condition. `EVIDENCE_CLASS`, `ASSAY`, and `SAMPLE` use exact string equality.
+The properties address the region's primary `trackEvidence`. To constrain a
+reference track unambiguously when multiple peaks may overlap one query,
+filter that track first and pass the filtered alias to `OVERLAPS`.
+Filtering does not normalize or calibrate imported measurements: narrowPeak
+score and `signalValue` remain defined by the upstream caller and experiment.
+Thresholds therefore require assay-specific justification.
+
 When a FASTA is active, every track chromosome and interval bound is checked
 against it and interval sequence is attached. A track loaded before its genome
 cannot be assembly-validated, so real workflows should load the sequence

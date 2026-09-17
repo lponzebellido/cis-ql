@@ -51,6 +51,11 @@ void Lexer::initKeywords() {
     keywords["OTHER"] = TokenType::OTHER;
     keywords["ASSAY"] = TokenType::ASSAY;
     keywords["SAMPLE"] = TokenType::SAMPLE;
+    keywords["TRACK_SCORE"] = TokenType::TRACK_SCORE;
+    keywords["SIGNAL_VALUE"] = TokenType::SIGNAL_VALUE;
+    keywords["MINUS_LOG10_PVALUE"] = TokenType::MINUS_LOG10_PVALUE;
+    keywords["MINUS_LOG10_QVALUE"] = TokenType::MINUS_LOG10_QVALUE;
+    keywords["EVIDENCE_CLASS"] = TokenType::EVIDENCE_CLASS;
     keywords["BED"] = TokenType::BED;
     keywords["NARROWPEAK"] = TokenType::NARROWPEAK;
     keywords["GFF3"] = TokenType::GFF3;
@@ -401,6 +406,11 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::OTHER: return "OTHER";
         case TokenType::ASSAY: return "ASSAY";
         case TokenType::SAMPLE: return "SAMPLE";
+        case TokenType::TRACK_SCORE: return "TRACK_SCORE";
+        case TokenType::SIGNAL_VALUE: return "SIGNAL_VALUE";
+        case TokenType::MINUS_LOG10_PVALUE: return "MINUS_LOG10_PVALUE";
+        case TokenType::MINUS_LOG10_QVALUE: return "MINUS_LOG10_QVALUE";
+        case TokenType::EVIDENCE_CLASS: return "EVIDENCE_CLASS";
         case TokenType::BED: return "BED";
         case TokenType::NARROWPEAK: return "NARROWPEAK";
         case TokenType::GFF3: return "GFF3";

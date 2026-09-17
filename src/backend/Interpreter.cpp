@@ -1386,6 +1386,42 @@ bool Interpreter::evaluateRegionCondition(
            compareValues(static_cast<double>(region.countEvidence.count),
                          condition->op, condition->value);
   }
+  if (condition->property == "TRACK_SCORE") {
+    return region.trackEvidence.present && region.trackEvidence.hasScore &&
+           compareValues(region.trackEvidence.score, condition->op,
+                         condition->value);
+  }
+  if (condition->property == "SIGNAL_VALUE") {
+    return region.trackEvidence.present &&
+           region.trackEvidence.hasSignalValue &&
+           compareValues(region.trackEvidence.signalValue, condition->op,
+                         condition->value);
+  }
+  if (condition->property == "MINUS_LOG10_PVALUE") {
+    return region.trackEvidence.present &&
+           region.trackEvidence.hasMinusLog10PValue &&
+           compareValues(region.trackEvidence.minusLog10PValue,
+                         condition->op, condition->value);
+  }
+  if (condition->property == "MINUS_LOG10_QVALUE") {
+    return region.trackEvidence.present &&
+           region.trackEvidence.hasMinusLog10QValue &&
+           compareValues(region.trackEvidence.minusLog10QValue,
+                         condition->op, condition->value);
+  }
+  if (condition->property == "EVIDENCE_CLASS" ||
+      condition->property == "ASSAY" || condition->property == "SAMPLE") {
+    if (!region.trackEvidence.present)
+      return false;
+    const std::string expected = stripQuotes(condition->value);
+    const std::string &observed =
+        condition->property == "EVIDENCE_CLASS"
+            ? region.trackEvidence.evidenceClass
+            : condition->property == "ASSAY" ? region.trackEvidence.assay
+                                               : region.trackEvidence.sample;
+    return (condition->op == "=" || condition->op == "==") &&
+           observed == expected;
+  }
   if (condition->property == "ID" || condition->property == "NAME") {
     const std::string expected = stripQuotes(condition->value);
     if (condition->op == "=" || condition->op == "==")
@@ -1498,7 +1534,9 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
   } else if (resultSets.count(resultId)) {
     if (!conditionUsesOnly(
             instr.condition,
-            {"LENGTH", "SIMILARITY", "GC_CONTENT", "COUNT", "ID", "NAME"})) {
+            {"LENGTH", "SIMILARITY", "GC_CONTENT", "COUNT", "ID", "NAME",
+             "TRACK_SCORE", "SIGNAL_VALUE", "MINUS_LOG10_PVALUE",
+             "MINUS_LOG10_QVALUE", "EVIDENCE_CLASS", "ASSAY", "SAMPLE"})) {
       reportRuntimeError("Unsupported condition for a genomic region set.");
       return;
     }
