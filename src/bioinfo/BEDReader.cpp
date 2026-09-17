@@ -44,6 +44,9 @@ std::vector<GenomicRegion> BEDReader::read(const std::string &filename,
                                            const std::string &evidenceClass,
                                            const std::string &assay,
                                            const std::string &sample,
+                                           const std::string &condition,
+                                           const std::string &replicate,
+                                           const std::string &control,
                                            std::string *error) {
   std::vector<GenomicRegion> regions;
   std::ifstream file(filename);
@@ -99,6 +102,9 @@ std::vector<GenomicRegion> BEDReader::read(const std::string &filename,
     region.trackEvidence.evidenceClass = evidenceClass;
     region.trackEvidence.assay = assay;
     region.trackEvidence.sample = sample;
+    region.trackEvidence.condition = condition;
+    region.trackEvidence.replicate = replicate;
+    region.trackEvidence.control = control;
 
     if (fields.size() >= 5) {
       if (!parseDouble(fields[4], region.trackEvidence.score) ||

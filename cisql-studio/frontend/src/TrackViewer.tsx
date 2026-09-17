@@ -69,6 +69,9 @@ interface TrackEvidence {
   evidenceClass: string;
   assay?: string;
   sample?: string;
+  condition?: string;
+  replicate?: string;
+  control?: string;
   score?: number;
   signalValue?: number;
   minusLog10PValue?: number;
@@ -88,6 +91,7 @@ interface OverlapEvidence {
     name: string;
   };
   trackEvidence?: TrackEvidence;
+  supportingEvidence?: OverlapEvidence[];
 }
 
 interface ModuleMemberEvidence {
@@ -681,6 +685,9 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                   <br /><span className="tt-label">Evidence:</span> {hoveredRegion.trackEvidence.evidenceClass}
                   {hoveredRegion.trackEvidence.assay && <><br /><span className="tt-label">Assay:</span> {hoveredRegion.trackEvidence.assay}</>}
                   {hoveredRegion.trackEvidence.sample && <><br /><span className="tt-label">Sample:</span> {hoveredRegion.trackEvidence.sample}</>}
+                  {hoveredRegion.trackEvidence.condition && <><br /><span className="tt-label">Condition:</span> {hoveredRegion.trackEvidence.condition}</>}
+                  {hoveredRegion.trackEvidence.replicate && <><br /><span className="tt-label">Replicate:</span> {hoveredRegion.trackEvidence.replicate}</>}
+                  {hoveredRegion.trackEvidence.control && <><br /><span className="tt-label">Control:</span> {hoveredRegion.trackEvidence.control}</>}
                   {hoveredRegion.trackEvidence.score !== undefined && <><br /><span className="tt-label">Track score:</span> {hoveredRegion.trackEvidence.score}</>}
                   {hoveredRegion.trackEvidence.signalValue !== undefined && <><br /><span className="tt-label">Signal:</span> {hoveredRegion.trackEvidence.signalValue}</>}
                   {hoveredRegion.trackEvidence.peakPosition !== undefined && <><br /><span className="tt-label">Summit:</span> {hoveredRegion.trackEvidence.peakPosition.toLocaleString()}</>}
@@ -689,7 +696,7 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
               {hoveredRegion.overlapEvidence && hoveredRegion.overlapEvidence.length > 0 && (
                 <>
                   <br /><span className="tt-label">Overlap support:</span> {hoveredRegion.overlapEvidence.length} reference{hoveredRegion.overlapEvidence.length === 1 ? '' : 's'}
-                  <br /><span className="tt-label">Matched:</span> {hoveredRegion.overlapEvidence.map(item => `${item.reference.name || item.reference.type}${item.trackEvidence ? ` [${item.trackEvidence.evidenceClass}]` : ''}`).join(', ')}
+                  <br /><span className="tt-label">Matched:</span> {hoveredRegion.overlapEvidence.map(item => `${item.reference.name || item.reference.type}${item.trackEvidence ? ` [${item.trackEvidence.evidenceClass}${item.trackEvidence.replicate ? `/${item.trackEvidence.replicate}` : ''}]` : ''}${item.supportingEvidence?.length ? ` + ${item.supportingEvidence.length} nested support` : ''}`).join(', ')}
                 </>
               )}
               {hoveredRegion.moduleEvidence && (
@@ -815,6 +822,9 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                       {selectedRegion.trackEvidence.evidenceClass}
                       {selectedRegion.trackEvidence.assay ? ` · ${selectedRegion.trackEvidence.assay}` : ''}
                       {selectedRegion.trackEvidence.sample ? ` · ${selectedRegion.trackEvidence.sample}` : ''}
+                      {selectedRegion.trackEvidence.condition ? ` · condition ${selectedRegion.trackEvidence.condition}` : ''}
+                      {selectedRegion.trackEvidence.replicate ? ` · replicate ${selectedRegion.trackEvidence.replicate}` : ''}
+                      {selectedRegion.trackEvidence.control ? ` · control ${selectedRegion.trackEvidence.control}` : ''}
                     </span>
                   </div>
                   <div className="detail-field">
@@ -837,6 +847,18 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                       <span key={`${item.referenceSet}-${item.reference.chr}-${item.reference.start}-${index}`} style={{ display: 'block' }}>
                         {item.referenceSet}: {item.reference.name || item.reference.type} · {item.reference.chr}:{item.reference.start.toLocaleString()}-{item.reference.end.toLocaleString()}
                         {item.trackEvidence ? ` · ${item.trackEvidence.evidenceClass}${item.trackEvidence.assay ? ` (${item.trackEvidence.assay})` : ''}` : ''}
+                        {item.trackEvidence?.condition ? ` · condition ${item.trackEvidence.condition}` : ''}
+                        {item.trackEvidence?.replicate ? ` · replicate ${item.trackEvidence.replicate}` : ''}
+                        {item.trackEvidence?.control ? ` · control ${item.trackEvidence.control}` : ''}
+                        {item.supportingEvidence?.map((support, supportIndex) => (
+                          <span key={`${support.referenceSet}-${support.reference.chr}-${support.reference.start}-${supportIndex}`} style={{ display: 'block', paddingLeft: 12 }}>
+                            ↳ {support.referenceSet}: {support.reference.name || support.reference.type}
+                            {support.trackEvidence ? ` · ${support.trackEvidence.evidenceClass}` : ''}
+                            {support.trackEvidence?.condition ? ` · condition ${support.trackEvidence.condition}` : ''}
+                            {support.trackEvidence?.replicate ? ` · replicate ${support.trackEvidence.replicate}` : ''}
+                            {support.trackEvidence?.control ? ` · control ${support.trackEvidence.control}` : ''}
+                          </span>
+                        ))}
                       </span>
                     ))}
                   </span>

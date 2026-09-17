@@ -98,6 +98,9 @@ LOAD TRACK "data_examples/anthocyanin_accessibility_demo.narrowPeak"
     EVIDENCE ACCESSIBILITY
     ASSAY "synthetic ATAC-seq-like fixture"
     SAMPLE "synthetic anthocyanin locus"
+    CONDITION "pigmented petal"
+    REPLICATE "A1"
+    CONTROL "input"
     AS accessibility_peaks;
 ```
 
@@ -113,9 +116,10 @@ and rejects assembly-incompatible records. narrowPeak's `pValue` and `qValue`
 columns are preserved according to that format as `-log10(p)` and `-log10(q)`;
 they are not confused with the calibrated probabilities produced by `SCAN`.
 Every track must declare `EVIDENCE ACCESSIBILITY`, `BINDING`, or `OTHER`.
-Optional `ASSAY` and `SAMPLE` strings travel with derived results and exports;
-these declarations preserve provenance but do not validate experimental
-quality or biological interpretation.
+Optional `ASSAY`, `SAMPLE`, `CONDITION`, `REPLICATE`, and `CONTROL` strings
+may appear in any order and travel with derived results and exports. Duplicate
+metadata clauses are rejected. These declarations preserve provenance but do
+not validate experimental quality or biological interpretation.
 
 When multiple sequence or annotation datasets are loaded, select the active
 context explicitly:
@@ -179,7 +183,11 @@ instead performs a directional semi-join: each query interval is retained once
 if any reference interval overlaps it. This preserves the query coordinates,
 sequence, and motif evidence. Every matching reference is recorded in the
 result's `overlapEvidence`; when a reference came from `LOAD TRACK`, its
-evidence class, assay, sample, score, signal, and summit remain attached.
+evidence class, experimental metadata, score, signal, and summit remain
+attached. If that reference was itself supported by an earlier `OVERLAPS`,
+its prior evidence is retained recursively as `supportingEvidence`; this
+preserves the provenance path without claiming that a transitive relationship
+is a direct overlap.
 
 `NEAR query TO reference WITHIN distance` also preserves each complete query
 record, but retains it only when its nearest same-chromosome reference is no
@@ -240,18 +248,21 @@ EXTRACT GENE AS homologous_genes
 EXTRACT accessibility_peaks AS strong_accessibility
     WHERE TRACK_SCORE >= 600
       AND SIGNAL_VALUE >= 10
-      AND EVIDENCE_CLASS = "ACCESSIBILITY";
+      AND EVIDENCE_CLASS = "ACCESSIBILITY"
+      AND CONDITION = "pigmented petal"
+      AND REPLICATE = "A1";
 ```
 
 Condition properties are result-specific: region sets support `LENGTH`,
 `SIMILARITY`, `GC_CONTENT`, and `ID`, plus `COUNT` when count evidence is
 attached. Track-backed regions additionally support `TRACK_SCORE`,
 `SIGNAL_VALUE`, `MINUS_LOG10_PVALUE`, `MINUS_LOG10_QVALUE`,
-`EVIDENCE_CLASS`, `ASSAY`, and `SAMPLE`. Missing optional narrowPeak values do
-not satisfy a numeric condition. These properties filter the primary track;
-filter a reference track before combining it with `OVERLAPS`. Motif results
-support `LENGTH` and `GC_CONTENT`; GC profiles support `GC_CONTENT`. `IF`
-currently evaluates the GC content of the active sequence dataset.
+`EVIDENCE_CLASS`, `ASSAY`, `SAMPLE`, `CONDITION`, `REPLICATE`, and `CONTROL`.
+Missing optional narrowPeak values do not satisfy a numeric condition.
+Metadata uses exact string equality. These properties filter the primary
+track; filter a reference track before combining it with `OVERLAPS`. Motif
+results support `LENGTH` and `GC_CONTENT`; GC profiles support `GC_CONTENT`.
+`IF` currently evaluates the GC content of the active sequence dataset.
 
 These filters do not calibrate experimental evidence. BED/narrowPeak scores
 and `signalValue` remain upstream-tool-specific, so thresholds require an
@@ -310,7 +321,9 @@ Statement          ::= LoadStmt | UseStmt | ExportStmt | FindStmt | ExtractStmt
 LoadStmt           ::= LOAD (SEQUENCE | ANNOTATION | MATRIX) STRING AS ID SEMICOLON
                      | LOAD TRACK STRING FORMAT (BED | NARROWPEAK)
                        EVIDENCE (ACCESSIBILITY | BINDING | OTHER)
-                       (ASSAY STRING)? (SAMPLE STRING)? AS ID SEMICOLON
+                       TrackMetadata* AS ID SEMICOLON
+TrackMetadata      ::= ASSAY STRING | SAMPLE STRING | CONDITION STRING
+                     | REPLICATE STRING | CONTROL STRING
 UseStmt            ::= USE (SEQUENCE | ANNOTATION) ID SEMICOLON
 ExportStmt         ::= EXPORT ID TO STRING FORMAT (BED | GFF3 | TSV) SEMICOLON
 DefinePromotersStmt ::= DEFINE PROMOTERS OF (GENE | TSS | ID) FROM TSS
@@ -367,7 +380,8 @@ SimpleCondition    ::= Property RelOp Value
 Property           ::= LENGTH | GC_CONTENT | COUNT | ID | NAME
                      | TRACK_SCORE | SIGNAL_VALUE
                      | MINUS_LOG10_PVALUE | MINUS_LOG10_QVALUE
-                     | EVIDENCE_CLASS | ASSAY | SAMPLE
+                     | EVIDENCE_CLASS | ASSAY | SAMPLE | CONDITION
+                     | REPLICATE | CONTROL
 SimilarityRefOpt   ::= TO ID | λ
 RelOp              ::= ">" | "<" | ">=" | "<=" | "="
 Value              ::= (NUM | FLOAT) Unit | (NUM | FLOAT) PERCENT | NUM | FLOAT | STRING
@@ -414,7 +428,7 @@ requirements needed before reporting external benchmark results.
 
 ## Curated Examples Suite (`cql_examples/`)
 
-The repository includes ten `.cql` analyses forming one coherent,
+The repository includes eleven `.cql` analyses forming one coherent,
 synthetic anthocyanin-regulation path. Compiler feature coverage belongs in
 the automated tests; these programs are examples of scientific questions.
 
@@ -433,6 +447,7 @@ The regulatory progression and its expected outputs are described in
 | `08_integrated_anthocyanin_query.cql` | Connect the complete evidence path | promoters, calibrated sites, modules, counts, candidate links |
 | `09_accessible_myb_evidence.cql` | Combine imported accessibility peaks with motif support | narrowPeak provenance, `COUNT`, `NEAR` |
 | `10_accessible_bound_myb_candidates.cql` | Combine filtered accessibility, binding, motif, and proximity | track-evidence `WHERE`, multi-track `overlapEvidence`, `COUNT`, `NEAR` |
+| `11_replicate_supported_candidates.cql` | Require coordinate-level support from two binding replicates | structured condition/replicate/control metadata, nested evidence provenance |
 
 ---
 

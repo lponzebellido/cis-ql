@@ -51,6 +51,9 @@ void Lexer::initKeywords() {
     keywords["OTHER"] = TokenType::OTHER;
     keywords["ASSAY"] = TokenType::ASSAY;
     keywords["SAMPLE"] = TokenType::SAMPLE;
+    keywords["CONDITION"] = TokenType::CONDITION;
+    keywords["REPLICATE"] = TokenType::REPLICATE;
+    keywords["CONTROL"] = TokenType::CONTROL;
     keywords["TRACK_SCORE"] = TokenType::TRACK_SCORE;
     keywords["SIGNAL_VALUE"] = TokenType::SIGNAL_VALUE;
     keywords["MINUS_LOG10_PVALUE"] = TokenType::MINUS_LOG10_PVALUE;
@@ -406,6 +409,9 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::OTHER: return "OTHER";
         case TokenType::ASSAY: return "ASSAY";
         case TokenType::SAMPLE: return "SAMPLE";
+        case TokenType::CONDITION: return "CONDITION";
+        case TokenType::REPLICATE: return "REPLICATE";
+        case TokenType::CONTROL: return "CONTROL";
         case TokenType::TRACK_SCORE: return "TRACK_SCORE";
         case TokenType::SIGNAL_VALUE: return "SIGNAL_VALUE";
         case TokenType::MINUS_LOG10_PVALUE: return "MINUS_LOG10_PVALUE";

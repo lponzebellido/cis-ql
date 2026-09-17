@@ -159,10 +159,13 @@ def main() -> int:
             'LOAD ANNOTATION "fixture.gff3" AS annot;\n'
             'LOAD MATRIX "fixture.pwm" AS matrix;\n'
             'LOAD TRACK "accessibility.narrowPeak" FORMAT NARROWPEAK '
-            'EVIDENCE ACCESSIBILITY ASSAY "ATAC-seq" SAMPLE "leaf" '
+            'EVIDENCE ACCESSIBILITY SAMPLE "leaf" CONTROL "input" '
+            'ASSAY "ATAC-seq" REPLICATE "R1" CONDITION "pigmented" '
             'AS accessible;\n'
             'LOAD TRACK "binding.narrowPeak" FORMAT NARROWPEAK '
-            'EVIDENCE BINDING ASSAY "DAP-seq" SAMPLE "leaf" AS bound;\n'
+            'EVIDENCE BINDING ASSAY "DAP-seq" SAMPLE "leaf" '
+            'CONDITION "pigmented" REPLICATE "R1" CONTROL "input" '
+            'AS bound;\n'
             'SCAN matrix IN accessible STRAND POSITIVE THRESHOLD 100 % '
             'AS accessible_sites;\n'
             'EXTRACT accessible AS strong_accessibility '
@@ -172,7 +175,9 @@ def main() -> int:
             'AND MINUS_LOG10_QVALUE >= 3;\n'
             'EXTRACT accessible AS leaf_accessibility '
             'WHERE EVIDENCE_CLASS = "ACCESSIBILITY" '
-            'AND ASSAY = "ATAC-seq" AND SAMPLE = "leaf";\n'
+            'AND ASSAY = "ATAC-seq" AND SAMPLE = "leaf" '
+            'AND CONDITION = "pigmented" AND REPLICATE = "R1" '
+            'AND CONTROL = "input";\n'
             'EXTRACT GENE AS genes_with_track_score '
             'WHERE TRACK_SCORE >= 0;\n'
             'OVERLAPS accessible WITH bound AS accessible_and_bound;\n'
@@ -206,6 +211,9 @@ def main() -> int:
                     "evidenceClass": "ACCESSIBILITY",
                     "assay": "ATAC-seq",
                     "sample": "leaf",
+                    "condition": "pigmented",
+                    "replicate": "R1",
+                    "control": "input",
                     "score": 500,
                     "signalValue": 12.5,
                     "minusLog10PValue": 4.2,
@@ -220,6 +228,9 @@ def main() -> int:
                     "evidenceClass": "ACCESSIBILITY",
                     "assay": "ATAC-seq",
                     "sample": "leaf",
+                    "condition": "pigmented",
+                    "replicate": "R1",
+                    "control": "input",
                     "score": 200,
                     "signalValue": 7,
                 },
@@ -253,17 +264,18 @@ def main() -> int:
         track_tsv = (workspace / "accessible.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(track_tsv) == 94 and track_tsv[81:93] == [
+        require(len(track_tsv) == 97 and track_tsv[81:96] == [
                     "accessible", "accessibility.narrowPeak", "NARROWPEAK",
-                    "ACCESSIBILITY", "ATAC-seq", "leaf", "500", "12.5",
+                    "ACCESSIBILITY", "ATAC-seq", "leaf", "pigmented",
+                    "R1", "input", "500", "12.5",
                     "4.2000000000000002",
                     "3.7999999999999998", "25", "25",
                 ], "TSV export preserves typed narrowPeak evidence")
         combined_tsv = (workspace / "accessible_bound.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        combined_overlap = json.loads(combined_tsv[93])
-        require(len(combined_tsv) == 94 and
+        combined_overlap = json.loads(combined_tsv[96])
+        require(len(combined_tsv) == 97 and
                 combined_overlap[0]["referenceSet"] == "bound" and
                 combined_overlap[0]["trackEvidence"]["evidenceClass"]
                 == "BINDING" and
@@ -277,6 +289,9 @@ def main() -> int:
                 "EvidenceClass=ACCESSIBILITY" in track_gff and
                 "Assay=ATAC-seq" in track_gff and
                 "Sample=leaf" in track_gff and
+                "Condition=pigmented" in track_gff and
+                "Replicate=R1" in track_gff and
+                "Control=input" in track_gff and
                 "SignalValue=12.5" in track_gff and
                 "TrackMinusLog10PValue=4.2" in track_gff and
                 "PeakPosition=25" in track_gff,
@@ -325,6 +340,17 @@ def main() -> int:
         )
         require("Expected 'EVIDENCE'" in parser_error,
                 "LOAD TRACK requires an explicit evidence class")
+
+        parser_error = run_invalid_query(
+            workspace,
+            "track_rejects_duplicate_metadata",
+            'LOAD TRACK "candidate_regions.bed" FORMAT BED '
+            'EVIDENCE OTHER REPLICATE "R1" REPLICATE "R2" '
+            'AS candidates;\n',
+            2,
+        )
+        require("Duplicate REPLICATE clause" in parser_error,
+                "LOAD TRACK rejects contradictory duplicate metadata")
 
         runtime_error = run_invalid_query(
             workspace,
@@ -578,7 +604,8 @@ def main() -> int:
                 "\tsecond_matrix_id\tsecond_raw_score\tsecond_p_value"
                 "\tsecond_q_value"
                 "\ttrack_alias\ttrack_source\ttrack_format\tevidence_class"
-                "\tassay\tsample\ttrack_score"
+                "\tassay\tsample\tcondition\treplicate\tcontrol"
+                "\ttrack_score"
                 "\tsignal_value\ttrack_minus_log10_p_value"
                 "\ttrack_minus_log10_q_value\tpeak_offset\tpeak_position"
                 "\toverlap_evidence_json",
@@ -754,7 +781,7 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()
         first_tsv_site = tsv_rows[1].split("\t")
-        require(len(tsv_rows) == 10 and len(first_tsv_site) == 94 and
+        require(len(tsv_rows) == 10 and len(first_tsv_site) == 97 and
                 first_tsv_site[7:11]
                 == ["matrix", "TEST", "test", "fixture.pwm"] and
                 float(first_tsv_site[11]) > 0 and
@@ -770,7 +797,7 @@ def main() -> int:
                 abs(float(first_tsv_site[31]) - 0.1) < 1e-12 and
                 first_tsv_site[32:34] == ["short_promoter", "promoter"] and
                 first_tsv_site[36] == "0" and
-                first_tsv_site[37:] == [""] * 57,
+                first_tsv_site[37:] == [""] * 60,
                 "motif TSV export retains evidence columns")
 
         data, _ = run_query(
@@ -808,8 +835,8 @@ def main() -> int:
         promoter_overlap_tsv = (workspace / "promoter_sites.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(promoter_overlap_tsv) == 94 and
-                json.loads(promoter_overlap_tsv[93])[0]["reference"]
+        require(len(promoter_overlap_tsv) == 97 and
+                json.loads(promoter_overlap_tsv[96])[0]["reference"]
                     ["name"] == "short_promoter",
                 "OVERLAPS TSV evidence identifies the matching reference")
 
@@ -860,10 +887,10 @@ def main() -> int:
         linked_tsv = (workspace / "linked.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(linked_tsv) == 94 and linked_tsv[37:48] == [
+        require(len(linked_tsv) == 97 and linked_tsv[37:48] == [
                     "NEAR", "GENE", "chr1", "0", "1200", "+", "gene",
                     "short", "0", "0", "true",
-                ] and linked_tsv[48:] == [""] * 46,
+                ] and linked_tsv[48:] == [""] * 49,
                 "TSV export retains typed nearest-reference evidence")
 
         data, _ = run_query(
@@ -907,9 +934,9 @@ def main() -> int:
         count_tsv = (workspace / "counts.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(count_tsv) == 94 and count_tsv[48:52] == [
+        require(len(count_tsv) == 97 and count_tsv[48:52] == [
                     "OVERLAPS", "sites", "promoters", "20",
-                ] and count_tsv[52:] == [""] * 42,
+                ] and count_tsv[52:] == [""] * 45,
                 "TSV export retains count provenance")
 
         data, _ = run_query(
@@ -969,7 +996,7 @@ def main() -> int:
         module_tsv = (workspace / "modules.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(module_tsv) == 94 and
+        require(len(module_tsv) == 97 and
                 module_tsv[52:59] == [
                     "2", "2", "2", "ANY", "FIRST_BEFORE_SECOND",
                     "SAME", "SAME",
@@ -1174,7 +1201,11 @@ def main() -> int:
                     peak["trackEvidence"].get("assay")
                     == "synthetic ATAC-seq-like fixture" and
                     peak["trackEvidence"].get("sample")
-                    == "synthetic anthocyanin locus"
+                    == "synthetic anthocyanin locus" and
+                    peak["trackEvidence"].get("condition")
+                    == "pigmented petal" and
+                    peak["trackEvidence"].get("replicate") == "A1" and
+                    peak["trackEvidence"].get("control") == "input"
                     for peak in peak_counts) and
                 [peak["name"] for peak in candidate_links] == [
                     "anthocyanin_promoter_accessible",
@@ -1207,10 +1238,15 @@ def main() -> int:
             [peak["countEvidence"]["count"] for peak in combined_counts]
             == [1, 2] and
             all(peak["trackEvidence"]["evidenceClass"] == "ACCESSIBILITY"
+                and peak["trackEvidence"]["replicate"] == "A1"
                 for peak in combined_counts) and
             all(len(peak["overlapEvidence"]) == 1 and
                 peak["overlapEvidence"][0]["trackEvidence"]
-                    ["evidenceClass"] == "BINDING"
+                    ["evidenceClass"] == "BINDING" and
+                peak["overlapEvidence"][0]["trackEvidence"]
+                    ["replicate"] == "R1" and
+                peak["overlapEvidence"][0]["trackEvidence"]
+                    ["control"] == "mock"
                 for peak in combined_counts) and
             combined_counts[0]["overlapEvidence"][0]["trackEvidence"]
                 ["peakPosition"] == 160 and
@@ -1220,6 +1256,55 @@ def main() -> int:
             [link["spatialRelation"]["distance"] for link in combined_links]
             == [25, 60],
             "multi-track example retains accessibility, binding, motif, and proximity evidence",
+        )
+
+        replicate_example = (
+            ROOT / "cql_examples" /
+            "11_replicate_supported_candidates.cql"
+        ).read_text(encoding="utf-8")
+        data, _ = run_query(
+            workspace, "anthocyanin_replicate_supported_candidates",
+            replicate_example
+        )
+        replicate_peaks = data["resultSets"][
+            "replicate_supported_accessible_peaks"
+        ]
+        replicate_counts = data["resultSets"][
+            "replicate_supported_peak_myb_counts"
+        ]
+        replicate_links = data["resultSets"][
+            "replicate_supported_gene_hypotheses"
+        ]
+        direct_support = replicate_peaks[0]["overlapEvidence"][0]
+        nested_support = direct_support["supportingEvidence"][0]
+        require(
+            len(replicate_peaks) == 2 and
+            [peak["countEvidence"]["count"] for peak in replicate_counts]
+            == [1, 2] and
+            all(peak["trackEvidence"]["replicate"] == "A1"
+                for peak in replicate_counts) and
+            direct_support["referenceSet"]
+            == "replicate_supported_binding_peaks" and
+            direct_support["trackEvidence"]["replicate"] == "R1" and
+            len(direct_support["supportingEvidence"]) == 1 and
+            nested_support["referenceSet"] == "strong_myb_binding_rep2" and
+            nested_support["trackEvidence"]["replicate"] == "R2" and
+            nested_support["trackEvidence"]["condition"]
+            == "pigmented petal" and
+            nested_support["trackEvidence"]["control"] == "mock" and
+            [link["spatialRelation"]["distance"]
+             for link in replicate_links] == [25, 60],
+            "replicate example preserves direct and nested experimental support",
+        )
+        replicate_tsv = (
+            workspace / "replicate_supported_peak_myb_counts.tsv"
+        ).read_text(encoding="utf-8").splitlines()[1].split("\t")
+        exported_support = json.loads(replicate_tsv[96])[0]
+        require(
+            exported_support["trackEvidence"]["replicate"] == "R1" and
+            exported_support["supportingEvidence"][0]["trackEvidence"]
+                ["replicate"] == "R2",
+            "TSV recursively exports replicate-support provenance",
         )
 
         nearest_example = (

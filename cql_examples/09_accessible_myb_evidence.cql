@@ -6,6 +6,9 @@ LOAD TRACK "data_examples/anthocyanin_accessibility_demo.narrowPeak"
     EVIDENCE ACCESSIBILITY
     ASSAY "synthetic ATAC-seq-like fixture"
     SAMPLE "synthetic anthocyanin locus"
+    CONDITION "pigmented petal"
+    REPLICATE "A1"
+    CONTROL "input"
     AS accessibility_peaks;
 
 SCAN myb_matrix

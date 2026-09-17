@@ -7,6 +7,9 @@ LOAD TRACK "data_examples/anthocyanin_accessibility_demo.narrowPeak"
     EVIDENCE ACCESSIBILITY
     ASSAY "synthetic ATAC-seq-like fixture"
     SAMPLE "synthetic anthocyanin locus"
+    CONDITION "pigmented petal"
+    REPLICATE "A1"
+    CONTROL "input"
     AS accessibility_peaks;
 
 LOAD TRACK "data_examples/anthocyanin_myb_binding_demo.narrowPeak"
@@ -14,15 +17,21 @@ LOAD TRACK "data_examples/anthocyanin_myb_binding_demo.narrowPeak"
     EVIDENCE BINDING
     ASSAY "synthetic DAP-seq-like fixture"
     SAMPLE "synthetic anthocyanin locus"
+    CONDITION "pigmented petal"
+    REPLICATE "R1"
+    CONTROL "mock"
     AS myb_binding_peaks;
 
 EXTRACT accessibility_peaks
     AS strong_accessibility_peaks
-    WHERE TRACK_SCORE >= 600 AND SIGNAL_VALUE >= 10;
+    WHERE TRACK_SCORE >= 600 AND SIGNAL_VALUE >= 10
+      AND CONDITION = "pigmented petal" AND REPLICATE = "A1";
 
 EXTRACT myb_binding_peaks
     AS strong_myb_binding_peaks
-    WHERE TRACK_SCORE >= 800 AND SIGNAL_VALUE >= 18;
+    WHERE TRACK_SCORE >= 800 AND SIGNAL_VALUE >= 18
+      AND CONDITION = "pigmented petal" AND REPLICATE = "R1"
+      AND CONTROL = "mock";
 
 OVERLAPS strong_accessibility_peaks WITH strong_myb_binding_peaks
     AS accessible_bound_peaks;

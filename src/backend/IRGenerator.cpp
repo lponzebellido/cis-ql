@@ -120,6 +120,9 @@ void IRGenerator::visit(LoadStmtNode* node) {
   instr.arg4 = node->evidenceClass;
   instr.arg5 = node->assay;
   instr.arg6 = node->sample;
+  instr.arg7 = node->condition;
+  instr.arg8 = node->replicate;
+  instr.arg9 = node->control;
   instructions.push_back(instr);
 }
 

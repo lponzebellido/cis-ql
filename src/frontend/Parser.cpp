@@ -320,6 +320,9 @@ std::unique_ptr<LoadStmtNode> Parser::parseLoad() {
   std::string evidenceClass;
   std::string assay;
   std::string sample;
+  std::string condition;
+  std::string replicate;
+  std::string control;
   if (loadType == "TRACK") {
     consume(TokenType::FORMAT, "Expected 'FORMAT' after the track file name.");
     if (match(TokenType::BED) || match(TokenType::NARROWPEAK)) {
@@ -338,13 +341,42 @@ std::unique_ptr<LoadStmtNode> Parser::parseLoad() {
                   "Expected ACCESSIBILITY, BINDING, or OTHER after EVIDENCE.");
       throw std::runtime_error("Parse error");
     }
-    if (match(TokenType::ASSAY)) {
-      consume(TokenType::STRING, "Expected an assay description string.");
-      assay = previous().lexeme;
-    }
-    if (match(TokenType::SAMPLE)) {
-      consume(TokenType::STRING, "Expected a sample description string.");
-      sample = previous().lexeme;
+    bool hasAssay = false;
+    bool hasSample = false;
+    bool hasCondition = false;
+    bool hasReplicate = false;
+    bool hasControl = false;
+    while (check(TokenType::ASSAY) || check(TokenType::SAMPLE) ||
+           check(TokenType::CONDITION) || check(TokenType::REPLICATE) ||
+           check(TokenType::CONTROL)) {
+      const Token metadata = advance();
+      bool *seen = nullptr;
+      std::string *destination = nullptr;
+      if (metadata.type == TokenType::ASSAY) {
+        seen = &hasAssay;
+        destination = &assay;
+      } else if (metadata.type == TokenType::SAMPLE) {
+        seen = &hasSample;
+        destination = &sample;
+      } else if (metadata.type == TokenType::CONDITION) {
+        seen = &hasCondition;
+        destination = &condition;
+      } else if (metadata.type == TokenType::REPLICATE) {
+        seen = &hasReplicate;
+        destination = &replicate;
+      } else {
+        seen = &hasControl;
+        destination = &control;
+      }
+      if (*seen) {
+        reportError(metadata, "Duplicate " + metadata.lexeme +
+                                  " clause in LOAD TRACK.");
+        throw std::runtime_error("Parse error");
+      }
+      *seen = true;
+      consume(TokenType::STRING,
+              "Expected a string after '" + metadata.lexeme + "'.");
+      *destination = previous().lexeme;
     }
   }
   consume(TokenType::AS, "Expected 'AS' after the file name.");
@@ -354,7 +386,7 @@ std::unique_ptr<LoadStmtNode> Parser::parseLoad() {
           "Expected ';' at the end of the LOAD statement.");
   return std::unique_ptr<LoadStmtNode>(
       new LoadStmtNode(loadType, file, format, evidenceClass, assay, sample,
-                       alias));
+                       condition, replicate, control, alias));
 }
 
 std::unique_ptr<FindStmtNode> Parser::parseFind() {
@@ -747,7 +779,8 @@ std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
       match(TokenType::MINUS_LOG10_PVALUE) ||
       match(TokenType::MINUS_LOG10_QVALUE) ||
       match(TokenType::EVIDENCE_CLASS) || match(TokenType::ASSAY) ||
-      match(TokenType::SAMPLE) ||
+      match(TokenType::SAMPLE) || match(TokenType::CONDITION) ||
+      match(TokenType::REPLICATE) || match(TokenType::CONTROL) ||
       match(TokenType::ID)) {
     prop = previous().lexeme;
   } else {

@@ -128,6 +128,28 @@ int main() {
               supportedSites[0].overlapEvidence[1].referenceStart == 4,
           "overlap semi-join preserves one query and every matching reference");
 
+  GenomicRegion replicateOne = region(3, 6);
+  replicateOne.name = "replicate_one_peak";
+  replicateOne.trackEvidence.present = true;
+  replicateOne.trackEvidence.replicate = "R1";
+  OverlapEvidence replicateTwoSupport;
+  replicateTwoSupport.referenceSet = "replicate_two";
+  replicateTwoSupport.referenceName = "replicate_two_peak";
+  replicateTwoSupport.trackEvidence.present = true;
+  replicateTwoSupport.trackEvidence.replicate = "R2";
+  replicateOne.overlapEvidence.push_back(replicateTwoSupport);
+  const auto nestedSupport = SetOperations::selectOverlapping(
+      {region(0, 10)}, {replicateOne}, "replicate_one");
+  require(nestedSupport.size() == 1 &&
+              nestedSupport[0].overlapEvidence.size() == 1 &&
+              nestedSupport[0].overlapEvidence[0].trackEvidence.replicate ==
+                  "R1" &&
+              nestedSupport[0].overlapEvidence[0]
+                      .supportingEvidence.size() == 1 &&
+              nestedSupport[0].overlapEvidence[0]
+                      .supportingEvidence[0].trackEvidence.replicate == "R2",
+          "overlap semi-join preserves nested reference provenance");
+
   std::vector<GenomicRegion> indexedReferences;
   std::vector<GenomicRegion> indexedQueries;
   for (size_t index = 0; index < 250; ++index) {

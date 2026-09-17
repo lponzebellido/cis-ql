@@ -365,7 +365,8 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
   static const std::set<std::string> supportedProperties = {
       "LENGTH", "SIMILARITY", "GC_CONTENT", "COUNT", "ID", "NAME",
       "TRACK_SCORE", "SIGNAL_VALUE", "MINUS_LOG10_PVALUE",
-      "MINUS_LOG10_QVALUE", "EVIDENCE_CLASS", "ASSAY", "SAMPLE"};
+      "MINUS_LOG10_QVALUE", "EVIDENCE_CLASS", "ASSAY", "SAMPLE",
+      "CONDITION", "REPLICATE", "CONTROL"};
   if (!supportedProperties.count(node->property)) {
     reportError("Unsupported condition property '" + node->property + "'.");
     return;
@@ -421,7 +422,10 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
                   "without a unit.");
     }
   } else if (node->property == "EVIDENCE_CLASS" ||
-             node->property == "ASSAY" || node->property == "SAMPLE") {
+             node->property == "ASSAY" || node->property == "SAMPLE" ||
+             node->property == "CONDITION" ||
+             node->property == "REPLICATE" ||
+             node->property == "CONTROL") {
     if (node->value.size() < 2 || node->value.front() != '"' ||
         node->value.back() != '"') {
       reportError(node->property + " must be compared with a string value.");

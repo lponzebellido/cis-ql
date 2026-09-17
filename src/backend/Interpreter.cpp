@@ -139,6 +139,12 @@ Interpreter::serializeTrackEvidenceJSON(const TrackEvidence &track) const {
     out << ",\"assay\":\"" << jsonEscape(track.assay) << "\"";
   if (!track.sample.empty())
     out << ",\"sample\":\"" << jsonEscape(track.sample) << "\"";
+  if (!track.condition.empty())
+    out << ",\"condition\":\"" << jsonEscape(track.condition) << "\"";
+  if (!track.replicate.empty())
+    out << ",\"replicate\":\"" << jsonEscape(track.replicate) << "\"";
+  if (!track.control.empty())
+    out << ",\"control\":\"" << jsonEscape(track.control) << "\"";
   if (track.hasScore)
     out << ",\"score\":" << track.score;
   if (track.hasSignalValue)
@@ -172,6 +178,9 @@ std::string Interpreter::serializeOverlapEvidenceJSON(
     if (item.trackEvidence.present)
       out << ",\"trackEvidence\":"
           << serializeTrackEvidenceJSON(item.trackEvidence);
+    if (!item.supportingEvidence.empty())
+      out << ",\"supportingEvidence\":"
+          << serializeOverlapEvidenceJSON(item.supportingEvidence);
     out << '}';
   }
   out << ']';
@@ -268,6 +277,12 @@ void Interpreter::printRegions(const std::vector<GenomicRegion> &regions,
         std::cout << " assay:\"" << r.trackEvidence.assay << "\"";
       if (!r.trackEvidence.sample.empty())
         std::cout << " sample:\"" << r.trackEvidence.sample << "\"";
+      if (!r.trackEvidence.condition.empty())
+        std::cout << " condition:\"" << r.trackEvidence.condition << "\"";
+      if (!r.trackEvidence.replicate.empty())
+        std::cout << " replicate:\"" << r.trackEvidence.replicate << "\"";
+      if (!r.trackEvidence.control.empty())
+        std::cout << " control:\"" << r.trackEvidence.control << "\"";
       if (r.trackEvidence.hasScore)
         std::cout << " score:" << r.trackEvidence.score;
       if (r.trackEvidence.hasSignalValue)
@@ -414,6 +429,9 @@ void Interpreter::executeLoadTrack(const IRInstruction &instr) {
   const std::string &evidenceClass = instr.arg4;
   const std::string assay = stripQuotes(instr.arg5);
   const std::string sample = stripQuotes(instr.arg6);
+  const std::string condition = stripQuotes(instr.arg7);
+  const std::string replicate = stripQuotes(instr.arg8);
+  const std::string control = stripQuotes(instr.arg9);
   if (debugMode) {
     std::cout << "> LOAD TRACK \"" << filename << "\" FORMAT " << format
               << " EVIDENCE " << evidenceClass;
@@ -421,13 +439,19 @@ void Interpreter::executeLoadTrack(const IRInstruction &instr) {
       std::cout << " ASSAY \"" << assay << "\"";
     if (!sample.empty())
       std::cout << " SAMPLE \"" << sample << "\"";
+    if (!condition.empty())
+      std::cout << " CONDITION \"" << condition << "\"";
+    if (!replicate.empty())
+      std::cout << " REPLICATE \"" << replicate << "\"";
+    if (!control.empty())
+      std::cout << " CONTROL \"" << control << "\"";
     std::cout << " AS " << alias << std::endl;
   }
 
   std::string error;
   std::vector<GenomicRegion> regions =
       BEDReader::read(filename, format, alias, evidenceClass, assay, sample,
-                      &error);
+                      condition, replicate, control, &error);
   if (!error.empty()) {
     reportRuntimeError(error);
     return;
@@ -695,6 +719,12 @@ void Interpreter::executeExport(const IRInstruction &instr) {
           out << ";Assay=" << gffAttributeEscape(track.assay);
         if (!track.sample.empty())
           out << ";Sample=" << gffAttributeEscape(track.sample);
+        if (!track.condition.empty())
+          out << ";Condition=" << gffAttributeEscape(track.condition);
+        if (!track.replicate.empty())
+          out << ";Replicate=" << gffAttributeEscape(track.replicate);
+        if (!track.control.empty())
+          out << ";Control=" << gffAttributeEscape(track.control);
         if (track.hasScore)
           out << ";TrackScore=" << track.score;
         if (track.hasSignalValue)
@@ -743,7 +773,7 @@ void Interpreter::executeExport(const IRInstruction &instr) {
            "\tsecond_strand\tsecond_type\tsecond_name\tsecond_matrix_id"
            "\tsecond_raw_score\tsecond_p_value\tsecond_q_value"
            "\ttrack_alias\ttrack_source\ttrack_format\tevidence_class"
-           "\tassay\tsample\ttrack_score"
+           "\tassay\tsample\tcondition\treplicate\tcontrol\ttrack_score"
            "\tsignal_value\ttrack_minus_log10_p_value"
            "\ttrack_minus_log10_q_value"
            "\tpeak_offset\tpeak_position\toverlap_evidence_json\n";
@@ -860,7 +890,10 @@ void Interpreter::executeExport(const IRInstruction &instr) {
             << cleanTabularField(track.format) << '\t'
             << cleanTabularField(track.evidenceClass) << '\t'
             << cleanTabularField(track.assay) << '\t'
-            << cleanTabularField(track.sample) << '\t';
+            << cleanTabularField(track.sample) << '\t'
+            << cleanTabularField(track.condition) << '\t'
+            << cleanTabularField(track.replicate) << '\t'
+            << cleanTabularField(track.control) << '\t';
         if (track.hasScore)
           out << track.score;
         out << '\t';
@@ -879,7 +912,7 @@ void Interpreter::executeExport(const IRInstruction &instr) {
         if (track.hasPeak)
           out << track.peakPosition;
       } else {
-        for (int emptyColumn = 0; emptyColumn < 11; ++emptyColumn)
+        for (int emptyColumn = 0; emptyColumn < 14; ++emptyColumn)
           out << '\t';
       }
       out << '\t';
@@ -1410,15 +1443,21 @@ bool Interpreter::evaluateRegionCondition(
                          condition->op, condition->value);
   }
   if (condition->property == "EVIDENCE_CLASS" ||
-      condition->property == "ASSAY" || condition->property == "SAMPLE") {
+      condition->property == "ASSAY" || condition->property == "SAMPLE" ||
+      condition->property == "CONDITION" ||
+      condition->property == "REPLICATE" ||
+      condition->property == "CONTROL") {
     if (!region.trackEvidence.present)
       return false;
     const std::string expected = stripQuotes(condition->value);
-    const std::string &observed =
+    const std::string observed =
         condition->property == "EVIDENCE_CLASS"
             ? region.trackEvidence.evidenceClass
-            : condition->property == "ASSAY" ? region.trackEvidence.assay
-                                               : region.trackEvidence.sample;
+        : condition->property == "ASSAY" ? region.trackEvidence.assay
+        : condition->property == "SAMPLE" ? region.trackEvidence.sample
+        : condition->property == "CONDITION" ? region.trackEvidence.condition
+        : condition->property == "REPLICATE" ? region.trackEvidence.replicate
+                                               : region.trackEvidence.control;
     return (condition->op == "=" || condition->op == "==") &&
            observed == expected;
   }
@@ -1536,7 +1575,8 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
             instr.condition,
             {"LENGTH", "SIMILARITY", "GC_CONTENT", "COUNT", "ID", "NAME",
              "TRACK_SCORE", "SIGNAL_VALUE", "MINUS_LOG10_PVALUE",
-             "MINUS_LOG10_QVALUE", "EVIDENCE_CLASS", "ASSAY", "SAMPLE"})) {
+             "MINUS_LOG10_QVALUE", "EVIDENCE_CLASS", "ASSAY", "SAMPLE",
+             "CONDITION", "REPLICATE", "CONTROL"})) {
       reportRuntimeError("Unsupported condition for a genomic region set.");
       return;
     }

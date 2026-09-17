@@ -4,6 +4,7 @@
 #include "TrackEvidence.h"
 #include <cstddef>
 #include <string>
+#include <vector>
 
 struct OverlapEvidence {
   std::string referenceSet;
@@ -14,6 +15,7 @@ struct OverlapEvidence {
   std::string referenceType;
   std::string referenceName;
   TrackEvidence trackEvidence;
+  std::vector<OverlapEvidence> supportingEvidence;
 };
 
 #endif

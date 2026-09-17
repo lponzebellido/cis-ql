@@ -400,6 +400,7 @@ std::vector<GenomicRegion> SetOperations::selectOverlapping(
       evidence.referenceType = referenceRegion.type;
       evidence.referenceName = referenceRegion.name;
       evidence.trackEvidence = referenceRegion.trackEvidence;
+      evidence.supportingEvidence = referenceRegion.overlapEvidence;
       selected.overlapEvidence.push_back(std::move(evidence));
     }
     if (!matches.empty())

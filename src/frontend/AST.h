@@ -102,12 +102,18 @@ public:
   std::string evidenceClass;
   std::string assay;
   std::string sample;
+  std::string condition;
+  std::string replicate;
+  std::string control;
   std::string alias;
   LoadStmtNode(std::string lt, std::string f, std::string fmt,
                std::string evidence, std::string assayName,
-               std::string sampleName, std::string a)
+               std::string sampleName, std::string conditionName,
+               std::string replicateName, std::string controlName,
+               std::string a)
       : loadType(lt), filename(f), format(fmt), evidenceClass(evidence),
-        assay(assayName), sample(sampleName), alias(a) {}
+        assay(assayName), sample(sampleName), condition(conditionName),
+        replicate(replicateName), control(controlName), alias(a) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;
 };

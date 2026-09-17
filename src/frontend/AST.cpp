@@ -26,6 +26,9 @@ void LoadStmtNode::print(std::string prefix, bool isLast) const {
     if (!evidenceClass.empty()) std::cout << ", Evidence: " << evidenceClass;
     if (!assay.empty()) std::cout << ", Assay: " << assay;
     if (!sample.empty()) std::cout << ", Sample: " << sample;
+    if (!condition.empty()) std::cout << ", Condition: " << condition;
+    if (!replicate.empty()) std::cout << ", Replicate: " << replicate;
+    if (!control.empty()) std::cout << ", Control: " << control;
     std::cout << ", Alias: " << alias << ")" << std::endl;
 }
 

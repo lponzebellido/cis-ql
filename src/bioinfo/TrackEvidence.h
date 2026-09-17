@@ -12,6 +12,9 @@ struct TrackEvidence {
   std::string evidenceClass;
   std::string assay;
   std::string sample;
+  std::string condition;
+  std::string replicate;
+  std::string control;
   bool hasScore = false;
   double score = 0.0;
   bool hasSignalValue = false;

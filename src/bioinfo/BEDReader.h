@@ -13,6 +13,9 @@ public:
                                          const std::string &evidenceClass,
                                          const std::string &assay,
                                          const std::string &sample,
+                                         const std::string &condition,
+                                         const std::string &replicate,
+                                         const std::string &control,
                                          std::string *error = nullptr);
 };
 

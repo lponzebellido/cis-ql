@@ -1,6 +1,6 @@
 # Cis-QL regulatory example path
 
-These ten programs are a progressive analysis of one synthetic
+These eleven programs are a progressive analysis of one synthetic
 anthocyanin-regulatory locus. They teach how evidence moves through the
 language; they are not biological evidence or an exhaustive grammar catalog.
 
@@ -41,6 +41,11 @@ language; they are not biological evidence or an exhaustive grammar catalog.
     bounded nearest-gene hypotheses. The accessibility record remains the
     primary `trackEvidence`; every matching binding record is retained in
     `overlapEvidence`.
+11. `11_replicate_supported_candidates.cql` attaches condition, replicate,
+    and control labels to accessibility and binding tracks, filters each
+    replicate explicitly, and requires an R1 peak to overlap an R2 peak before
+    combining it with accessibility and motif support. The direct R1 match
+    retains its R2 observation as nested `supportingEvidence`.
 
 The shared `anthocyanin_regulatory_demo` FASTA and GFF3 files contain three
 annotated genes, one candidate enhancer, two promoter-local MYB instances, and
@@ -50,11 +55,12 @@ exists in a plant.
 
 `anthocyanin_accessibility_demo.narrowPeak` is likewise synthetic. Its four
 peaks exist to exercise imported experimental-track semantics. The example's
-`EVIDENCE`, `ASSAY`, and `SAMPLE` values are deliberately marked as synthetic;
-they do not turn the fixture into an ATAC-seq or ChIP-seq measurement.
-`anthocyanin_myb_binding_demo.narrowPeak` is also synthetic and exists only to
-exercise multi-track evidence retention. Its `BINDING` declaration is not an
-experimental claim.
+`EVIDENCE`, `ASSAY`, `SAMPLE`, `CONDITION`, `REPLICATE`, and `CONTROL` values
+are deliberately marked as synthetic; they do not turn the fixtures into
+ATAC-seq, DAP-seq, or ChIP-seq measurements.
+`anthocyanin_myb_binding_demo.narrowPeak` and its `rep2` companion are also
+synthetic and exist only to exercise multi-track and nested evidence
+retention. Their `BINDING` declarations are not experimental claims.
 
 The `MA0054.1 myb.Ph3` frequency matrix is the unmodified JASPAR CORE profile
 for *Petunia x hybrida* MYB.Ph3. Applying a related profile to a real
@@ -78,6 +84,9 @@ Interpret the outputs conservatively:
   assay, sample, controls, assembly, and peak-calling provenance are suitable.
   Cis-QL preserves the supplied statistics but does not reinterpret them as
   proof of target-gene regulation.
+- Overlap between two replicate peak sets is coordinate-level concordance. It
+  is not IDR, does not model replicate quality or controls, and is not by
+  itself a formal reproducibility assessment.
 
 The removed historical examples mixed eukaryotic TF models and promoter
 assumptions with an *E. coli* fixture. Their language constructs remain covered

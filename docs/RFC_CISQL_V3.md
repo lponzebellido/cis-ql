@@ -363,6 +363,9 @@ LOAD TRACK "sample_accessibility.narrowPeak"
   EVIDENCE ACCESSIBILITY
   ASSAY "ATAC-seq"
   SAMPLE "pigmented petal"
+  CONDITION "pigmented"
+  REPLICATE "A1"
+  CONTROL "input"
   AS accessibility_peaks;
 ```
 
@@ -372,14 +375,19 @@ half-open. BED name, score, and strand are retained; narrowPeak additionally
 retains signalValue, the supplied `-log10(p)` and `-log10(q)` values, and the
 summit offset and absolute summit position. The file path, declared format,
 query alias, required evidence class (`ACCESSIBILITY`, `BINDING`, or `OTHER`),
-and optional assay and sample labels are recorded as typed `trackEvidence` in
-JSON, GFF3, TSV, and Studio. The class is an explicit user declaration, not an
-inference from the filename or an assertion that the experiment is valid.
+and optional assay, sample, condition, replicate, and control labels are
+recorded as typed `trackEvidence` in JSON, GFF3, TSV, and Studio. Metadata
+clauses may appear in any order; duplicates are rejected. The class is an
+explicit user declaration, not an inference from the filename or an assertion
+that the experiment is valid.
 When `OVERLAPS` combines two tracks, the left/query observation stays in
 `trackEvidence` and all matching right/reference observations are stored in
 `overlapEvidence`. JSON and Studio expose the structured records directly;
 TSV stores the array as JSON in `overlap_evidence_json`, and GFF3 stores a
-count plus a percent-encoded JSON attribute.
+count plus a percent-encoded JSON attribute. If a reference already has
+overlap evidence, the prior observations remain nested under
+`supportingEvidence`. This records the real operation path and avoids
+misrepresenting transitive support as a direct overlap.
 
 Track evidence is executable in `WHERE` filters:
 
@@ -387,13 +395,16 @@ Track evidence is executable in `WHERE` filters:
 EXTRACT accessibility_peaks AS strong_accessibility
   WHERE TRACK_SCORE >= 600
     AND SIGNAL_VALUE >= 10
-    AND EVIDENCE_CLASS = "ACCESSIBILITY";
+    AND EVIDENCE_CLASS = "ACCESSIBILITY"
+    AND CONDITION = "pigmented"
+    AND REPLICATE = "A1";
 ```
 
 `TRACK_SCORE`, `SIGNAL_VALUE`, `MINUS_LOG10_PVALUE`, and
 `MINUS_LOG10_QVALUE` use finite non-negative thresholds without genomic or
 percentage units. Missing optional narrowPeak values fail the corresponding
-condition. `EVIDENCE_CLASS`, `ASSAY`, and `SAMPLE` use exact string equality.
+condition. `EVIDENCE_CLASS`, `ASSAY`, `SAMPLE`, `CONDITION`, `REPLICATE`, and
+`CONTROL` use exact string equality.
 The properties address the region's primary `trackEvidence`. To constrain a
 reference track unambiguously when multiple peaks may overlap one query,
 filter that track first and pass the filtered alias to `OVERLAPS`.
@@ -407,10 +418,13 @@ cannot be assembly-validated, so real workflows should load the sequence
 first. Imported tracks can participate in `SCAN`, `OVERLAPS`, `COUNT`, `NEAR`,
 and module construction. The language preserves upstream statistics; it does
 not infer assay type, quality, or biological validity from a filename.
+Using `OVERLAPS` between replicate peak sets reports coordinate-level
+concordance only. It is not an IDR calculation, does not account for replicate
+quality or control design, and is not a formal reproducibility test.
 
 Still planned:
 
-- structured replicate, condition, control, and genome-assembly identity;
+- explicit genome-assembly identity and richer experimental design schemas;
 - tabular expression/coexpression inputs;
 - Accessibility, DAP/ChIP, expression, coexpression, and literature evidence.
 - CRE-to-gene linking by promoter, distance, or an imported relationship.

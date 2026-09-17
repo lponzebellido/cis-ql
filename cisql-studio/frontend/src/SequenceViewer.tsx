@@ -69,6 +69,9 @@ interface TrackEvidence {
   evidenceClass: string;
   assay?: string;
   sample?: string;
+  condition?: string;
+  replicate?: string;
+  control?: string;
   score?: number;
   signalValue?: number;
   minusLog10PValue?: number;
@@ -88,6 +91,7 @@ interface OverlapEvidence {
     name: string;
   };
   trackEvidence?: TrackEvidence;
+  supportingEvidence?: OverlapEvidence[];
 }
 
 interface ModuleMemberEvidence {
@@ -370,13 +374,13 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
                               {region.trackEvidence && (
                                 <>
                                   <span>Track: {region.trackEvidence.trackAlias} ({region.trackEvidence.format})</span>
-                                  <span>Evidence: {region.trackEvidence.evidenceClass}{region.trackEvidence.assay ? `; assay ${region.trackEvidence.assay}` : ''}{region.trackEvidence.sample ? `; sample ${region.trackEvidence.sample}` : ''}</span>
+                                  <span>Evidence: {region.trackEvidence.evidenceClass}{region.trackEvidence.assay ? `; assay ${region.trackEvidence.assay}` : ''}{region.trackEvidence.sample ? `; sample ${region.trackEvidence.sample}` : ''}{region.trackEvidence.condition ? `; condition ${region.trackEvidence.condition}` : ''}{region.trackEvidence.replicate ? `; replicate ${region.trackEvidence.replicate}` : ''}{region.trackEvidence.control ? `; control ${region.trackEvidence.control}` : ''}</span>
                                   {(region.trackEvidence.score !== undefined || region.trackEvidence.signalValue !== undefined) && <span>Track score: {region.trackEvidence.score ?? 'N/A'}{region.trackEvidence.signalValue !== undefined ? `; signal ${region.trackEvidence.signalValue}` : ''}</span>}
                                   {region.trackEvidence.peakPosition !== undefined && <span>Peak summit: {region.trackEvidence.peakPosition.toLocaleString()}</span>}
                                 </>
                               )}
                               {region.overlapEvidence && region.overlapEvidence.length > 0 && (
-                                <span>Overlap support: {region.overlapEvidence.map(item => `${item.referenceSet}:${item.reference.name || item.reference.type}${item.trackEvidence ? ` [${item.trackEvidence.evidenceClass}]` : ''}`).join(', ')}</span>
+                                <span>Overlap support: {region.overlapEvidence.map(item => `${item.referenceSet}:${item.reference.name || item.reference.type}${item.trackEvidence ? ` [${item.trackEvidence.evidenceClass}${item.trackEvidence.condition ? `/${item.trackEvidence.condition}` : ''}${item.trackEvidence.replicate ? `/${item.trackEvidence.replicate}` : ''}${item.trackEvidence.control ? `/${item.trackEvidence.control}` : ''}]` : ''}${item.supportingEvidence?.length ? ` +${item.supportingEvidence.length} nested` : ''}`).join(', ')}</span>
                               )}
                               {region.moduleEvidence && (
                                 <>
