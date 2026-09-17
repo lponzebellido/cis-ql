@@ -225,6 +225,9 @@ public:
   std::string entity2;
   std::string distanceValue;
   std::string distanceUnit;
+  std::vector<std::string> entities;
+  std::string anchor;
+  std::string minimumSupport;
   std::string alias;
   std::unique_ptr<ConditionNode> whereClause;
   SetOpStmtNode(std::string o, std::string e1, std::string e2,

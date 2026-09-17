@@ -2,6 +2,7 @@
 #define OVERLAP_EVIDENCE_H
 
 #include "TrackEvidence.h"
+#include "ConsensusEvidence.h"
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -15,6 +16,7 @@ struct OverlapEvidence {
   std::string referenceType;
   std::string referenceName;
   TrackEvidence trackEvidence;
+  ConsensusEvidence consensusEvidence;
   std::vector<OverlapEvidence> supportingEvidence;
 };
 

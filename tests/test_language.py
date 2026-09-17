@@ -264,7 +264,7 @@ def main() -> int:
         track_tsv = (workspace / "accessible.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(track_tsv) == 97 and track_tsv[81:96] == [
+        require(len(track_tsv) == 101 and track_tsv[81:96] == [
                     "accessible", "accessibility.narrowPeak", "NARROWPEAK",
                     "ACCESSIBILITY", "ATAC-seq", "leaf", "pigmented",
                     "R1", "input", "500", "12.5",
@@ -275,7 +275,7 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()[1].split("\t")
         combined_overlap = json.loads(combined_tsv[96])
-        require(len(combined_tsv) == 97 and
+        require(len(combined_tsv) == 101 and
                 combined_overlap[0]["referenceSet"] == "bound" and
                 combined_overlap[0]["trackEvidence"]["evidenceClass"]
                 == "BINDING" and
@@ -351,6 +351,34 @@ def main() -> int:
         )
         require("Duplicate REPLICATE clause" in parser_error,
                 "LOAD TRACK rejects contradictory duplicate metadata")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "consensus_requires_listed_anchor",
+            'LOAD TRACK "accessibility.narrowPeak" FORMAT NARROWPEAK '
+            'EVIDENCE ACCESSIBILITY AS first;\n'
+            'LOAD TRACK "binding.narrowPeak" FORMAT NARROWPEAK '
+            'EVIDENCE BINDING AS second;\n'
+            'CONSENSUS FROM [first, second] ANCHOR missing '
+            'MIN_SUPPORT 2 AS invalid;\n',
+            3,
+        )
+        require("must also appear in the input list" in semantic_error,
+                "CONSENSUS requires an explicit listed anchor")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "consensus_checks_support_threshold",
+            'LOAD TRACK "accessibility.narrowPeak" FORMAT NARROWPEAK '
+            'EVIDENCE ACCESSIBILITY AS first;\n'
+            'LOAD TRACK "binding.narrowPeak" FORMAT NARROWPEAK '
+            'EVIDENCE BINDING AS second;\n'
+            'CONSENSUS FROM [first, second] ANCHOR first '
+            'MIN_SUPPORT 3 AS invalid;\n',
+            3,
+        )
+        require("MIN_SUPPORT must be between 2" in semantic_error,
+                "CONSENSUS bounds support by its distinct input sets")
 
         runtime_error = run_invalid_query(
             workspace,
@@ -608,7 +636,9 @@ def main() -> int:
                 "\ttrack_score"
                 "\tsignal_value\ttrack_minus_log10_p_value"
                 "\ttrack_minus_log10_q_value\tpeak_offset\tpeak_position"
-                "\toverlap_evidence_json",
+                "\toverlap_evidence_json"
+                "\tconsensus_anchor_set\tconsensus_minimum_support"
+                "\tconsensus_observed_support\tconsensus_evidence_json",
                 "region TSV export")
         profile_lines = (workspace / "profile.tsv").read_text(
             encoding="utf-8"
@@ -781,7 +811,7 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()
         first_tsv_site = tsv_rows[1].split("\t")
-        require(len(tsv_rows) == 10 and len(first_tsv_site) == 97 and
+        require(len(tsv_rows) == 10 and len(first_tsv_site) == 101 and
                 first_tsv_site[7:11]
                 == ["matrix", "TEST", "test", "fixture.pwm"] and
                 float(first_tsv_site[11]) > 0 and
@@ -797,7 +827,7 @@ def main() -> int:
                 abs(float(first_tsv_site[31]) - 0.1) < 1e-12 and
                 first_tsv_site[32:34] == ["short_promoter", "promoter"] and
                 first_tsv_site[36] == "0" and
-                first_tsv_site[37:] == [""] * 60,
+                first_tsv_site[37:] == [""] * 64,
                 "motif TSV export retains evidence columns")
 
         data, _ = run_query(
@@ -835,7 +865,7 @@ def main() -> int:
         promoter_overlap_tsv = (workspace / "promoter_sites.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(promoter_overlap_tsv) == 97 and
+        require(len(promoter_overlap_tsv) == 101 and
                 json.loads(promoter_overlap_tsv[96])[0]["reference"]
                     ["name"] == "short_promoter",
                 "OVERLAPS TSV evidence identifies the matching reference")
@@ -887,10 +917,10 @@ def main() -> int:
         linked_tsv = (workspace / "linked.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(linked_tsv) == 97 and linked_tsv[37:48] == [
+        require(len(linked_tsv) == 101 and linked_tsv[37:48] == [
                     "NEAR", "GENE", "chr1", "0", "1200", "+", "gene",
                     "short", "0", "0", "true",
-                ] and linked_tsv[48:] == [""] * 49,
+                ] and linked_tsv[48:] == [""] * 53,
                 "TSV export retains typed nearest-reference evidence")
 
         data, _ = run_query(
@@ -934,9 +964,9 @@ def main() -> int:
         count_tsv = (workspace / "counts.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(count_tsv) == 97 and count_tsv[48:52] == [
+        require(len(count_tsv) == 101 and count_tsv[48:52] == [
                     "OVERLAPS", "sites", "promoters", "20",
-                ] and count_tsv[52:] == [""] * 45,
+                ] and count_tsv[52:] == [""] * 49,
                 "TSV export retains count provenance")
 
         data, _ = run_query(
@@ -996,7 +1026,7 @@ def main() -> int:
         module_tsv = (workspace / "modules.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(module_tsv) == 97 and
+        require(len(module_tsv) == 101 and
                 module_tsv[52:59] == [
                     "2", "2", "2", "ANY", "FIRST_BEFORE_SECOND",
                     "SAME", "SAME",
@@ -1269,6 +1299,9 @@ def main() -> int:
         replicate_peaks = data["resultSets"][
             "replicate_supported_accessible_peaks"
         ]
+        binding_consensus = data["resultSets"][
+            "replicate_supported_binding_peaks"
+        ]
         replicate_counts = data["resultSets"][
             "replicate_supported_peak_myb_counts"
         ]
@@ -1279,6 +1312,14 @@ def main() -> int:
         nested_support = direct_support["supportingEvidence"][0]
         require(
             len(replicate_peaks) == 2 and
+            len(binding_consensus) == 2 and
+            all(peak["consensusEvidence"] == {
+                    "anchorSet": "strong_myb_binding_rep1",
+                    "minimumSupport": 2,
+                    "observedSupport": 2,
+                    "inputSets": ["strong_myb_binding_rep1",
+                                  "strong_myb_binding_rep2"],
+                } for peak in binding_consensus) and
             [peak["countEvidence"]["count"] for peak in replicate_counts]
             == [1, 2] and
             all(peak["trackEvidence"]["replicate"] == "A1"
@@ -1286,6 +1327,8 @@ def main() -> int:
             direct_support["referenceSet"]
             == "replicate_supported_binding_peaks" and
             direct_support["trackEvidence"]["replicate"] == "R1" and
+            direct_support["consensusEvidence"]["minimumSupport"] == 2 and
+            direct_support["consensusEvidence"]["observedSupport"] == 2 and
             len(direct_support["supportingEvidence"]) == 1 and
             nested_support["referenceSet"] == "strong_myb_binding_rep2" and
             nested_support["trackEvidence"]["replicate"] == "R2" and
@@ -1302,9 +1345,37 @@ def main() -> int:
         exported_support = json.loads(replicate_tsv[96])[0]
         require(
             exported_support["trackEvidence"]["replicate"] == "R1" and
+            exported_support["consensusEvidence"]["observedSupport"] == 2 and
             exported_support["supportingEvidence"][0]["trackEvidence"]
                 ["replicate"] == "R2",
             "TSV recursively exports replicate-support provenance",
+        )
+        consensus_tsv = (
+            workspace / "replicate_supported_binding_peaks.tsv"
+        ).read_text(encoding="utf-8").splitlines()[1].split("\t")
+        require(
+            len(consensus_tsv) == 101 and
+            consensus_tsv[97:100] == [
+                "strong_myb_binding_rep1", "2", "2",
+            ] and
+            json.loads(consensus_tsv[100]) == {
+                "anchorSet": "strong_myb_binding_rep1",
+                "minimumSupport": 2,
+                "observedSupport": 2,
+                "inputSets": ["strong_myb_binding_rep1",
+                              "strong_myb_binding_rep2"],
+            },
+            "TSV exports typed coordinate-consensus evidence",
+        )
+        consensus_gff = (
+            workspace / "replicate_supported_binding_peaks.gff3"
+        ).read_text(encoding="utf-8").splitlines()[1]
+        require(
+            "ConsensusAnchorSet=strong_myb_binding_rep1" in consensus_gff and
+            "ConsensusMinimumSupport=2" in consensus_gff and
+            "ConsensusObservedSupport=2" in consensus_gff and
+            "ConsensusEvidenceJSON=" in consensus_gff,
+            "GFF3 exports typed coordinate-consensus evidence",
         )
 
         nearest_example = (

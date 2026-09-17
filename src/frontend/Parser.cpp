@@ -63,6 +63,7 @@ void Parser::synchronize() {
     case TokenType::EXCEPT:
     case TokenType::OVERLAPS:
     case TokenType::NEAR:
+    case TokenType::CONSENSUS:
     case TokenType::COUNT:
       return;
     default:
@@ -110,7 +111,7 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
     return parseCount();
   if (match(TokenType::INTERSECT) || match(TokenType::UNION) ||
       match(TokenType::EXCEPT) || match(TokenType::OVERLAPS) ||
-      match(TokenType::NEAR)) {
+      match(TokenType::NEAR) || match(TokenType::CONSENSUS)) {
     current--;
     return parseSetOperation();
   }
@@ -128,8 +129,8 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
   }
 
   reportError(peek(), "Expected start of a statement (LOAD, USE, EXPORT, FIND, "
-                      "EXTRACT, INTERSECT, UNION, EXCEPT, OVERLAPS, NEAR, SCAN, "
-                      "COUNT, ANALYZE, IF, FOREACH, DEFINE)");
+                      "EXTRACT, INTERSECT, UNION, EXCEPT, OVERLAPS, NEAR, "
+                      "CONSENSUS, SCAN, COUNT, ANALYZE, IF, FOREACH, DEFINE)");
   throw std::runtime_error("Parse error");
 }
 
@@ -489,6 +490,42 @@ std::unique_ptr<ExtractStmtNode> Parser::parseExtract() {
 
 std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
   std::string op;
+  if (match(TokenType::CONSENSUS)) {
+    consume(TokenType::FROM, "Expected 'FROM' after CONSENSUS.");
+    consume(TokenType::LBRACKET,
+            "Expected '[' before the CONSENSUS input aliases.");
+    std::vector<std::string> entities;
+    consume(TokenType::ID,
+            "Expected at least one input alias in CONSENSUS.");
+    entities.push_back(previous().lexeme);
+    while (match(TokenType::COMMA)) {
+      consume(TokenType::ID, "Expected an input alias after ','.");
+      entities.push_back(previous().lexeme);
+    }
+    consume(TokenType::RBRACKET,
+            "Expected ']' after the CONSENSUS input aliases.");
+    consume(TokenType::ANCHOR,
+            "Expected 'ANCHOR' after the CONSENSUS input list.");
+    consume(TokenType::ID, "Expected an anchor alias after ANCHOR.");
+    const std::string anchor = previous().lexeme;
+    consume(TokenType::MIN_SUPPORT,
+            "Expected 'MIN_SUPPORT' after the CONSENSUS anchor.");
+    consume(TokenType::NUM,
+            "Expected a whole-number support threshold after MIN_SUPPORT.");
+    const std::string minimumSupport = previous().lexeme;
+    consume(TokenType::AS, "Expected 'AS' after the CONSENSUS threshold.");
+    consume(TokenType::ID, "Expected an alias identifier after AS.");
+    const std::string alias = previous().lexeme;
+    auto whereClause = parseWhereClause();
+    consume(TokenType::SEMICOLON,
+            "Expected ';' at the end of CONSENSUS.");
+    auto node = std::unique_ptr<SetOpStmtNode>(new SetOpStmtNode(
+        "CONSENSUS", "", "", "", "", alias, std::move(whereClause)));
+    node->entities = std::move(entities);
+    node->anchor = anchor;
+    node->minimumSupport = minimumSupport;
+    return node;
+  }
   if (match(TokenType::INTERSECT))
     op = "INTERSECT";
   else if (match(TokenType::UNION))
@@ -778,7 +815,8 @@ std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
       match(TokenType::TRACK_SCORE) || match(TokenType::SIGNAL_VALUE) ||
       match(TokenType::MINUS_LOG10_PVALUE) ||
       match(TokenType::MINUS_LOG10_QVALUE) ||
-      match(TokenType::EVIDENCE_CLASS) || match(TokenType::ASSAY) ||
+      match(TokenType::EVIDENCE_CLASS) || match(TokenType::SUPPORT_COUNT) ||
+      match(TokenType::ASSAY) ||
       match(TokenType::SAMPLE) || match(TokenType::CONDITION) ||
       match(TokenType::REPLICATE) || match(TokenType::CONTROL) ||
       match(TokenType::ID)) {

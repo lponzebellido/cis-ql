@@ -43,9 +43,10 @@ language; they are not biological evidence or an exhaustive grammar catalog.
     `overlapEvidence`.
 11. `11_replicate_supported_candidates.cql` attaches condition, replicate,
     and control labels to accessibility and binding tracks, filters each
-    replicate explicitly, and requires an R1 peak to overlap an R2 peak before
-    combining it with accessibility and motif support. The direct R1 match
-    retains its R2 observation as nested `supportingEvidence`.
+    replicate explicitly, and uses an anchor-preserving `CONSENSUS` requiring
+    two distinct supporting sets before combining binding with accessibility
+    and motif support. The result records the `2/2` criterion; downstream
+    overlap evidence retains both the consensus rule and the R2 observation.
 
 The shared `anthocyanin_regulatory_demo` FASTA and GFF3 files contain three
 annotated genes, one candidate enhancer, two promoter-local MYB instances, and
@@ -87,6 +88,9 @@ Interpret the outputs conservatively:
 - Overlap between two replicate peak sets is coordinate-level concordance. It
   is not IDR, does not model replicate quality or controls, and is not by
   itself a formal reproducibility assessment.
+- `CONSENSUS` counts distinct input sets, not individual overlapping peaks,
+  and retains the declared anchor geometry. Choosing an anchor and support
+  threshold remains an analysis decision that must be justified.
 
 The removed historical examples mixed eukaryotic TF models and promoter
 assumptions with an *E. coli* fixture. Their language constructs remain covered

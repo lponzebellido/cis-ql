@@ -24,6 +24,7 @@ std::string irOpcodeToString(IROpCode op) {
     case IROpCode::SET_EXCEPT:       return "SET_EXCEPT";
     case IROpCode::SET_OVERLAPS:     return "SET_OVERLAPS";
     case IROpCode::SET_NEAR:         return "SET_NEAR";
+    case IROpCode::SET_CONSENSUS:    return "SET_CONSENSUS";
     case IROpCode::COUNT_OVERLAPS:   return "COUNT_OVERLAPS";
     case IROpCode::PRINT_RESULTS:    return "PRINT_RESULTS";
     case IROpCode::LOAD_MATRIX:      return "LOAD_MATRIX";
@@ -258,6 +259,31 @@ void IRGenerator::visit(ExtractStmtNode* node) {
 }
 
 void IRGenerator::visit(SetOpStmtNode* node) {
+  if (node->op == "CONSENSUS") {
+    currentTemp = newTemp("Consensus_" + node->anchor);
+    IRInstruction consensus;
+    consensus.opcode = IROpCode::SET_CONSENSUS;
+    consensus.arg1 = node->anchor;
+    consensus.arg2 = node->minimumSupport;
+    consensus.arg3 = currentTemp;
+    consensus.listArgs = node->entities;
+    instructions.push_back(consensus);
+
+    emitFilter(node->whereClause.get(), currentTemp);
+
+    IRInstruction alias;
+    alias.opcode = IROpCode::RESULT_ALIAS;
+    alias.arg1 = currentTemp;
+    alias.arg2 = node->alias;
+    instructions.push_back(alias);
+
+    IRInstruction print;
+    print.opcode = IROpCode::PRINT_RESULTS;
+    print.arg1 = node->alias;
+    print.arg2 = "CONSENSUS";
+    instructions.push_back(print);
+    return;
+  }
   currentTemp = newTemp(node->op + "_" + node->entity1 + "_" + node->entity2);
 
   IRInstruction setInstr;

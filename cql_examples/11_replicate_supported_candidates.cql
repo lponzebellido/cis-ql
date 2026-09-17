@@ -49,8 +49,11 @@ EXTRACT myb_binding_rep2
       AND CONDITION = "pigmented petal" AND REPLICATE = "R2"
       AND CONTROL = "mock";
 
-OVERLAPS strong_myb_binding_rep1 WITH strong_myb_binding_rep2
-    AS replicate_supported_binding_peaks;
+CONSENSUS FROM [strong_myb_binding_rep1, strong_myb_binding_rep2]
+    ANCHOR strong_myb_binding_rep1
+    MIN_SUPPORT 2
+    AS replicate_supported_binding_peaks
+    WHERE SUPPORT_COUNT >= 2;
 
 OVERLAPS strong_accessibility_peaks WITH replicate_supported_binding_peaks
     AS replicate_supported_accessible_peaks;
@@ -72,5 +75,9 @@ NEAR replicate_supported_regulatory_candidates TO GENE WITHIN 100 BP
 
 EXPORT replicate_supported_peak_myb_counts
     TO "replicate_supported_peak_myb_counts.tsv" FORMAT TSV;
+EXPORT replicate_supported_binding_peaks
+    TO "replicate_supported_binding_peaks.tsv" FORMAT TSV;
+EXPORT replicate_supported_binding_peaks
+    TO "replicate_supported_binding_peaks.gff3" FORMAT GFF3;
 EXPORT replicate_supported_gene_hypotheses
     TO "replicate_supported_gene_hypotheses.gff3" FORMAT GFF3;

@@ -62,6 +62,13 @@ interface CountEvidence {
   count: number;
 }
 
+interface ConsensusEvidence {
+  anchorSet: string;
+  minimumSupport: number;
+  observedSupport: number;
+  inputSets: string[];
+}
+
 interface TrackEvidence {
   trackAlias: string;
   source: string;
@@ -91,6 +98,7 @@ interface OverlapEvidence {
     name: string;
   };
   trackEvidence?: TrackEvidence;
+  consensusEvidence?: ConsensusEvidence;
   supportingEvidence?: OverlapEvidence[];
 }
 
@@ -123,6 +131,7 @@ interface GenomicRegion {
   motifEvidence?: MotifEvidence;
   spatialRelation?: SpatialRelation;
   countEvidence?: CountEvidence;
+  consensusEvidence?: ConsensusEvidence;
   moduleEvidence?: ModuleEvidence;
   trackEvidence?: TrackEvidence;
   overlapEvidence?: OverlapEvidence[];
@@ -371,6 +380,9 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
                               {region.countEvidence && (
                                 <span>Overlap count: {region.countEvidence.count.toLocaleString()} from {region.countEvidence.countedSet}</span>
                               )}
+                              {region.consensusEvidence && (
+                                <span>Consensus: {region.consensusEvidence.observedSupport}/{region.consensusEvidence.inputSets.length} sets; minimum {region.consensusEvidence.minimumSupport}; anchor {region.consensusEvidence.anchorSet}</span>
+                              )}
                               {region.trackEvidence && (
                                 <>
                                   <span>Track: {region.trackEvidence.trackAlias} ({region.trackEvidence.format})</span>
@@ -380,7 +392,7 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
                                 </>
                               )}
                               {region.overlapEvidence && region.overlapEvidence.length > 0 && (
-                                <span>Overlap support: {region.overlapEvidence.map(item => `${item.referenceSet}:${item.reference.name || item.reference.type}${item.trackEvidence ? ` [${item.trackEvidence.evidenceClass}${item.trackEvidence.condition ? `/${item.trackEvidence.condition}` : ''}${item.trackEvidence.replicate ? `/${item.trackEvidence.replicate}` : ''}${item.trackEvidence.control ? `/${item.trackEvidence.control}` : ''}]` : ''}${item.supportingEvidence?.length ? ` +${item.supportingEvidence.length} nested` : ''}`).join(', ')}</span>
+                                <span>Overlap support: {region.overlapEvidence.map(item => `${item.referenceSet}:${item.reference.name || item.reference.type}${item.trackEvidence ? ` [${item.trackEvidence.evidenceClass}${item.trackEvidence.condition ? `/${item.trackEvidence.condition}` : ''}${item.trackEvidence.replicate ? `/${item.trackEvidence.replicate}` : ''}${item.trackEvidence.control ? `/${item.trackEvidence.control}` : ''}]` : ''}${item.consensusEvidence ? ` consensus ${item.consensusEvidence.observedSupport}/${item.consensusEvidence.inputSets.length}` : ''}${item.supportingEvidence?.length ? ` +${item.supportingEvidence.length} nested` : ''}`).join(', ')}</span>
                               )}
                               {region.moduleEvidence && (
                                 <>

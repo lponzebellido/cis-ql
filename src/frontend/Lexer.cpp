@@ -59,6 +59,7 @@ void Lexer::initKeywords() {
     keywords["MINUS_LOG10_PVALUE"] = TokenType::MINUS_LOG10_PVALUE;
     keywords["MINUS_LOG10_QVALUE"] = TokenType::MINUS_LOG10_QVALUE;
     keywords["EVIDENCE_CLASS"] = TokenType::EVIDENCE_CLASS;
+    keywords["SUPPORT_COUNT"] = TokenType::SUPPORT_COUNT;
     keywords["BED"] = TokenType::BED;
     keywords["NARROWPEAK"] = TokenType::NARROWPEAK;
     keywords["GFF3"] = TokenType::GFF3;
@@ -90,6 +91,9 @@ void Lexer::initKeywords() {
     keywords["EXCEPT"] = TokenType::EXCEPT;
     keywords["OVERLAPS"] = TokenType::OVERLAPS;
     keywords["NEAR"] = TokenType::NEAR;
+    keywords["CONSENSUS"] = TokenType::CONSENSUS;
+    keywords["ANCHOR"] = TokenType::ANCHOR;
+    keywords["MIN_SUPPORT"] = TokenType::MIN_SUPPORT;
 
     keywords["SIMILARITY"] = TokenType::SIMILARITY;
     keywords["REVERSE_COMPLEMENT"] = TokenType::REVERSE_COMPLEMENT;
@@ -417,6 +421,7 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::MINUS_LOG10_PVALUE: return "MINUS_LOG10_PVALUE";
         case TokenType::MINUS_LOG10_QVALUE: return "MINUS_LOG10_QVALUE";
         case TokenType::EVIDENCE_CLASS: return "EVIDENCE_CLASS";
+        case TokenType::SUPPORT_COUNT: return "SUPPORT_COUNT";
         case TokenType::BED: return "BED";
         case TokenType::NARROWPEAK: return "NARROWPEAK";
         case TokenType::GFF3: return "GFF3";
@@ -445,6 +450,9 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::EXCEPT: return "EXCEPT";
         case TokenType::OVERLAPS: return "OVERLAPS";
         case TokenType::NEAR: return "NEAR";
+        case TokenType::CONSENSUS: return "CONSENSUS";
+        case TokenType::ANCHOR: return "ANCHOR";
+        case TokenType::MIN_SUPPORT: return "MIN_SUPPORT";
         case TokenType::SIMILARITY: return "SIMILARITY";
         case TokenType::REVERSE_COMPLEMENT: return "REVERSE_COMPLEMENT";
         case TokenType::MATRIX: return "MATRIX";

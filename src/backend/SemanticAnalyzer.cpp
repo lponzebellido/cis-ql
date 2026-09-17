@@ -267,6 +267,43 @@ void SemanticAnalyzer::visit(ExtractStmtNode *node) {
 }
 
 void SemanticAnalyzer::visit(SetOpStmtNode *node) {
+  if (node->op == "CONSENSUS") {
+    const std::set<std::string> uniqueInputs(node->entities.begin(),
+                                             node->entities.end());
+    if (node->entities.size() < 2) {
+      reportError("CONSENSUS requires at least two input aliases.");
+    }
+    if (uniqueInputs.size() != node->entities.size()) {
+      reportError("CONSENSUS input aliases must be unique.");
+    }
+    if (!uniqueInputs.count(node->anchor)) {
+      reportError("CONSENSUS ANCHOR '" + node->anchor +
+                  "' must also appear in the input list.");
+    }
+    const unsigned long long minimumSupport =
+        std::strtoull(node->minimumSupport.c_str(), nullptr, 10);
+    if (minimumSupport < 2 || minimumSupport > uniqueInputs.size()) {
+      reportError("CONSENSUS MIN_SUPPORT must be between 2 and the number of "
+                  "distinct input sets.");
+    }
+    for (const auto &entity : node->entities) {
+      if (!symbolTable.lookup(entity)) {
+        reportError("CONSENSUS input alias '" + entity +
+                    "' is not defined.");
+      } else if (!isResultAlias(symbolTable, entity)) {
+        reportError("CONSENSUS requires region or motif-hit sets; '" + entity +
+                    "' has type " + symbolTable.typeOf(entity) + ".");
+      }
+    }
+    if (node->whereClause)
+      node->whereClause->accept(*this);
+    if (symbolTable.lookup(node->alias)) {
+      reportError("Alias '" + node->alias + "' is already defined.");
+    } else {
+      symbolTable.insert(node->alias, "RESULT_SET");
+    }
+    return;
+  }
   if (node->op == "NEAR") {
     const long double factor = node->distanceUnit == "MB" ? 1000000.0L
                                : node->distanceUnit == "KB" ? 1000.0L
@@ -366,7 +403,7 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
       "LENGTH", "SIMILARITY", "GC_CONTENT", "COUNT", "ID", "NAME",
       "TRACK_SCORE", "SIGNAL_VALUE", "MINUS_LOG10_PVALUE",
       "MINUS_LOG10_QVALUE", "EVIDENCE_CLASS", "ASSAY", "SAMPLE",
-      "CONDITION", "REPLICATE", "CONTROL"};
+      "CONDITION", "REPLICATE", "CONTROL", "SUPPORT_COUNT"};
   if (!supportedProperties.count(node->property)) {
     reportError("Unsupported condition property '" + node->property + "'.");
     return;
@@ -401,12 +438,14 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
     if (gc < 0 || gc > 100) {
       reportError("GC_CONTENT must be between 0 and 100.");
     }
-  } else if (node->property == "COUNT") {
+  } else if (node->property == "COUNT" ||
+             node->property == "SUPPORT_COUNT") {
     const double count = parseValue(node->value);
     if (!std::isfinite(count) || count < 0.0 || std::floor(count) != count ||
         node->value.find(' ') != std::string::npos ||
         (!node->value.empty() && node->value.front() == '"')) {
-      reportError("COUNT must be compared with a finite, non-negative whole "
+      reportError(node->property +
+                  " must be compared with a finite, non-negative whole "
                   "number without a unit.");
     }
   } else if (node->property == "TRACK_SCORE" ||

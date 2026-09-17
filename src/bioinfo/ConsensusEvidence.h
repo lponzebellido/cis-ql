@@ -1,0 +1,16 @@
+#ifndef CONSENSUS_EVIDENCE_H
+#define CONSENSUS_EVIDENCE_H
+
+#include <cstddef>
+#include <string>
+#include <vector>
+
+struct ConsensusEvidence {
+  bool present = false;
+  std::string anchorSet;
+  size_t minimumSupport = 0;
+  size_t observedSupport = 0;
+  std::vector<std::string> inputSets;
+};
+
+#endif

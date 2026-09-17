@@ -422,6 +422,26 @@ Using `OVERLAPS` between replicate peak sets reports coordinate-level
 concordance only. It is not an IDR calculation, does not account for replicate
 quality or control design, and is not a formal reproducibility test.
 
+Anchor-preserving coordinate consensus is implemented explicitly:
+
+```cql
+CONSENSUS FROM [binding_rep1, binding_rep2]
+  ANCHOR binding_rep1
+  MIN_SUPPORT 2
+  AS reproducible_binding
+  WHERE SUPPORT_COUNT >= 2;
+```
+
+The anchor must be one unique member of a list containing at least two named
+region sets. It supplies output coordinates and primary evidence and counts as
+one supporting set. Every other input contributes at most one support unit per
+anchor interval, while all of its overlapping observations remain auditable.
+`consensusEvidence` records the anchor, input aliases, minimum support, and
+observed support and remains attached when the consensus is later used as an
+`OVERLAPS` reference. `SUPPORT_COUNT` exposes observed support to `WHERE`.
+This operation deliberately does not merge peak geometry, infer replicate
+quality, or claim IDR-equivalent reproducibility.
+
 Still planned:
 
 - explicit genome-assembly identity and richer experimental design schemas;

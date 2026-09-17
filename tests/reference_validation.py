@@ -138,6 +138,27 @@ def count_overlaps_by_container(
     ]
 
 
+def anchor_consensus(
+    anchor: list[tuple[str, int, int]],
+    supporting_sets: list[list[tuple[str, int, int]]],
+    minimum_support: int,
+) -> list[tuple[tuple[str, int, int], int]]:
+    result = []
+    for interval in anchor:
+        observed_support = 1 + sum(
+            any(
+                interval[0] == candidate[0]
+                and interval[1] < candidate[2]
+                and interval[2] > candidate[1]
+                for candidate in support_set
+            )
+            for support_set in supporting_sets
+        )
+        if observed_support >= minimum_support:
+            result.append((interval, observed_support))
+    return result
+
+
 def define_homotypic_modules(
     sites: list[tuple[str, int, int, str]],
     minimum_spacing: int,
@@ -540,6 +561,55 @@ def main() -> int:
         require(observed_counts == expected_counts == [2, 0],
                 "COUNT differs from independent overlap aggregation")
         print("[ok] overlap counting by container")
+
+        (workspace / "replicate_one.bed").write_text(
+            "chr1\t0\t10\tanchor_one\t100\t.\n"
+            "chr1\t20\t30\tanchor_two\t100\t.\n",
+            encoding="utf-8",
+        )
+        (workspace / "replicate_two.bed").write_text(
+            "chr1\t1\t4\tr2_first_a\t100\t.\n"
+            "chr1\t5\t9\tr2_first_b\t100\t.\n"
+            "chr1\t21\t25\tr2_second\t100\t.\n",
+            encoding="utf-8",
+        )
+        (workspace / "replicate_three.bed").write_text(
+            "chr1\t6\t12\tr3_first\t100\t.\n",
+            encoding="utf-8",
+        )
+        consensus_data = run_query(
+            workspace,
+            "consensus_reference",
+            'LOAD TRACK "replicate_one.bed" FORMAT BED EVIDENCE BINDING '
+            'AS replicate_one;\n'
+            'LOAD TRACK "replicate_two.bed" FORMAT BED EVIDENCE BINDING '
+            'AS replicate_two;\n'
+            'LOAD TRACK "replicate_three.bed" FORMAT BED EVIDENCE BINDING '
+            'AS replicate_three;\n'
+            'CONSENSUS FROM [replicate_one, replicate_two, replicate_three] '
+            'ANCHOR replicate_one MIN_SUPPORT 3 AS strict_consensus;\n',
+        )
+        observed_consensus = consensus_data["resultSets"]["strict_consensus"]
+        expected_consensus = anchor_consensus(
+            [("chr1", 0, 10), ("chr1", 20, 30)],
+            [
+                [("chr1", 1, 4), ("chr1", 5, 9), ("chr1", 21, 25)],
+                [("chr1", 6, 12)],
+            ],
+            3,
+        )
+        require(
+            [
+                ((region["chr"], region["start"], region["end"]),
+                 region["consensusEvidence"]["observedSupport"])
+                for region in observed_consensus
+            ] == expected_consensus == [(('chr1', 0, 10), 3)] and
+            [item["referenceSet"] for item in
+             observed_consensus[0]["overlapEvidence"]]
+            == ["replicate_two", "replicate_two", "replicate_three"],
+            "CONSENSUS differs from independent distinct-set support count",
+        )
+        print("[ok] anchor-preserving distinct-set consensus")
 
         (workspace / "similarity.fasta").write_text(
             ">chr1\nACGTNNACGA\n", encoding="utf-8"

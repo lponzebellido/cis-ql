@@ -99,6 +99,23 @@ void ExtractStmtNode::print(std::string prefix, bool isLast) const {
 }
 
 void SetOpStmtNode::print(std::string prefix, bool isLast) const {
+    if (op == "CONSENSUS") {
+        std::cout << prefix << (isLast ? "└── " : "├── ")
+                  << "ConsensusStmt(From: [";
+        for (size_t index = 0; index < entities.size(); ++index) {
+            if (index > 0) std::cout << ", ";
+            std::cout << entities[index];
+        }
+        std::cout << "], Anchor: " << anchor
+                  << ", Minimum support: " << minimumSupport
+                  << ", AS: " << alias << ")" << std::endl;
+        if (whereClause) {
+            std::string childPrefix = prefix + (isLast ? "    " : "│   ");
+            std::cout << childPrefix << "└── Where:" << std::endl;
+            whereClause->print(childPrefix + "    ", true);
+        }
+        return;
+    }
     const std::string separator = op == "EXCEPT" ? " FROM "
                                   : op == "OVERLAPS" ? " WITH "
                                   : op == "NEAR" ? " TO " : " AND ";

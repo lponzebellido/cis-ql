@@ -160,6 +160,22 @@ Interpreter::serializeTrackEvidenceJSON(const TrackEvidence &track) const {
   return out.str();
 }
 
+std::string Interpreter::serializeConsensusEvidenceJSON(
+    const ConsensusEvidence &evidence) const {
+  std::ostringstream out;
+  out << "{\"anchorSet\":\"" << jsonEscape(evidence.anchorSet)
+      << "\",\"minimumSupport\":" << evidence.minimumSupport
+      << ",\"observedSupport\":" << evidence.observedSupport
+      << ",\"inputSets\":[";
+  for (size_t index = 0; index < evidence.inputSets.size(); ++index) {
+    if (index > 0)
+      out << ',';
+    out << '"' << jsonEscape(evidence.inputSets[index]) << '"';
+  }
+  out << "]}";
+  return out.str();
+}
+
 std::string Interpreter::serializeOverlapEvidenceJSON(
     const std::vector<OverlapEvidence> &evidence) const {
   std::ostringstream out;
@@ -178,6 +194,9 @@ std::string Interpreter::serializeOverlapEvidenceJSON(
     if (item.trackEvidence.present)
       out << ",\"trackEvidence\":"
           << serializeTrackEvidenceJSON(item.trackEvidence);
+    if (item.consensusEvidence.present)
+      out << ",\"consensusEvidence\":"
+          << serializeConsensusEvidenceJSON(item.consensusEvidence);
     if (!item.supportingEvidence.empty())
       out << ",\"supportingEvidence\":"
           << serializeOverlapEvidenceJSON(item.supportingEvidence);
@@ -268,6 +287,13 @@ void Interpreter::printRegions(const std::vector<GenomicRegion> &regions,
                 << r.countEvidence.relation << " "
                 << r.countEvidence.containerSet << ":" << r.countEvidence.count
                 << std::endl;
+    }
+    if (r.consensusEvidence.present) {
+      std::cout << "      CONSENSUS anchor:"
+                << r.consensusEvidence.anchorSet << " support:"
+                << r.consensusEvidence.observedSupport << "/"
+                << r.consensusEvidence.inputSets.size() << " required:"
+                << r.consensusEvidence.minimumSupport << std::endl;
     }
     if (r.trackEvidence.present) {
       std::cout << "      TRACK " << r.trackEvidence.trackAlias << " ("
@@ -664,6 +690,16 @@ void Interpreter::executeExport(const IRInstruction &instr) {
             << gffAttributeEscape(region.countEvidence.containerSet)
             << ";OverlapCount=" << region.countEvidence.count;
       }
+      if (region.consensusEvidence.present) {
+        const ConsensusEvidence &consensus = region.consensusEvidence;
+        out << ";ConsensusAnchorSet="
+            << gffAttributeEscape(consensus.anchorSet)
+            << ";ConsensusMinimumSupport=" << consensus.minimumSupport
+            << ";ConsensusObservedSupport=" << consensus.observedSupport
+            << ";ConsensusEvidenceJSON="
+            << gffAttributeEscape(
+                   serializeConsensusEvidenceJSON(consensus));
+      }
       if (region.moduleEvidence.present) {
         const ModuleEvidence &module = region.moduleEvidence;
         out << ";ModuleMinimumSpacing=" << module.minimumSpacing
@@ -776,7 +812,9 @@ void Interpreter::executeExport(const IRInstruction &instr) {
            "\tassay\tsample\tcondition\treplicate\tcontrol\ttrack_score"
            "\tsignal_value\ttrack_minus_log10_p_value"
            "\ttrack_minus_log10_q_value"
-           "\tpeak_offset\tpeak_position\toverlap_evidence_json\n";
+           "\tpeak_offset\tpeak_position\toverlap_evidence_json"
+           "\tconsensus_anchor_set\tconsensus_minimum_support"
+           "\tconsensus_observed_support\tconsensus_evidence_json\n";
     for (const auto &region : regionsIt->second) {
       out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
           << region.end << '\t' << cleanTabularField(region.strand) << '\t'
@@ -919,6 +957,16 @@ void Interpreter::executeExport(const IRInstruction &instr) {
       if (!region.overlapEvidence.empty())
         out << cleanTabularField(
             serializeOverlapEvidenceJSON(region.overlapEvidence));
+      out << '\t';
+      if (region.consensusEvidence.present) {
+        out << cleanTabularField(region.consensusEvidence.anchorSet) << '\t'
+            << region.consensusEvidence.minimumSupport << '\t'
+            << region.consensusEvidence.observedSupport << '\t'
+            << cleanTabularField(
+                   serializeConsensusEvidenceJSON(region.consensusEvidence));
+      } else {
+        out << "\t\t\t";
+      }
       out << '\n';
     }
   }
@@ -1419,6 +1467,12 @@ bool Interpreter::evaluateRegionCondition(
            compareValues(static_cast<double>(region.countEvidence.count),
                          condition->op, condition->value);
   }
+  if (condition->property == "SUPPORT_COUNT") {
+    return region.consensusEvidence.present &&
+           compareValues(
+               static_cast<double>(region.consensusEvidence.observedSupport),
+               condition->op, condition->value);
+  }
   if (condition->property == "TRACK_SCORE") {
     return region.trackEvidence.present && region.trackEvidence.hasScore &&
            compareValues(region.trackEvidence.score, condition->op,
@@ -1576,7 +1630,7 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
             {"LENGTH", "SIMILARITY", "GC_CONTENT", "COUNT", "ID", "NAME",
              "TRACK_SCORE", "SIGNAL_VALUE", "MINUS_LOG10_PVALUE",
              "MINUS_LOG10_QVALUE", "EVIDENCE_CLASS", "ASSAY", "SAMPLE",
-             "CONDITION", "REPLICATE", "CONTROL"})) {
+             "CONDITION", "REPLICATE", "CONTROL", "SUPPORT_COUNT"})) {
       reportRuntimeError("Unsupported condition for a genomic region set.");
       return;
     }
@@ -1760,6 +1814,32 @@ void Interpreter::executeSetOp(const IRInstruction &instr) {
   }
 
   resultSets[resultId] = result;
+}
+
+void Interpreter::executeConsensus(const IRInstruction &instr) {
+  const std::string &anchorSet = instr.arg1;
+  const size_t minimumSupport =
+      static_cast<size_t>(std::strtoull(instr.arg2.c_str(), nullptr, 10));
+  const std::vector<GenomicRegion> anchor = resolveEntity(anchorSet);
+  std::vector<std::pair<std::string, std::vector<GenomicRegion>>> supportSets;
+  for (const auto &inputSet : instr.listArgs) {
+    if (inputSet != anchorSet)
+      supportSets.push_back({inputSet, resolveEntity(inputSet)});
+  }
+
+  if (debugMode) {
+    std::cout << "> CONSENSUS FROM [";
+    for (size_t index = 0; index < instr.listArgs.size(); ++index) {
+      if (index > 0)
+        std::cout << ", ";
+      std::cout << instr.listArgs[index];
+    }
+    std::cout << "] ANCHOR " << anchorSet << " MIN_SUPPORT "
+              << minimumSupport << std::endl;
+  }
+
+  resultSets[instr.arg3] = SetOperations::consensus(
+      anchor, anchorSet, supportSets, instr.listArgs, minimumSupport);
 }
 
 void Interpreter::executeCountOverlaps(const IRInstruction &instr) {
@@ -2368,6 +2448,10 @@ void Interpreter::dumpResultsJSON() const {
             << "          \"count\": " << r.countEvidence.count << "\n"
             << "        }";
       }
+      if (r.consensusEvidence.present) {
+        out << ",\n        \"consensusEvidence\": "
+            << serializeConsensusEvidenceJSON(r.consensusEvidence);
+      }
       if (r.trackEvidence.present) {
         out << ",\n        \"trackEvidence\": "
             << serializeTrackEvidenceJSON(r.trackEvidence);
@@ -2638,6 +2722,9 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
     case IROpCode::SET_OVERLAPS:
     case IROpCode::SET_NEAR:
       executeSetOp(instr);
+      break;
+    case IROpCode::SET_CONSENSUS:
+      executeConsensus(instr);
       break;
     case IROpCode::COUNT_OVERLAPS:
       executeCountOverlaps(instr);

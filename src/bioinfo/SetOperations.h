@@ -2,6 +2,8 @@
 #define SET_OPERATIONS_H
 
 #include "GenomicRegion.h"
+#include <string>
+#include <utility>
 #include <vector>
 
 class SetOperations {
@@ -16,6 +18,12 @@ public:
       const std::vector<GenomicRegion> &query,
       const std::vector<GenomicRegion> &reference,
       const std::string &referenceSet = "");
+  static std::vector<GenomicRegion> consensus(
+      const std::vector<GenomicRegion> &anchor,
+      const std::string &anchorSet,
+      const std::vector<std::pair<std::string, std::vector<GenomicRegion>>>
+          &supportSets,
+      const std::vector<std::string> &inputSets, size_t minimumSupport);
   static std::vector<GenomicRegion> selectNear(
       const std::vector<GenomicRegion> &query,
       const std::vector<GenomicRegion> &reference,

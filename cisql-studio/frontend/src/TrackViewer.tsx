@@ -62,6 +62,13 @@ interface CountEvidence {
   count: number;
 }
 
+interface ConsensusEvidence {
+  anchorSet: string;
+  minimumSupport: number;
+  observedSupport: number;
+  inputSets: string[];
+}
+
 interface TrackEvidence {
   trackAlias: string;
   source: string;
@@ -91,6 +98,7 @@ interface OverlapEvidence {
     name: string;
   };
   trackEvidence?: TrackEvidence;
+  consensusEvidence?: ConsensusEvidence;
   supportingEvidence?: OverlapEvidence[];
 }
 
@@ -123,6 +131,7 @@ interface GenomicRegion {
   motifEvidence?: MotifEvidence;
   spatialRelation?: SpatialRelation;
   countEvidence?: CountEvidence;
+  consensusEvidence?: ConsensusEvidence;
   moduleEvidence?: ModuleEvidence;
   trackEvidence?: TrackEvidence;
   overlapEvidence?: OverlapEvidence[];
@@ -679,6 +688,12 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                   <br /><span className="tt-label">Counted set:</span> {hoveredRegion.countEvidence.countedSet}
                 </>
               )}
+              {hoveredRegion.consensusEvidence && (
+                <>
+                  <br /><span className="tt-label">Consensus:</span> {hoveredRegion.consensusEvidence.observedSupport}/{hoveredRegion.consensusEvidence.inputSets.length} sets (minimum {hoveredRegion.consensusEvidence.minimumSupport})
+                  <br /><span className="tt-label">Anchor:</span> {hoveredRegion.consensusEvidence.anchorSet}
+                </>
+              )}
               {hoveredRegion.trackEvidence && (
                 <>
                   <br /><span className="tt-label">Track:</span> {hoveredRegion.trackEvidence.trackAlias} ({hoveredRegion.trackEvidence.format})
@@ -839,6 +854,16 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                   </div>
                 </>
               )}
+              {selectedRegion.consensusEvidence && (
+                <div className="detail-field">
+                  <span className="detail-label">Coordinate consensus</span>
+                  <span className="detail-value">
+                    {selectedRegion.consensusEvidence.observedSupport}/{selectedRegion.consensusEvidence.inputSets.length} supporting sets · minimum {selectedRegion.consensusEvidence.minimumSupport}<br />
+                    anchor {selectedRegion.consensusEvidence.anchorSet}<br />
+                    {selectedRegion.consensusEvidence.inputSets.join(', ')}
+                  </span>
+                </div>
+              )}
               {selectedRegion.overlapEvidence && selectedRegion.overlapEvidence.length > 0 && (
                 <div className="detail-field">
                   <span className="detail-label">Overlap evidence</span>
@@ -850,6 +875,7 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                         {item.trackEvidence?.condition ? ` · condition ${item.trackEvidence.condition}` : ''}
                         {item.trackEvidence?.replicate ? ` · replicate ${item.trackEvidence.replicate}` : ''}
                         {item.trackEvidence?.control ? ` · control ${item.trackEvidence.control}` : ''}
+                        {item.consensusEvidence ? ` · consensus ${item.consensusEvidence.observedSupport}/${item.consensusEvidence.inputSets.length} (minimum ${item.consensusEvidence.minimumSupport})` : ''}
                         {item.supportingEvidence?.map((support, supportIndex) => (
                           <span key={`${support.referenceSet}-${support.reference.chr}-${support.reference.start}-${supportIndex}`} style={{ display: 'block', paddingLeft: 12 }}>
                             ↳ {support.referenceSet}: {support.reference.name || support.reference.type}

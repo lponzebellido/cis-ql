@@ -4,6 +4,7 @@
 #include "MotifEvidence.h"
 #include "SpatialRelationEvidence.h"
 #include "CountEvidence.h"
+#include "ConsensusEvidence.h"
 #include "ModuleEvidence.h"
 #include "OverlapEvidence.h"
 #include "TrackEvidence.h"
@@ -22,6 +23,7 @@ struct GenomicRegion {
   MotifEvidence motifEvidence;
   SpatialRelationEvidence spatialRelation;
   CountEvidence countEvidence;
+  ConsensusEvidence consensusEvidence;
   ModuleEvidence moduleEvidence;
   TrackEvidence trackEvidence;
   std::vector<OverlapEvidence> overlapEvidence;

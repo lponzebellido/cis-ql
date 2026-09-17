@@ -400,11 +400,63 @@ std::vector<GenomicRegion> SetOperations::selectOverlapping(
       evidence.referenceType = referenceRegion.type;
       evidence.referenceName = referenceRegion.name;
       evidence.trackEvidence = referenceRegion.trackEvidence;
+      evidence.consensusEvidence = referenceRegion.consensusEvidence;
       evidence.supportingEvidence = referenceRegion.overlapEvidence;
       selected.overlapEvidence.push_back(std::move(evidence));
     }
     if (!matches.empty())
       result.push_back(std::move(selected));
+  }
+  return result;
+}
+
+std::vector<GenomicRegion> SetOperations::consensus(
+    const std::vector<GenomicRegion> &anchor, const std::string &anchorSet,
+    const std::vector<std::pair<std::string, std::vector<GenomicRegion>>>
+        &supportSets,
+    const std::vector<std::string> &inputSets, size_t minimumSupport) {
+  std::vector<GenomicRegion> candidates = anchor;
+  std::vector<size_t> observedSupport(anchor.size(), 1);
+
+  const auto sameAnchor = [](const GenomicRegion &left,
+                             const GenomicRegion &right) {
+    return left.chr == right.chr && left.start == right.start &&
+           left.end == right.end && left.strand == right.strand &&
+           left.type == right.type && left.name == right.name;
+  };
+
+  for (const auto &supportSet : supportSets) {
+    const std::vector<GenomicRegion> supported = selectOverlapping(
+        anchor, supportSet.second, supportSet.first);
+    size_t supportedIndex = 0;
+    for (size_t anchorIndex = 0;
+         anchorIndex < anchor.size() && supportedIndex < supported.size();
+         ++anchorIndex) {
+      if (!sameAnchor(anchor[anchorIndex], supported[supportedIndex]))
+        continue;
+      ++observedSupport[anchorIndex];
+      const size_t inheritedEvidence =
+          anchor[anchorIndex].overlapEvidence.size();
+      candidates[anchorIndex].overlapEvidence.insert(
+          candidates[anchorIndex].overlapEvidence.end(),
+          supported[supportedIndex].overlapEvidence.begin() +
+              inheritedEvidence,
+          supported[supportedIndex].overlapEvidence.end());
+      ++supportedIndex;
+    }
+  }
+
+  std::vector<GenomicRegion> result;
+  for (size_t index = 0; index < candidates.size(); ++index) {
+    if (observedSupport[index] < minimumSupport)
+      continue;
+    candidates[index].consensusEvidence.present = true;
+    candidates[index].consensusEvidence.anchorSet = anchorSet;
+    candidates[index].consensusEvidence.minimumSupport = minimumSupport;
+    candidates[index].consensusEvidence.observedSupport =
+        observedSupport[index];
+    candidates[index].consensusEvidence.inputSets = inputSets;
+    result.push_back(std::move(candidates[index]));
   }
   return result;
 }

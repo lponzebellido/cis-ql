@@ -63,6 +63,8 @@ private:
   std::string stripQuotes(const std::string &s) const;
   std::string jsonEscape(const std::string &s) const;
   std::string serializeTrackEvidenceJSON(const TrackEvidence &track) const;
+  std::string serializeConsensusEvidenceJSON(
+      const ConsensusEvidence &evidence) const;
   std::string serializeOverlapEvidenceJSON(
       const std::vector<OverlapEvidence> &evidence) const;
   void reportRuntimeError(const std::string &message);
@@ -93,6 +95,7 @@ private:
   void executeFilterSimilarity(const IRInstruction &instr);
   void executeFilterCondition(const IRInstruction &instr);
   void executeSetOp(const IRInstruction &instr);
+  void executeConsensus(const IRInstruction &instr);
   void executeCountOverlaps(const IRInstruction &instr);
   void executePrint(const IRInstruction &instr);
   void executeLoadMatrix(const IRInstruction &instr);

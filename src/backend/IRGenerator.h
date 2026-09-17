@@ -40,6 +40,7 @@ enum class IROpCode {
   SET_EXCEPT,
   SET_OVERLAPS,
   SET_NEAR,
+  SET_CONSENSUS,
   COUNT_OVERLAPS,
   PRINT_RESULTS,
   LOAD_MATRIX,
@@ -70,6 +71,7 @@ struct IRInstruction {
   std::string arg7;
   std::string arg8;
   std::string arg9;
+  std::vector<std::string> listArgs;
   std::shared_ptr<IRCondition> condition;
 };
 

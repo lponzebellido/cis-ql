@@ -167,7 +167,7 @@ ANALYZE GC_CONTENT WINDOW 1 KB AS gc_profile;
 ANALYZE CPG_ISLANDS AS cpg_islands;
 ```
 
-### 5. Interval Operations (`INTERSECT`, `UNION`, `EXCEPT`, `OVERLAPS`, `NEAR`)
+### 5. Interval Operations (`INTERSECT`, `UNION`, `EXCEPT`, `OVERLAPS`, `NEAR`, `CONSENSUS`)
 
 Combine or filter interval sets using high-speed interval algebra:
 
@@ -176,6 +176,9 @@ OVERLAPS supported_myb_sites WITH candidate_promoters AS promoter_myb_sites;
 NEAR supported_myb_sites TO GENE WITHIN 2 KB AS proximal_gene_candidates;
 COUNT supported_myb_sites IN candidate_promoters AS promoter_site_counts;
 EXTRACT promoter_site_counts AS supported_promoters WHERE COUNT >= 1;
+
+CONSENSUS FROM [binding_rep1, binding_rep2]
+    ANCHOR binding_rep1 MIN_SUPPORT 2 AS reproducible_binding;
 ```
 
 `INTERSECT` emits the clipped overlap geometry. `OVERLAPS query WITH reference`
@@ -188,6 +191,15 @@ attached. If that reference was itself supported by an earlier `OVERLAPS`,
 its prior evidence is retained recursively as `supportingEvidence`; this
 preserves the provenance path without claiming that a transitive relationship
 is a direct overlap.
+
+`CONSENSUS FROM [sets] ANCHOR set MIN_SUPPORT n` retains complete intervals
+from the named anchor when they overlap records from enough distinct input
+sets. The anchor itself contributes one unit of support; each other set
+contributes at most one, regardless of how many of its records overlap. The
+result records the requested and observed support, all input aliases, every
+matching observation, and the anchor geometry. `SUPPORT_COUNT` makes the
+observed number queryable in `WHERE`. This is coordinate-level concordance,
+not IDR or a statistical reproducibility test.
 
 `NEAR query TO reference WITHIN distance` also preserves each complete query
 record, but retains it only when its nearest same-chromosome reference is no
@@ -263,6 +275,8 @@ Metadata uses exact string equality. These properties filter the primary
 track; filter a reference track before combining it with `OVERLAPS`. Motif
 results support `LENGTH` and `GC_CONTENT`; GC profiles support `GC_CONTENT`.
 `IF` currently evaluates the GC content of the active sequence dataset.
+Regions emitted by `CONSENSUS` additionally support the non-negative integer
+property `SUPPORT_COUNT`.
 
 These filters do not calibrate experimental evidence. BED/narrowPeak scores
 and `signalValue` remain upstream-tool-specific, so thresholds require an
@@ -315,7 +329,8 @@ StatementList      ::= Statement StatementList | λ
 
 Statement          ::= LoadStmt | UseStmt | ExportStmt | FindStmt | ExtractStmt
                      | DefinePromotersStmt | DefineModuleStmt
-                     | SetOperationStmt | CountStmt | ScanStmt | AnalyzeStmt
+                     | SetOperationStmt | ConsensusStmt | CountStmt
+                     | ScanStmt | AnalyzeStmt
                      | IfStmt | ForeachStmt
 
 LoadStmt           ::= LOAD (SEQUENCE | ANNOTATION | MATRIX) STRING AS ID SEMICOLON
@@ -357,6 +372,9 @@ SetOperationStmt   ::= (INTERSECT | UNION) EntityRef AND EntityRef AliasOpt Wher
                      | NEAR EntityRef TO EntityRef WITHIN
                          (NUM | FLOAT) RequiredUnit AliasOpt WhereClause SEMICOLON
 
+ConsensusStmt      ::= CONSENSUS FROM "[" ID ("," ID)+ "]"
+                       ANCHOR ID MIN_SUPPORT NUM AS ID WhereClause SEMICOLON
+
 CountStmt          ::= COUNT EntityRef IN EntityRef AS ID WhereClause SEMICOLON
 
 ExtractStmt        ::= EXTRACT EntityRef AliasOpt WhereClause SEMICOLON
@@ -378,6 +396,7 @@ Factor             ::= NOT Factor | SimpleCondition | "(" Condition ")"
 SimpleCondition    ::= Property RelOp Value
                      | SIMILARITY SimilarityRefOpt RelOp Value
 Property           ::= LENGTH | GC_CONTENT | COUNT | ID | NAME
+                     | SUPPORT_COUNT
                      | TRACK_SCORE | SIGNAL_VALUE
                      | MINUS_LOG10_PVALUE | MINUS_LOG10_QVALUE
                      | EVIDENCE_CLASS | ASSAY | SAMPLE | CONDITION
@@ -447,7 +466,7 @@ The regulatory progression and its expected outputs are described in
 | `08_integrated_anthocyanin_query.cql` | Connect the complete evidence path | promoters, calibrated sites, modules, counts, candidate links |
 | `09_accessible_myb_evidence.cql` | Combine imported accessibility peaks with motif support | narrowPeak provenance, `COUNT`, `NEAR` |
 | `10_accessible_bound_myb_candidates.cql` | Combine filtered accessibility, binding, motif, and proximity | track-evidence `WHERE`, multi-track `overlapEvidence`, `COUNT`, `NEAR` |
-| `11_replicate_supported_candidates.cql` | Require coordinate-level support from two binding replicates | structured condition/replicate/control metadata, nested evidence provenance |
+| `11_replicate_supported_candidates.cql` | Require coordinate-level support from two binding replicates | `CONSENSUS`, `MIN_SUPPORT`, structured experimental provenance |
 
 ---
 
