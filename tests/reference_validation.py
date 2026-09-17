@@ -142,6 +142,7 @@ def anchor_consensus(
     anchor: list[tuple[str, int, int]],
     supporting_sets: list[list[tuple[str, int, int]]],
     minimum_support: int,
+    minimum_reciprocal_overlap_percent: float = 0.0,
 ) -> list[tuple[tuple[str, int, int], int]]:
     result = []
     for interval in anchor:
@@ -150,6 +151,16 @@ def anchor_consensus(
                 interval[0] == candidate[0]
                 and interval[1] < candidate[2]
                 and interval[2] > candidate[1]
+                and (
+                    min(interval[2], candidate[2])
+                    - max(interval[1], candidate[1])
+                ) / (interval[2] - interval[1]) * 100
+                >= minimum_reciprocal_overlap_percent
+                and (
+                    min(interval[2], candidate[2])
+                    - max(interval[1], candidate[1])
+                ) / (candidate[2] - candidate[1]) * 100
+                >= minimum_reciprocal_overlap_percent
                 for candidate in support_set
             )
             for support_set in supporting_sets
@@ -568,13 +579,14 @@ def main() -> int:
             encoding="utf-8",
         )
         (workspace / "replicate_two.bed").write_text(
-            "chr1\t1\t4\tr2_first_a\t100\t.\n"
-            "chr1\t5\t9\tr2_first_b\t100\t.\n"
-            "chr1\t21\t25\tr2_second\t100\t.\n",
+            "chr1\t1\t9\tr2_first_a\t100\t.\n"
+            "chr1\t2\t8\tr2_first_b\t100\t.\n"
+            "chr1\t21\t29\tr2_second\t100\t.\n",
             encoding="utf-8",
         )
         (workspace / "replicate_three.bed").write_text(
-            "chr1\t6\t12\tr3_first\t100\t.\n",
+            "chr1\t2\t10\tr3_first\t100\t.\n"
+            "chr1\t29\t35\tr3_marginal\t100\t.\n",
             encoding="utf-8",
         )
         consensus_data = run_query(
@@ -587,18 +599,31 @@ def main() -> int:
             'LOAD TRACK "replicate_three.bed" FORMAT BED EVIDENCE BINDING '
             'AS replicate_three;\n'
             'CONSENSUS FROM [replicate_one, replicate_two, replicate_three] '
-            'ANCHOR replicate_one MIN_SUPPORT 3 AS strict_consensus;\n',
+            'ANCHOR replicate_one MIN_SUPPORT 3 AS permissive_consensus;\n'
+            'CONSENSUS FROM [replicate_one, replicate_two, replicate_three] '
+            'ANCHOR replicate_one MIN_SUPPORT 3 '
+            'MIN_RECIPROCAL_OVERLAP 50 % AS strict_consensus;\n',
         )
+        permissive_consensus = consensus_data["resultSets"][
+            "permissive_consensus"
+        ]
         observed_consensus = consensus_data["resultSets"]["strict_consensus"]
         expected_consensus = anchor_consensus(
             [("chr1", 0, 10), ("chr1", 20, 30)],
             [
-                [("chr1", 1, 4), ("chr1", 5, 9), ("chr1", 21, 25)],
-                [("chr1", 6, 12)],
+                [("chr1", 1, 9), ("chr1", 2, 8), ("chr1", 21, 29)],
+                [("chr1", 2, 10), ("chr1", 29, 35)],
             ],
             3,
+            50.0,
         )
         require(
+            [
+                (region["chr"], region["start"], region["end"])
+                for region in permissive_consensus
+            ] == [("chr1", 0, 10), ("chr1", 20, 30)] and
+            "minimumReciprocalOverlapPercent"
+            not in permissive_consensus[0]["consensusEvidence"] and
             [
                 ((region["chr"], region["start"], region["end"]),
                  region["consensusEvidence"]["observedSupport"])
@@ -606,10 +631,12 @@ def main() -> int:
             ] == expected_consensus == [(('chr1', 0, 10), 3)] and
             [item["referenceSet"] for item in
              observed_consensus[0]["overlapEvidence"]]
-            == ["replicate_two", "replicate_two", "replicate_three"],
-            "CONSENSUS differs from independent distinct-set support count",
+            == ["replicate_two", "replicate_two", "replicate_three"] and
+            observed_consensus[0]["consensusEvidence"]
+                ["minimumReciprocalOverlapPercent"] == 50,
+            "CONSENSUS differs from independent reciprocal-overlap reference",
         )
-        print("[ok] anchor-preserving distinct-set consensus")
+        print("[ok] reciprocal-overlap, anchor-preserving consensus")
 
         (workspace / "similarity.fasta").write_text(
             ">chr1\nACGTNNACGA\n", encoding="utf-8"

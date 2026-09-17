@@ -279,7 +279,8 @@ std::vector<GenomicRegion> SetOperations::selectNear(
 std::vector<GenomicRegion> SetOperations::selectOverlapping(
     const std::vector<GenomicRegion> &query,
     const std::vector<GenomicRegion> &reference,
-    const std::string &referenceSet) {
+    const std::string &referenceSet,
+    double minimumReciprocalOverlapPercent) {
   const auto referenceOrder = [](const GenomicRegion *left,
                                  const GenomicRegion *right) {
     if (left->start != right->start)
@@ -387,6 +388,27 @@ std::vector<GenomicRegion> SetOperations::selectOverlapping(
     std::vector<const GenomicRegion *> matches;
     collectOverlaps(chromosome->second.get(), region.start, region.end,
                     matches);
+    if (minimumReciprocalOverlapPercent > 0.0) {
+      const double minimumFraction =
+          minimumReciprocalOverlapPercent / 100.0;
+      matches.erase(
+          std::remove_if(
+              matches.begin(), matches.end(),
+              [&region, minimumFraction](const GenomicRegion *candidate) {
+                const size_t overlapStart =
+                    std::max(region.start, candidate->start);
+                const size_t overlapEnd = std::min(region.end, candidate->end);
+                const double overlapLength =
+                    static_cast<double>(overlapEnd - overlapStart);
+                const double queryFraction =
+                    overlapLength / static_cast<double>(region.length());
+                const double referenceFraction =
+                    overlapLength / static_cast<double>(candidate->length());
+                return queryFraction < minimumFraction ||
+                       referenceFraction < minimumFraction;
+              }),
+          matches.end());
+    }
     std::sort(matches.begin(), matches.end(), referenceOrder);
     GenomicRegion selected = region;
     for (const auto *candidate : matches) {
@@ -414,7 +436,8 @@ std::vector<GenomicRegion> SetOperations::consensus(
     const std::vector<GenomicRegion> &anchor, const std::string &anchorSet,
     const std::vector<std::pair<std::string, std::vector<GenomicRegion>>>
         &supportSets,
-    const std::vector<std::string> &inputSets, size_t minimumSupport) {
+    const std::vector<std::string> &inputSets, size_t minimumSupport,
+    double minimumReciprocalOverlapPercent) {
   std::vector<GenomicRegion> candidates = anchor;
   std::vector<size_t> observedSupport(anchor.size(), 1);
 
@@ -427,7 +450,8 @@ std::vector<GenomicRegion> SetOperations::consensus(
 
   for (const auto &supportSet : supportSets) {
     const std::vector<GenomicRegion> supported = selectOverlapping(
-        anchor, supportSet.second, supportSet.first);
+        anchor, supportSet.second, supportSet.first,
+        minimumReciprocalOverlapPercent);
     size_t supportedIndex = 0;
     for (size_t anchorIndex = 0;
          anchorIndex < anchor.size() && supportedIndex < supported.size();
@@ -455,6 +479,11 @@ std::vector<GenomicRegion> SetOperations::consensus(
     candidates[index].consensusEvidence.minimumSupport = minimumSupport;
     candidates[index].consensusEvidence.observedSupport =
         observedSupport[index];
+    if (minimumReciprocalOverlapPercent > 0.0) {
+      candidates[index].consensusEvidence.hasMinimumReciprocalOverlap = true;
+      candidates[index].consensusEvidence.minimumReciprocalOverlapPercent =
+          minimumReciprocalOverlapPercent;
+    }
     candidates[index].consensusEvidence.inputSets = inputSets;
     result.push_back(std::move(candidates[index]));
   }

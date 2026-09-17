@@ -1,51 +1,73 @@
-# Cis-QL: Cis-Regulatory Query Language & Studio
+# Cis-QL: a query language for cis-regulatory analysis
 
-**Cis-QL** is a specialized Domain-Specific Language (DSL) and desktop environment engineered for bioinformatics, computational genomics, and cis-regulatory element discovery. Built on a native C++11 core, it enables researchers to search, filter, extract, and manipulate genomic regions, regulatory motifs, and sequence features using a human-readable, declarative syntax.
+Cis-QL is an experimental domain-specific language for describing
+cis-regulatory analyses as readable, executable queries. A `.cql` program
+names its sequence, annotation, motif models, and experimental tracks, then
+states how their evidence should be related: inside a promoter, overlapping an
+accessible region, supported across replicates, arranged as a motif module, or
+near a possible target gene.
 
----
+The project is motivated by a practical problem. These questions are usually
+spread across interval commands, motif-scanning tools, short scripts, and
+manually interpreted tables. Cis-QL makes the regulatory relationships part
+of the program and carries their provenance into the result. The goal is not
+to replace established upstream tools, but to provide a compact language for
+the evidence-integration step between their outputs and a testable regulatory
+hypothesis.
 
-## Overview & Purpose
+The command-line interpreter is written in C++11. Cis-QL Studio adds a desktop
+editor and result viewer, but `.cql` files do not depend on the graphical
+interface.
 
-Identifying cis-regulatory elements (such as promoters, enhancers, and transcription factor binding sites) often involves coordinating command-line utilities or custom scripts. Cis-QL explores whether a single declarative syntax can make a subset of these workflows shorter and easier to reproduce.
+## What the language does today
 
-**Cis-QL provides a unified, declarative interface.** The C++ execution engine currently handles FASTA and GFF3 parsing, motif and matrix scanning, bounded spatial searches, local alignment, and interval arithmetic.
+The current implementation reads FASTA sequences, GFF3 annotations, JASPAR
+frequency matrices, and BED or narrowPeak tracks. It can derive strand-aware
+promoters, find literal or IUPAC sequence patterns, scan PWMs with explicit
+background and multiple-testing metadata, combine genomic intervals, describe
+two-site motif modules, count support, select nearby features, and build
+anchor-preserving consensus sets across experimental tracks. Results can be
+inspected as structured JSON and exported to BED, GFF3, or TSV.
 
----
+A typical query has this shape:
 
-## What Problems Does Cis-QL Solve?
+```sql
+LOAD SEQUENCE "genome.fasta" AS genome;
+LOAD ANNOTATION "genes.gff3" AS annotation;
+LOAD MATRIX "tf_model.pwm" AS tf_model;
+LOAD TRACK "binding_rep1.narrowPeak" FORMAT NARROWPEAK
+    EVIDENCE BINDING REPLICATE "R1" AS binding_rep1;
+LOAD TRACK "binding_rep2.narrowPeak" FORMAT NARROWPEAK
+    EVIDENCE BINDING REPLICATE "R2" AS binding_rep2;
 
-- **Transcription Factor Binding Site Discovery:** Integrates Position Weight Matrices (PWMs) from standard databases (such as JASPAR) to identify TF binding sites using probabilistic log-odds scoring rather than rigid exact matching.
-- **Metagenomic Bioprospecting:** Enables *de novo* motif and open reading frame (ORF) discovery on raw, unannotated FASTA contigs from environmental samples lacking curated GFF3 annotations.
-- **Spatial Relative Queries:** Simplifies relative proximity searches (e.g., locating specific consensus motifs within designated base-pair windows upstream or downstream of coding sequences).
-- **Pipeline Unification & Reproducibility:** Condenses multi-step bioinformatic shell workflows into concise, shareable, and self-documenting query scripts.
+EXTRACT GENE AS candidate_genes WHERE ID = "candidate_1";
+DEFINE PROMOTERS OF candidate_genes FROM TSS
+    UPSTREAM 1000 BP DOWNSTREAM 100 BP AS candidate_promoters;
+SCAN tf_model IN candidate_promoters BACKGROUND FROM genome
+    QVALUE <= 0.01 AS promoter_sites;
+CONSENSUS FROM [binding_rep1, binding_rep2]
+    ANCHOR binding_rep1 MIN_SUPPORT 2
+    MIN_RECIPROCAL_OVERLAP 50 % AS reproducible_binding;
+OVERLAPS reproducible_binding WITH promoter_sites AS supported_binding;
+```
 
----
+The filenames and biological choices in that fragment are intentionally
+generic. Cis-QL does not encode a particular pathway, transcription-factor
+family, organism, or assay. The repository's progressive examples use an
+anthocyanin/MBW-inspired synthetic locus because it exercises promoter,
+enhancer, motif, accessibility, binding, and replicate evidence in one small
+case. The same grammar can express analogous hypotheses in other regulatory
+systems when supplied with appropriate models, annotations, tracks, and
+domain-specific assumptions.
 
-## Primary Operational Modes
+## Project status and boundaries
 
-Cis-QL operates across three primary modes:
-
-1. **Annotation-Driven Analysis:** Queries established `GFF3` annotation files to analyze known genes, exons, CDS, and regulatory features.
-2. **De Novo Discovery Mode:** Constructs a virtual annotation layer in memory directly from raw `.fasta` sequence data using literal strings, IUPAC ambiguity codes, or Regular Expressions.
-3. **Probabilistic PWM Scanning:** Scans sequences using Position Weight Matrices with log-odds PSSM scoring, normalizing thresholds across each matrix's attainable score range.
-
----
-
-## Key Technical Features
-
-- **Native IUPAC Degeneration Engine:** Translates IUPAC nucleotide ambiguity codes (`R`, `Y`, `S`, `W`, `K`, `M`, `B`, `D`, `H`, `V`, `N`) automatically into regular expression search patterns (e.g., `TATAWAW` translates to `TATA[AT]A[AT]`).
-- **Multi-Chromosome Scanning:** Uses `std::async` to scan loaded contigs independently. Performance depends on contig count, input size, and the host implementation.
-- **Regulatory Interval Queries:** Supports geometric interval algebra, directional `OVERLAPS`, evidence-preserving nearest-feature selection, and per-region overlap counts with explicit provenance.
-- **Experimental Track Import:** Loads BED and narrowPeak intervals as named
-  regulatory tracks while preserving scores, signal values, supplied
-  significance fields, summit positions, and source provenance.
-- **Pairwise Smith-Waterman Local Alignment:** Computes a normalized local-alignment score in C++. `SIMILARITY TO alias` requires an explicit one-region reference set. The older implicit-reference form remains available for compatibility.
-- **Explicit Dataset Context:** Multiple FASTA and GFF3 datasets can be loaded and selected deterministically with `USE SEQUENCE` and `USE ANNOTATION`.
-- **Standard Result Export:** Named region sets can be written as BED, GFF3, or TSV; GC profiles can be written as TSV.
-- **Control Flow & Scripting (v2.0):** Supports conditional execution (`IF / ELSE`) based on sequence metrics and batch iteration (`FOREACH`) over matrix collections.
-- **Cis-QL Studio (GUI):** Desktop environment built with Electron and React 18 for interactive query authoring, multi-track genomic visualization, and live result inspection.
-
----
+Cis-QL is a research prototype, not a complete genomics platform. It does not
+align reads, call peaks, infer enhancers, perform IDR, prove a target-gene
+relationship, or decide whether a PWM and threshold are biologically suitable.
+Those choices remain explicit inputs to the analysis. The value of the
+language is that they can be stated, reviewed, rerun, and exported together
+instead of disappearing inside an ad hoc pipeline.
 
 ## Compilation and Execution
 
@@ -178,7 +200,8 @@ COUNT supported_myb_sites IN candidate_promoters AS promoter_site_counts;
 EXTRACT promoter_site_counts AS supported_promoters WHERE COUNT >= 1;
 
 CONSENSUS FROM [binding_rep1, binding_rep2]
-    ANCHOR binding_rep1 MIN_SUPPORT 2 AS reproducible_binding;
+    ANCHOR binding_rep1 MIN_SUPPORT 2
+    MIN_RECIPROCAL_OVERLAP 50 % AS reproducible_binding;
 ```
 
 `INTERSECT` emits the clipped overlap geometry. `OVERLAPS query WITH reference`
@@ -196,10 +219,13 @@ is a direct overlap.
 from the named anchor when they overlap records from enough distinct input
 sets. The anchor itself contributes one unit of support; each other set
 contributes at most one, regardless of how many of its records overlap. The
-result records the requested and observed support, all input aliases, every
-matching observation, and the anchor geometry. `SUPPORT_COUNT` makes the
-observed number queryable in `WHERE`. This is coordinate-level concordance,
-not IDR or a statistical reproducibility test.
+optional `MIN_RECIPROCAL_OVERLAP p %` clause requires each accepted match to
+cover at least `p` percent of both the anchor interval and the supporting
+interval, preventing a marginal one-base overlap from counting as replicate
+support. The result records the criterion, requested and observed support, all
+input aliases, every matching observation, and the anchor geometry.
+`SUPPORT_COUNT` makes the observed number queryable in `WHERE`. This remains
+coordinate-level concordance, not IDR or a statistical reproducibility test.
 
 `NEAR query TO reference WITHIN distance` also preserves each complete query
 record, but retains it only when its nearest same-chromosome reference is no
@@ -373,7 +399,9 @@ SetOperationStmt   ::= (INTERSECT | UNION) EntityRef AND EntityRef AliasOpt Wher
                          (NUM | FLOAT) RequiredUnit AliasOpt WhereClause SEMICOLON
 
 ConsensusStmt      ::= CONSENSUS FROM "[" ID ("," ID)+ "]"
-                       ANCHOR ID MIN_SUPPORT NUM AS ID WhereClause SEMICOLON
+                       ANCHOR ID MIN_SUPPORT NUM
+                       (MIN_RECIPROCAL_OVERLAP (NUM | FLOAT) PERCENT)?
+                       AS ID WhereClause SEMICOLON
 
 CountStmt          ::= COUNT EntityRef IN EntityRef AS ID WhereClause SEMICOLON
 
@@ -447,9 +475,12 @@ requirements needed before reporting external benchmark results.
 
 ## Curated Examples Suite (`cql_examples/`)
 
-The repository includes eleven `.cql` analyses forming one coherent,
-synthetic anthocyanin-regulation path. Compiler feature coverage belongs in
-the automated tests; these programs are examples of scientific questions.
+The repository includes eleven runnable `.cql` analyses built around one
+small, synthetic anthocyanin-regulation case. It is a reference workflow for
+following evidence through the language, not the intended boundary of
+Cis-QL. Adapting the workflow means replacing the sequence, annotation, TF
+model, tracks, and biological constraints; it does not require a different
+grammar. Compiler feature coverage belongs in the automated tests.
 
 The regulatory progression and its expected outputs are described in
 [`cql_examples/README.md`](cql_examples/README.md).
@@ -466,7 +497,7 @@ The regulatory progression and its expected outputs are described in
 | `08_integrated_anthocyanin_query.cql` | Connect the complete evidence path | promoters, calibrated sites, modules, counts, candidate links |
 | `09_accessible_myb_evidence.cql` | Combine imported accessibility peaks with motif support | narrowPeak provenance, `COUNT`, `NEAR` |
 | `10_accessible_bound_myb_candidates.cql` | Combine filtered accessibility, binding, motif, and proximity | track-evidence `WHERE`, multi-track `overlapEvidence`, `COUNT`, `NEAR` |
-| `11_replicate_supported_candidates.cql` | Require coordinate-level support from two binding replicates | `CONSENSUS`, `MIN_SUPPORT`, structured experimental provenance |
+| `11_replicate_supported_candidates.cql` | Require substantial coordinate support from two binding replicates | `CONSENSUS`, reciprocal overlap, structured experimental provenance |
 
 ---
 

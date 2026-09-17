@@ -66,6 +66,7 @@ interface ConsensusEvidence {
   anchorSet: string;
   minimumSupport: number;
   observedSupport: number;
+  minimumReciprocalOverlapPercent?: number;
   inputSets: string[];
 }
 
@@ -381,7 +382,7 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
                                 <span>Overlap count: {region.countEvidence.count.toLocaleString()} from {region.countEvidence.countedSet}</span>
                               )}
                               {region.consensusEvidence && (
-                                <span>Consensus: {region.consensusEvidence.observedSupport}/{region.consensusEvidence.inputSets.length} sets; minimum {region.consensusEvidence.minimumSupport}; anchor {region.consensusEvidence.anchorSet}</span>
+                                <span>Consensus: {region.consensusEvidence.observedSupport}/{region.consensusEvidence.inputSets.length} sets; minimum {region.consensusEvidence.minimumSupport}; anchor {region.consensusEvidence.anchorSet}{region.consensusEvidence.minimumReciprocalOverlapPercent !== undefined ? `; reciprocal overlap ≥ ${region.consensusEvidence.minimumReciprocalOverlapPercent}%` : ''}</span>
                               )}
                               {region.trackEvidence && (
                                 <>
@@ -392,7 +393,7 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
                                 </>
                               )}
                               {region.overlapEvidence && region.overlapEvidence.length > 0 && (
-                                <span>Overlap support: {region.overlapEvidence.map(item => `${item.referenceSet}:${item.reference.name || item.reference.type}${item.trackEvidence ? ` [${item.trackEvidence.evidenceClass}${item.trackEvidence.condition ? `/${item.trackEvidence.condition}` : ''}${item.trackEvidence.replicate ? `/${item.trackEvidence.replicate}` : ''}${item.trackEvidence.control ? `/${item.trackEvidence.control}` : ''}]` : ''}${item.consensusEvidence ? ` consensus ${item.consensusEvidence.observedSupport}/${item.consensusEvidence.inputSets.length}` : ''}${item.supportingEvidence?.length ? ` +${item.supportingEvidence.length} nested` : ''}`).join(', ')}</span>
+                                <span>Overlap support: {region.overlapEvidence.map(item => `${item.referenceSet}:${item.reference.name || item.reference.type}${item.trackEvidence ? ` [${item.trackEvidence.evidenceClass}${item.trackEvidence.condition ? `/${item.trackEvidence.condition}` : ''}${item.trackEvidence.replicate ? `/${item.trackEvidence.replicate}` : ''}${item.trackEvidence.control ? `/${item.trackEvidence.control}` : ''}]` : ''}${item.consensusEvidence ? ` consensus ${item.consensusEvidence.observedSupport}/${item.consensusEvidence.inputSets.length}${item.consensusEvidence.minimumReciprocalOverlapPercent !== undefined ? ` reciprocal≥${item.consensusEvidence.minimumReciprocalOverlapPercent}%` : ''}` : ''}${item.supportingEvidence?.length ? ` +${item.supportingEvidence.length} nested` : ''}`).join(', ')}</span>
                               )}
                               {region.moduleEvidence && (
                                 <>

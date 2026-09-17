@@ -513,6 +513,17 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
     consume(TokenType::NUM,
             "Expected a whole-number support threshold after MIN_SUPPORT.");
     const std::string minimumSupport = previous().lexeme;
+    std::string minimumReciprocalOverlap;
+    if (match(TokenType::MIN_RECIPROCAL_OVERLAP)) {
+      if (!match(TokenType::NUM) && !match(TokenType::FLOAT)) {
+        reportError(peek(), "Expected a percentage after "
+                            "MIN_RECIPROCAL_OVERLAP.");
+        throw std::runtime_error("Parse error");
+      }
+      minimumReciprocalOverlap = previous().lexeme;
+      consume(TokenType::PERCENT,
+              "Expected '%' after MIN_RECIPROCAL_OVERLAP percentage.");
+    }
     consume(TokenType::AS, "Expected 'AS' after the CONSENSUS threshold.");
     consume(TokenType::ID, "Expected an alias identifier after AS.");
     const std::string alias = previous().lexeme;
@@ -524,6 +535,7 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
     node->entities = std::move(entities);
     node->anchor = anchor;
     node->minimumSupport = minimumSupport;
+    node->minimumReciprocalOverlap = minimumReciprocalOverlap;
     return node;
   }
   if (match(TokenType::INTERSECT))

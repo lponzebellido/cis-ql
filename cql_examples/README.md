@@ -1,8 +1,32 @@
-# Cis-QL regulatory example path
+# Cis-QL regulatory analysis examples
 
-These eleven programs are a progressive analysis of one synthetic
-anthocyanin-regulatory locus. They teach how evidence moves through the
-language; they are not biological evidence or an exhaustive grammar catalog.
+These eleven runnable programs form a progressive analysis of one synthetic
+anthocyanin-regulatory locus. The locus and the MYB model make the examples
+concrete; neither is built into Cis-QL. The sequence of operations is the
+reusable part: define the regulatory search space, score a TF model, calibrate
+and filter its matches, relate them to annotations and experimental tracks,
+then retain the evidence used to form each candidate.
+
+## Adapting the workflow
+
+To use the same programs for another regulatory question, replace each input
+according to its role rather than copying the anthocyanin interpretation:
+
+| Role in the query | Anthocyanin fixture | Replacement in another study |
+| :--- | :--- | :--- |
+| Reference sequence | synthetic locus FASTA | the relevant genome, contigs, or locus in the correct assembly |
+| Feature coordinates | synthetic genes and enhancer in GFF3 | trusted annotations or explicitly defined candidate regions |
+| Binding model | MYB.Ph3 PWM | a justified PWM for the TF or TF family being tested |
+| Experimental support | synthetic accessibility and binding peaks | compatible BED/narrowPeak outputs from the assays and conditions of interest |
+| Regulatory assumptions | promoter bounds, distance, spacing, support thresholds | values justified for the organism, regulatory system, and question |
+
+For example, the same pattern can test a stress-response TF near induced
+genes, a developmental factor in accessible enhancers, or replicate-supported
+binding around a microbial promoter. Cis-QL evaluates the declared coordinate
+and motif relationships; it does not supply the biological assumptions or
+make those examples equivalent across systems.
+
+## Progressive reference workflow
 
 1. `01_define_promoters.cql` derives three strand-aware promoter windows from
    explicit TSS-relative bounds.
@@ -44,9 +68,10 @@ language; they are not biological evidence or an exhaustive grammar catalog.
 11. `11_replicate_supported_candidates.cql` attaches condition, replicate,
     and control labels to accessibility and binding tracks, filters each
     replicate explicitly, and uses an anchor-preserving `CONSENSUS` requiring
-    two distinct supporting sets before combining binding with accessibility
-    and motif support. The result records the `2/2` criterion; downstream
-    overlap evidence retains both the consensus rule and the R2 observation.
+    two distinct supporting sets and at least 50% reciprocal interval overlap
+    before combining binding with accessibility and motif support. The result
+    records both criteria; downstream overlap evidence retains the consensus
+    rule and the R2 observation.
 
 The shared `anthocyanin_regulatory_demo` FASTA and GFF3 files contain three
 annotated genes, one candidate enhancer, two promoter-local MYB instances, and
@@ -89,8 +114,10 @@ Interpret the outputs conservatively:
   is not IDR, does not model replicate quality or controls, and is not by
   itself a formal reproducibility assessment.
 - `CONSENSUS` counts distinct input sets, not individual overlapping peaks,
-  and retains the declared anchor geometry. Choosing an anchor and support
-  threshold remains an analysis decision that must be justified.
+  and retains the declared anchor geometry. Its optional reciprocal-overlap
+  threshold rejects marginal intersections, but it is still not IDR. Choosing
+  an anchor, support threshold, and overlap fraction remains an analysis
+  decision that must be justified.
 
 The removed historical examples mixed eukaryotic TF models and promoter
 assumptions with an *E. coli* fixture. Their language constructs remain covered

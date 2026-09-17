@@ -286,6 +286,16 @@ void SemanticAnalyzer::visit(SetOpStmtNode *node) {
       reportError("CONSENSUS MIN_SUPPORT must be between 2 and the number of "
                   "distinct input sets.");
     }
+    if (!node->minimumReciprocalOverlap.empty()) {
+      const double minimumReciprocalOverlap =
+          parseValue(node->minimumReciprocalOverlap);
+      if (!std::isfinite(minimumReciprocalOverlap) ||
+          minimumReciprocalOverlap <= 0.0 ||
+          minimumReciprocalOverlap > 100.0) {
+        reportError("CONSENSUS MIN_RECIPROCAL_OVERLAP must be greater than "
+                    "0% and at most 100%.");
+      }
+    }
     for (const auto &entity : node->entities) {
       if (!symbolTable.lookup(entity)) {
         reportError("CONSENSUS input alias '" + entity +

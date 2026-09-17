@@ -165,8 +165,11 @@ std::string Interpreter::serializeConsensusEvidenceJSON(
   std::ostringstream out;
   out << "{\"anchorSet\":\"" << jsonEscape(evidence.anchorSet)
       << "\",\"minimumSupport\":" << evidence.minimumSupport
-      << ",\"observedSupport\":" << evidence.observedSupport
-      << ",\"inputSets\":[";
+      << ",\"observedSupport\":" << evidence.observedSupport;
+  if (evidence.hasMinimumReciprocalOverlap)
+    out << ",\"minimumReciprocalOverlapPercent\":"
+        << evidence.minimumReciprocalOverlapPercent;
+  out << ",\"inputSets\":[";
   for (size_t index = 0; index < evidence.inputSets.size(); ++index) {
     if (index > 0)
       out << ',';
@@ -293,7 +296,12 @@ void Interpreter::printRegions(const std::vector<GenomicRegion> &regions,
                 << r.consensusEvidence.anchorSet << " support:"
                 << r.consensusEvidence.observedSupport << "/"
                 << r.consensusEvidence.inputSets.size() << " required:"
-                << r.consensusEvidence.minimumSupport << std::endl;
+                << r.consensusEvidence.minimumSupport;
+      if (r.consensusEvidence.hasMinimumReciprocalOverlap)
+        std::cout << " reciprocal-overlap:"
+                  << r.consensusEvidence.minimumReciprocalOverlapPercent
+                  << "%";
+      std::cout << std::endl;
     }
     if (r.trackEvidence.present) {
       std::cout << "      TRACK " << r.trackEvidence.trackAlias << " ("
@@ -695,8 +703,11 @@ void Interpreter::executeExport(const IRInstruction &instr) {
         out << ";ConsensusAnchorSet="
             << gffAttributeEscape(consensus.anchorSet)
             << ";ConsensusMinimumSupport=" << consensus.minimumSupport
-            << ";ConsensusObservedSupport=" << consensus.observedSupport
-            << ";ConsensusEvidenceJSON="
+            << ";ConsensusObservedSupport=" << consensus.observedSupport;
+        if (consensus.hasMinimumReciprocalOverlap)
+          out << ";ConsensusMinimumReciprocalOverlapPercent="
+              << consensus.minimumReciprocalOverlapPercent;
+        out << ";ConsensusEvidenceJSON="
             << gffAttributeEscape(
                    serializeConsensusEvidenceJSON(consensus));
       }
@@ -814,7 +825,9 @@ void Interpreter::executeExport(const IRInstruction &instr) {
            "\ttrack_minus_log10_q_value"
            "\tpeak_offset\tpeak_position\toverlap_evidence_json"
            "\tconsensus_anchor_set\tconsensus_minimum_support"
-           "\tconsensus_observed_support\tconsensus_evidence_json\n";
+           "\tconsensus_observed_support"
+           "\tconsensus_minimum_reciprocal_overlap_percent"
+           "\tconsensus_evidence_json\n";
     for (const auto &region : regionsIt->second) {
       out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
           << region.end << '\t' << cleanTabularField(region.strand) << '\t'
@@ -961,11 +974,13 @@ void Interpreter::executeExport(const IRInstruction &instr) {
       if (region.consensusEvidence.present) {
         out << cleanTabularField(region.consensusEvidence.anchorSet) << '\t'
             << region.consensusEvidence.minimumSupport << '\t'
-            << region.consensusEvidence.observedSupport << '\t'
-            << cleanTabularField(
+            << region.consensusEvidence.observedSupport << '\t';
+        if (region.consensusEvidence.hasMinimumReciprocalOverlap)
+          out << region.consensusEvidence.minimumReciprocalOverlapPercent;
+        out << '\t' << cleanTabularField(
                    serializeConsensusEvidenceJSON(region.consensusEvidence));
       } else {
-        out << "\t\t\t";
+        out << "\t\t\t\t";
       }
       out << '\n';
     }
@@ -1820,6 +1835,8 @@ void Interpreter::executeConsensus(const IRInstruction &instr) {
   const std::string &anchorSet = instr.arg1;
   const size_t minimumSupport =
       static_cast<size_t>(std::strtoull(instr.arg2.c_str(), nullptr, 10));
+  const double minimumReciprocalOverlapPercent =
+      instr.arg4.empty() ? 0.0 : std::strtod(instr.arg4.c_str(), nullptr);
   const std::vector<GenomicRegion> anchor = resolveEntity(anchorSet);
   std::vector<std::pair<std::string, std::vector<GenomicRegion>>> supportSets;
   for (const auto &inputSet : instr.listArgs) {
@@ -1835,11 +1852,16 @@ void Interpreter::executeConsensus(const IRInstruction &instr) {
       std::cout << instr.listArgs[index];
     }
     std::cout << "] ANCHOR " << anchorSet << " MIN_SUPPORT "
-              << minimumSupport << std::endl;
+              << minimumSupport;
+    if (minimumReciprocalOverlapPercent > 0.0)
+      std::cout << " MIN_RECIPROCAL_OVERLAP "
+                << minimumReciprocalOverlapPercent << "%";
+    std::cout << std::endl;
   }
 
   resultSets[instr.arg3] = SetOperations::consensus(
-      anchor, anchorSet, supportSets, instr.listArgs, minimumSupport);
+      anchor, anchorSet, supportSets, instr.listArgs, minimumSupport,
+      minimumReciprocalOverlapPercent);
 }
 
 void Interpreter::executeCountOverlaps(const IRInstruction &instr) {

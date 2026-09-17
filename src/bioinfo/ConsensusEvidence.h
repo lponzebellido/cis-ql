@@ -10,6 +10,8 @@ struct ConsensusEvidence {
   std::string anchorSet;
   size_t minimumSupport = 0;
   size_t observedSupport = 0;
+  bool hasMinimumReciprocalOverlap = false;
+  double minimumReciprocalOverlapPercent = 0.0;
   std::vector<std::string> inputSets;
 };
 

@@ -107,8 +107,11 @@ void SetOpStmtNode::print(std::string prefix, bool isLast) const {
             std::cout << entities[index];
         }
         std::cout << "], Anchor: " << anchor
-                  << ", Minimum support: " << minimumSupport
-                  << ", AS: " << alias << ")" << std::endl;
+                  << ", Minimum support: " << minimumSupport;
+        if (!minimumReciprocalOverlap.empty())
+            std::cout << ", Minimum reciprocal overlap: "
+                      << minimumReciprocalOverlap << "%";
+        std::cout << ", AS: " << alias << ")" << std::endl;
         if (whereClause) {
             std::string childPrefix = prefix + (isLast ? "    " : "│   ");
             std::cout << childPrefix << "└── Where:" << std::endl;

@@ -160,22 +160,39 @@ int main() {
   replicateTwoSecond.name = "replicate_two_second";
   GenomicRegion replicateThreeFirst = region(4, 12);
   replicateThreeFirst.name = "replicate_three_first";
+  GenomicRegion replicateThreeMarginal = region(29, 35);
+  replicateThreeMarginal.name = "replicate_three_marginal";
+  const auto permissiveConsensus = SetOperations::consensus(
+      {anchorPeakOne, anchorPeakTwo}, "replicate_one",
+      {{"replicate_two", {replicateTwoFirst, replicateTwoSecond}},
+       {"replicate_three",
+        {replicateThreeFirst, replicateThreeMarginal}}},
+      {"replicate_one", "replicate_two", "replicate_three"}, 3);
+  require(permissiveConsensus.size() == 2 &&
+              !permissiveConsensus[1].consensusEvidence
+                   .hasMinimumReciprocalOverlap,
+          "consensus keeps one-base overlaps when no stricter rule is given");
   const auto strictConsensus = SetOperations::consensus(
       {anchorPeakOne, anchorPeakTwo}, "replicate_one",
       {{"replicate_two", {replicateTwoFirst, replicateTwoSecond}},
-       {"replicate_three", {replicateThreeFirst}}},
-      {"replicate_one", "replicate_two", "replicate_three"}, 3);
+       {"replicate_three",
+        {replicateThreeFirst, replicateThreeMarginal}}},
+      {"replicate_one", "replicate_two", "replicate_three"}, 3, 50.0);
   require(strictConsensus.size() == 1 &&
               strictConsensus[0].name == "anchor_one" &&
               strictConsensus[0].consensusEvidence.present &&
               strictConsensus[0].consensusEvidence.minimumSupport == 3 &&
               strictConsensus[0].consensusEvidence.observedSupport == 3 &&
+              strictConsensus[0].consensusEvidence
+                      .hasMinimumReciprocalOverlap &&
+              strictConsensus[0].consensusEvidence
+                      .minimumReciprocalOverlapPercent == 50.0 &&
               strictConsensus[0].overlapEvidence.size() == 2 &&
               strictConsensus[0].overlapEvidence[0].referenceSet ==
                   "replicate_two" &&
               strictConsensus[0].overlapEvidence[1].referenceSet ==
                   "replicate_three",
-          "consensus counts distinct supporting sets and preserves the anchor");
+          "consensus applies reciprocal overlap per distinct supporting set");
 
   std::vector<GenomicRegion> indexedReferences;
   std::vector<GenomicRegion> indexedQueries;
