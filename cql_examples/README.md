@@ -3,9 +3,9 @@
 These runnable programs demonstrate distinct language capabilities with small,
 inspectable inputs. They are a portfolio, not one prescribed biological
 workflow. Scripts 01-11 follow a synthetic eukaryotic regulatory locus through
-motif calibration and experimental-evidence integration. Script 12 uses an
-*E. coli* reference to demonstrate strand-aware sequence patterns and explicit
-reading-frame constraints. Neither fixture is built into Cis-QL.
+motif calibration and experimental-evidence integration. Scripts 12-13 use an
+*E. coli* reference to demonstrate sequence patterns, reading-frame constraints,
+and annotation hierarchy. Neither fixture is built into Cis-QL.
 
 ## Regulatory evidence-integration workflow
 
@@ -93,6 +93,20 @@ The same operators are useful outside coding-sequence examples. `START MOD n`,
 express phased repeats, periodic sequence architectures, strand-specific
 anchors, or assay-specific coordinate conventions. Their interpretation remains
 the responsibility of the program.
+
+## Annotation hierarchy workflow
+
+13. `13_gff3_hierarchy.cql` loads the *E. coli* K-12 MG1655 `U00096.3`
+    sequence and its NCBI annotation, then selects `thrA` and its CDS using
+    preserved GFF3 identity and parentage. The query distinguishes `ID` from
+    `Name`, tests `Parent` membership and phase, and queries `locus_tag` and
+    `protein_id` without adding organism-specific keywords to the language.
+
+`EXTRACT FEATURE` deliberately returns the annotation vocabulary as supplied.
+The programmer chooses `TYPE = "mRNA"`, `TYPE = "CDS"`, a Sequence Ontology
+term, or another source-specific type. Cis-QL preserves the hierarchy but does
+not currently validate the parent graph, resolve canonical transcripts, or
+infer a transcript policy.
 
 The shared `anthocyanin_regulatory_demo` FASTA and GFF3 files contain three
 annotated genes, one candidate enhancer, two promoter-local MYB instances, and

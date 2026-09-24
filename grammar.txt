@@ -3,9 +3,9 @@ Context-Free Grammar (CFG) for Cis-QL (v3.0-dev, regulatory foundation)
 Terminals (Tokens):
 
 LOAD, USE, EXPORT, DEFINE, PROMOTERS, MODULE, OF, SEQUENCE, ANNOTATION, TRACK, MATRIX, STRING, AS, ID, SEMICOLON, FIND, MOTIF, COUNT, WITHIN, NUM,
-FROM, WITH, GENE, PROMOTER, ENHANCER, EXON, INTRON, UTR, TSS, CDS, REGION, STRAND, POSITIVE, NEGATIVE,
+FROM, WITH, GENE, PROMOTER, ENHANCER, EXON, INTRON, UTR, TSS, CDS, REGION, FEATURE, STRAND, POSITIVE, NEGATIVE,
 CHR, EXTRACT, WHERE, INTERSECT, UNION, EXCEPT, OVERLAPS, NEAR, CONSENSUS, ANCHOR, MIN_SUPPORT, MIN_RECIPROCAL_OVERLAP, MAX_SUMMIT_DISTANCE, AND, OR, NOT, LPAREN, RPAREN, LBRACKET, RBRACKET,
-LENGTH, START, END, MOD, SIMILARITY, GREATER, LESS, GREATER_EQ, LESS_EQ, ASSIGN, FLOAT, PERCENT, BP, KB, MB,
+LENGTH, START, END, MOD, TYPE, PARENT, SOURCE, PHASE, ATTRIBUTE, SIMILARITY, GREATER, LESS, GREATER_EQ, LESS_EQ, ASSIGN, FLOAT, PERCENT, BP, KB, MB,
 UPSTREAM, DOWNSTREAM, SCAN, THRESHOLD, PVALUE, QVALUE, BACKGROUND, UNIFORM, ANALYZE, GC_CONTENT, CPG_ISLANDS, WINDOW,
 IF, THEN, ELSE, ENDIF, FOREACH, IN, DO, ENDFOR, COMMA, TO, FORMAT, BED, GFF3, TSV,
 SPACING, ORDER, ORIENTATION, ANY, SAME, OPPOSITE, AS_WRITTEN, NARROWPEAK,
@@ -88,12 +88,14 @@ Factor             -> NOT Factor | SimpleCondition | LPAREN Condition RPAREN
 SimpleCondition    -> NumericProperty NumericModifierOpt RelOp Value
                     | SIMILARITY SimilarityRefOpt NumericModifierOpt RelOp Value
                     | StringProperty RelOp STRING
+                    | ATTRIBUTE STRING RelOp STRING
 NumericModifierOpt -> MOD (NUM | FLOAT) | λ
 NumericProperty    -> LENGTH | START | END | GC_CONTENT | COUNT
                     | SUPPORT_COUNT | TRACK_SCORE | SIGNAL_VALUE
                     | MINUS_LOG10_PVALUE | MINUS_LOG10_QVALUE
-StringProperty     -> ID | STRAND | EVIDENCE_CLASS | ASSAY | SAMPLE
-                    | CONDITION | REPLICATE | CONTROL
+StringProperty     -> ID | NAME | STRAND | TYPE | PARENT | SOURCE | PHASE
+                    | EVIDENCE_CLASS | ASSAY | SAMPLE | CONDITION
+                    | REPLICATE | CONTROL
 SimilarityRefOpt   -> TO ID | λ
 RelOp              -> GREATER | LESS | GREATER_EQ | LESS_EQ | ASSIGN
 Value              -> (NUM | FLOAT) Unit | (NUM | FLOAT) PERCENT | NUM | FLOAT | STRING
@@ -102,7 +104,7 @@ Probability        -> NUM | FLOAT
 Unit               -> BP | KB | MB | λ
 RequiredUnit       -> BP | KB | MB
 Direction          -> UPSTREAM | DOWNSTREAM
-Entity             -> GENE | PROMOTER | ENHANCER | EXON | INTRON | UTR | TSS | CDS | REGION
+Entity             -> GENE | PROMOTER | ENHANCER | EXON | INTRON | UTR | TSS | CDS | REGION | FEATURE
 EntityRef          -> Entity | ID
 EntityName         -> STRING | λ
 AliasOpt           -> AS ID | λ
@@ -127,3 +129,4 @@ Note on Execution Engine & Studio Integration:
 16. When the reference side of `OVERLAPS` already contains `overlapEvidence`, that prior provenance is attached recursively as `supportingEvidence` to the new direct reference observation. The hierarchy records the actual chain of interval operations instead of flattening transitive support into false direct overlaps. Coordinate overlap between replicate tracks is descriptive concordance, not IDR or a statistical reproducibility claim.
 17. `CONSENSUS FROM [inputs] ANCHOR anchor MIN_SUPPORT n` retains each complete anchor interval supported by at least `n` distinct input sets under direct half-open coordinate overlap. The anchor must occur once in the unique input list, contributes one support unit, and supplies the result geometry and primary evidence. Each non-anchor set contributes at most one unit even if multiple records overlap; all matching records remain in `overlapEvidence`. Results record the anchor, minimum support, observed support, and input aliases as typed `consensusEvidence`, queryable with `SUPPORT_COUNT`. This is descriptive coordinate concordance, not IDR or a formal reproducibility model.
 18. Numeric conditions may apply `MOD` before comparison. `START` and `END` expose zero-based, half-open genomic coordinates, while `STRAND` supports exact equality with `"+"`, `"-"`, or `"."`. These properties make coordinate phase and orientation testable without embedding those policies in a regular expression.
+19. `EXTRACT FEATURE` exposes every imported GFF3 feature without imposing a transcript ontology. `ID`, `NAME`, `TYPE`, `PARENT`, `SOURCE`, and `PHASE` query preserved annotation fields. `ATTRIBUTE "key" = "value"` queries any decoded GFF3 attribute by exact string equality; `PARENT` tests membership when a feature has multiple parents.

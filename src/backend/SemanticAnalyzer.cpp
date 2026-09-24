@@ -8,7 +8,7 @@
 
 static const std::set<std::string> BUILTIN_ENTITIES = {
     "GENE", "PROMOTER", "ENHANCER", "EXON", "INTRON",
-    "UTR", "TSS", "CDS", "REGION"};
+    "UTR", "TSS", "CDS", "REGION", "FEATURE"};
 
 static bool isBuiltinEntity(const std::string &name) {
   return BUILTIN_ENTITIES.count(name) > 0;
@@ -432,7 +432,8 @@ void SemanticAnalyzer::visit(NotConditionNode *node) {
 void SemanticAnalyzer::visit(SimpleConditionNode *node) {
   static const std::set<std::string> supportedProperties = {
       "LENGTH", "START", "END", "STRAND", "SIMILARITY", "GC_CONTENT",
-      "COUNT", "ID", "NAME",
+      "COUNT", "ID", "NAME", "TYPE", "PARENT", "SOURCE", "PHASE",
+      "ATTRIBUTE",
       "TRACK_SCORE", "SIGNAL_VALUE", "MINUS_LOG10_PVALUE",
       "MINUS_LOG10_QVALUE", "EVIDENCE_CLASS", "ASSAY", "SAMPLE",
       "CONDITION", "REPLICATE", "CONTROL", "SUPPORT_COUNT"};
@@ -526,6 +527,21 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
     }
     if (node->op != "=" && node->op != "==") {
       reportError("STRAND supports only equality comparison.");
+    }
+  } else if (node->property == "TYPE" || node->property == "PARENT" ||
+             node->property == "SOURCE" || node->property == "PHASE" ||
+             node->property == "ATTRIBUTE") {
+    if (node->value.size() < 2 || node->value.front() != '"' ||
+        node->value.back() != '"') {
+      reportError(node->property + " must be compared with a string value.");
+    }
+    if (node->op != "=" && node->op != "==") {
+      reportError(node->property + " supports only equality comparison.");
+    }
+    if (node->property == "ATTRIBUTE" &&
+        (node->reference.size() < 2 || node->reference.front() != '"' ||
+         node->reference.back() != '"')) {
+      reportError("ATTRIBUTE requires a quoted GFF3 attribute name.");
     }
   } else if (node->property == "EVIDENCE_CLASS" ||
              node->property == "ASSAY" || node->property == "SAMPLE" ||

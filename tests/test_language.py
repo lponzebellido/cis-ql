@@ -85,6 +85,18 @@ def main() -> int:
             "chr1\ttest\tgene\t3001\t3400\t.\t+\t.\tID=tiny\n",
             encoding="utf-8",
         )
+        (workspace / "hierarchy.gff3").write_text(
+            "##gff-version 3\n"
+            "chrH\tcurated\tgene\t1\t1000\t.\t+\t.\t"
+            "ID=gene1;Name=GENE%201;gene_biotype=protein_coding\n"
+            "chrH\tcurated\tmRNA\t1\t900\t.\t+\t.\t"
+            "ID=tx1;Parent=gene1;Name=Transcript%201\n"
+            "chrH\tcurated\texon\t1\t100\t.\t+\t.\t"
+            "ID=ex1;Parent=tx1,tx2;rank=1\n"
+            "chrH\tcurated\tCDS\t10\t90\t7.5\t+\t0\t"
+            "ID=cds1;Parent=tx1;protein_id=P1\n",
+            encoding="utf-8",
+        )
         (workspace / "fixture.pwm").write_text(
             ">TEST test\n"
             "A [ 10 10 ]\n"
@@ -267,7 +279,7 @@ def main() -> int:
         track_tsv = (workspace / "accessible.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(track_tsv) == 103 and track_tsv[81:96] == [
+        require(len(track_tsv) == 110 and track_tsv[81:96] == [
                     "accessible", "accessibility.narrowPeak", "NARROWPEAK",
                     "ACCESSIBILITY", "ATAC-seq", "leaf", "pigmented",
                     "R1", "input", "500", "12.5",
@@ -278,7 +290,7 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()[1].split("\t")
         combined_overlap = json.loads(combined_tsv[96])
-        require(len(combined_tsv) == 103 and
+        require(len(combined_tsv) == 110 and
                 combined_overlap[0]["referenceSet"] == "bound" and
                 combined_overlap[0]["trackEvidence"]["evidenceClass"]
                 == "BINDING" and
@@ -495,6 +507,71 @@ def main() -> int:
                 data["resultSets"]["annotated_tss"] == [],
                 "GFF import does not invent promoter or TSS features")
 
+        data, _ = run_query(
+            workspace,
+            "annotation_hierarchy",
+            'LOAD ANNOTATION "hierarchy.gff3" AS annotation;\n'
+            'EXTRACT FEATURE AS transcripts WHERE TYPE = "mRNA" '
+            'AND PARENT = "gene1";\n'
+            'EXTRACT FEATURE AS coding WHERE TYPE = "CDS" '
+            'AND SOURCE = "curated" AND PHASE = "0" '
+            'AND ATTRIBUTE "protein_id" = "P1";\n'
+            'EXTRACT FEATURE AS shared_children WHERE PARENT = "tx2";\n'
+            'EXTRACT GENE AS selected_gene WHERE ID = "gene1" '
+            'AND NAME = "GENE 1";\n'
+            'EXPORT transcripts TO "transcripts.gff3" FORMAT GFF3;\n'
+            'EXPORT coding TO "coding.tsv" FORMAT TSV;\n',
+        )
+        transcript = data["resultSets"]["transcripts"][0]
+        coding = data["resultSets"]["coding"][0]
+        require(
+            len(data["resultSets"]["transcripts"]) == 1 and
+            transcript["annotationEvidence"]["id"] == "tx1" and
+            transcript["annotationEvidence"]["name"] == "Transcript 1" and
+            transcript["annotationEvidence"]["parents"] == ["gene1"] and
+            transcript["annotationEvidence"]["attributes"]["Parent"]
+            == "gene1" and
+            coding["annotationEvidence"]["source"] == "curated" and
+            coding["annotationEvidence"]["score"] == "7.5" and
+            coding["annotationEvidence"]["phase"] == "0" and
+            coding["annotationEvidence"]["attributes"]["protein_id"]
+            == "P1" and
+            data["resultSets"]["shared_children"][0]
+                ["annotationEvidence"]["parents"] == ["tx1", "tx2"] and
+            data["resultSets"]["selected_gene"][0]
+                ["annotationEvidence"]["id"] == "gene1",
+            "GFF3 hierarchy, identity, and attributes remain queryable",
+        )
+        transcript_gff = (workspace / "transcripts.gff3").read_text(
+            encoding="utf-8"
+        ).splitlines()[1]
+        require(
+            transcript_gff.startswith("chrH\tcurated\tmRNA\t1\t900\t.\t+\t.")
+            and "ID=tx1;Parent=gene1;Name=Transcript%201" in transcript_gff,
+            "GFF3 export preserves source columns and raw attributes",
+        )
+        coding_tsv = (workspace / "coding.tsv").read_text(
+            encoding="utf-8"
+        ).splitlines()[1].split("\t")
+        require(
+            len(coding_tsv) == 110 and
+            coding_tsv[103:109] == ["curated", "cds1", "", "7.5", "0",
+                                      '["tx1"]'] and
+            json.loads(coding_tsv[109])["protein_id"] == "P1",
+            "TSV export preserves annotation identity and attributes",
+        )
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "annotation_attribute_requires_equality",
+            'LOAD ANNOTATION "hierarchy.gff3" AS annotation;\n'
+            'EXTRACT FEATURE AS invalid '
+            'WHERE ATTRIBUTE "rank" >= "1";\n',
+            3,
+        )
+        require("ATTRIBUTE supports only equality" in semantic_error,
+                "annotation attributes use exact string equality")
+
         semantic_error = run_invalid_query(
             workspace,
             "zero_promoter_window",
@@ -673,7 +750,10 @@ def main() -> int:
                 "\tconsensus_observed_support"
                 "\tconsensus_minimum_reciprocal_overlap_percent"
                 "\tconsensus_maximum_summit_distance_bp"
-                "\tconsensus_evidence_json",
+                "\tconsensus_evidence_json"
+                "\tannotation_source\tannotation_id\tannotation_name"
+                "\tannotation_score\tannotation_phase"
+                "\tannotation_parents_json\tannotation_attributes_json",
                 "region TSV export")
         profile_lines = (workspace / "profile.tsv").read_text(
             encoding="utf-8"
@@ -905,7 +985,7 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()
         first_tsv_site = tsv_rows[1].split("\t")
-        require(len(tsv_rows) == 10 and len(first_tsv_site) == 103 and
+        require(len(tsv_rows) == 10 and len(first_tsv_site) == 110 and
                 first_tsv_site[7:11]
                 == ["matrix", "TEST", "test", "fixture.pwm"] and
                 float(first_tsv_site[11]) > 0 and
@@ -921,7 +1001,7 @@ def main() -> int:
                 abs(float(first_tsv_site[31]) - 0.1) < 1e-12 and
                 first_tsv_site[32:34] == ["short_promoter", "promoter"] and
                 first_tsv_site[36] == "0" and
-                first_tsv_site[37:] == [""] * 66,
+                first_tsv_site[37:] == [""] * 73,
                 "motif TSV export retains evidence columns")
 
         data, _ = run_query(
@@ -959,7 +1039,7 @@ def main() -> int:
         promoter_overlap_tsv = (workspace / "promoter_sites.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(promoter_overlap_tsv) == 103 and
+        require(len(promoter_overlap_tsv) == 110 and
                 json.loads(promoter_overlap_tsv[96])[0]["reference"]
                     ["name"] == "short_promoter",
                 "OVERLAPS TSV evidence identifies the matching reference")
@@ -1011,10 +1091,10 @@ def main() -> int:
         linked_tsv = (workspace / "linked.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(linked_tsv) == 103 and linked_tsv[37:48] == [
+        require(len(linked_tsv) == 110 and linked_tsv[37:48] == [
                     "NEAR", "GENE", "chr1", "0", "1200", "+", "gene",
                     "short", "0", "0", "true",
-                ] and linked_tsv[48:] == [""] * 55,
+                ] and linked_tsv[48:] == [""] * 62,
                 "TSV export retains typed nearest-reference evidence")
 
         data, _ = run_query(
@@ -1058,9 +1138,9 @@ def main() -> int:
         count_tsv = (workspace / "counts.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(count_tsv) == 103 and count_tsv[48:52] == [
+        require(len(count_tsv) == 110 and count_tsv[48:52] == [
                     "OVERLAPS", "sites", "promoters", "20",
-                ] and count_tsv[52:] == [""] * 51,
+                ] and count_tsv[52:] == [""] * 58,
                 "TSV export retains count provenance")
 
         data, _ = run_query(
@@ -1120,7 +1200,7 @@ def main() -> int:
         module_tsv = (workspace / "modules.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(module_tsv) == 103 and
+        require(len(module_tsv) == 110 and
                 module_tsv[52:59] == [
                     "2", "2", "2", "ANY", "FIRST_BEFORE_SECOND",
                     "SAME", "SAME",
@@ -1450,7 +1530,7 @@ def main() -> int:
             workspace / "replicate_supported_binding_peaks.tsv"
         ).read_text(encoding="utf-8").splitlines()[1].split("\t")
         require(
-            len(consensus_tsv) == 103 and
+            len(consensus_tsv) == 110 and
             consensus_tsv[97:100] == [
                 "strong_myb_binding_rep1", "2", "2",
             ] and

@@ -3,7 +3,7 @@
 
 void SimpleConditionNode::print(std::string prefix, bool isLast) const {
     std::cout << prefix << (isLast ? "└── " : "├── ") << "SimpleCondition(" << property;
-    if (!reference.empty()) std::cout << " TO " << reference;
+    if (!reference.empty()) std::cout << (property == "ATTRIBUTE" ? " " : " TO ") << reference;
     if (!modifier.empty()) std::cout << " " << modifier << " " << modifierValue;
     std::cout << " " << op << " " << value << ")" << std::endl;
 }

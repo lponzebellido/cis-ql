@@ -62,6 +62,16 @@ interface CountEvidence {
   count: number;
 }
 
+interface AnnotationEvidence {
+  source: string;
+  score: string;
+  phase: string;
+  id: string;
+  name: string;
+  parents: string[];
+  attributes: Record<string, string>;
+}
+
 interface ConsensusEvidence {
   anchorSet: string;
   minimumSupport: number;
@@ -130,6 +140,7 @@ interface GenomicRegion {
   type: string;
   name: string;
   sequence?: string;
+  annotationEvidence?: AnnotationEvidence;
   motifEvidence?: MotifEvidence;
   spatialRelation?: SpatialRelation;
   countEvidence?: CountEvidence;
@@ -662,6 +673,13 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
               <span className="tt-label">Pos:</span> {hoveredRegion.chr}:{hoveredRegion.start.toLocaleString()}-{hoveredRegion.end.toLocaleString()}<br />
               <span className="tt-label">Strand:</span> {formatStrand(hoveredRegion.strand)}<br />
               <span className="tt-label">Length:</span> {(hoveredRegion.end - hoveredRegion.start).toLocaleString()} bp
+              {hoveredRegion.annotationEvidence && (
+                <>
+                  <br /><span className="tt-label">Annotation ID:</span> {hoveredRegion.annotationEvidence.id || 'N/A'}
+                  {hoveredRegion.annotationEvidence.parents.length > 0 && <><br /><span className="tt-label">Parent:</span> {hoveredRegion.annotationEvidence.parents.join(', ')}</>}
+                  <br /><span className="tt-label">Source / phase:</span> {hoveredRegion.annotationEvidence.source} / {hoveredRegion.annotationEvidence.phase}
+                </>
+              )}
               {hoveredRegion.motifEvidence && (
                 <>
                   <br /><span className="tt-label">Matrix:</span> {hoveredRegion.motifEvidence.matrixId || hoveredRegion.motifEvidence.matrixAlias}
@@ -769,6 +787,30 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                 <span className="detail-label">Strand</span>
                 <span className="detail-value">{formatStrand(selectedRegion.strand)}</span>
               </div>
+              {selectedRegion.annotationEvidence && (
+                <>
+                  <div className="detail-field">
+                    <span className="detail-label">Annotation identity</span>
+                    <span className="detail-value">
+                      ID {selectedRegion.annotationEvidence.id || 'N/A'}<br />
+                      Name {selectedRegion.annotationEvidence.name || 'N/A'}<br />
+                      Parent {selectedRegion.annotationEvidence.parents.join(', ') || 'N/A'}
+                    </span>
+                  </div>
+                  <div className="detail-field">
+                    <span className="detail-label">Annotation source</span>
+                    <span className="detail-value">
+                      {selectedRegion.annotationEvidence.source} · score {selectedRegion.annotationEvidence.score} · phase {selectedRegion.annotationEvidence.phase}
+                    </span>
+                  </div>
+                  <div className="detail-field">
+                    <span className="detail-label">GFF3 attributes</span>
+                    <span className="detail-value" style={{ wordBreak: 'break-word' }}>
+                      {Object.entries(selectedRegion.annotationEvidence.attributes).map(([key, value]) => `${key}=${value}`).join('; ')}
+                    </span>
+                  </div>
+                </>
+              )}
               {selectedRegion.motifEvidence && (
                 <>
                   <div className="detail-field">

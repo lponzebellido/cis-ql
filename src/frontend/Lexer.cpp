@@ -82,6 +82,12 @@ void Lexer::initKeywords() {
     keywords["UTR"] = TokenType::UTR;
     keywords["TSS"] = TokenType::TSS;
     keywords["CDS"] = TokenType::CDS;
+    keywords["FEATURE"] = TokenType::FEATURE;
+    keywords["TYPE"] = TokenType::TYPE;
+    keywords["PARENT"] = TokenType::PARENT;
+    keywords["SOURCE"] = TokenType::SOURCE;
+    keywords["PHASE"] = TokenType::PHASE;
+    keywords["ATTRIBUTE"] = TokenType::ATTRIBUTE;
 
     keywords["CHR"] = TokenType::CHR;
     keywords["CHROMOSOME"] = TokenType::CHROMOSOME;
@@ -449,6 +455,12 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::UTR: return "UTR";
         case TokenType::TSS: return "TSS";
         case TokenType::CDS: return "CDS";
+        case TokenType::FEATURE: return "FEATURE";
+        case TokenType::TYPE: return "TYPE";
+        case TokenType::PARENT: return "PARENT";
+        case TokenType::SOURCE: return "SOURCE";
+        case TokenType::PHASE: return "PHASE";
+        case TokenType::ATTRIBUTE: return "ATTRIBUTE";
         case TokenType::CHR: return "CHR";
         case TokenType::CHROMOSOME: return "CHROMOSOME";
         case TokenType::STRAND: return "STRAND";

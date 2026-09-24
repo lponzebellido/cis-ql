@@ -426,7 +426,8 @@ std::unique_ptr<FindStmtNode> Parser::parseFind() {
           match(TokenType::ENHANCER) || match(TokenType::EXON) ||
           match(TokenType::INTRON) || match(TokenType::UTR) ||
           match(TokenType::TSS) || match(TokenType::CDS) ||
-          match(TokenType::REGION) || match(TokenType::ID)) {
+          match(TokenType::REGION) || match(TokenType::FEATURE) ||
+          match(TokenType::ID)) {
         opt->value4 = previous().lexeme;
       } else {
         reportError(peek(), "Expected a biological entity or alias.");
@@ -472,7 +473,8 @@ std::unique_ptr<ExtractStmtNode> Parser::parseExtract() {
       match(TokenType::ENHANCER) || match(TokenType::EXON) ||
       match(TokenType::INTRON) || match(TokenType::UTR) ||
       match(TokenType::TSS) || match(TokenType::CDS) ||
-      match(TokenType::REGION) || match(TokenType::ID)) {
+      match(TokenType::REGION) || match(TokenType::FEATURE) ||
+      match(TokenType::ID)) {
     std::string entity = previous().lexeme;
     std::string alias;
     if (match(TokenType::AS)) {
@@ -584,7 +586,8 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
       match(TokenType::ENHANCER) || match(TokenType::EXON) ||
       match(TokenType::INTRON) || match(TokenType::UTR) ||
       match(TokenType::TSS) || match(TokenType::CDS) ||
-      match(TokenType::REGION) || match(TokenType::ID)) {
+      match(TokenType::REGION) || match(TokenType::FEATURE) ||
+      match(TokenType::ID)) {
     std::string e1 = previous().lexeme;
 
     std::string sepError = "Expected 'AND' (for INTERSECT/UNION), 'FROM' "
@@ -604,7 +607,8 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
         match(TokenType::ENHANCER) || match(TokenType::EXON) ||
         match(TokenType::INTRON) || match(TokenType::UTR) ||
         match(TokenType::TSS) || match(TokenType::CDS) ||
-        match(TokenType::REGION) || match(TokenType::ID)) {
+        match(TokenType::REGION) || match(TokenType::FEATURE) ||
+        match(TokenType::ID)) {
       std::string e2 = previous().lexeme;
       std::string distanceValue;
       std::string distanceUnit;
@@ -647,7 +651,8 @@ std::unique_ptr<CountStmtNode> Parser::parseCount() {
       match(TokenType::ENHANCER) || match(TokenType::EXON) ||
       match(TokenType::INTRON) || match(TokenType::UTR) ||
       match(TokenType::TSS) || match(TokenType::CDS) ||
-      match(TokenType::REGION) || match(TokenType::ID)) {
+      match(TokenType::REGION) || match(TokenType::FEATURE) ||
+      match(TokenType::ID)) {
     countedEntity = previous().lexeme;
   } else {
     reportError(peek(), "Expected an entity or alias after COUNT.");
@@ -660,7 +665,8 @@ std::unique_ptr<CountStmtNode> Parser::parseCount() {
       match(TokenType::ENHANCER) || match(TokenType::EXON) ||
       match(TokenType::INTRON) || match(TokenType::UTR) ||
       match(TokenType::TSS) || match(TokenType::CDS) ||
-      match(TokenType::REGION) || match(TokenType::ID)) {
+      match(TokenType::REGION) || match(TokenType::FEATURE) ||
+      match(TokenType::ID)) {
     containerEntity = previous().lexeme;
   } else {
     reportError(peek(), "Expected a container entity or alias after IN.");
@@ -702,7 +708,8 @@ std::unique_ptr<ScanStmtNode> Parser::parseScan() {
           match(TokenType::ENHANCER) || match(TokenType::EXON) ||
           match(TokenType::INTRON) || match(TokenType::UTR) ||
           match(TokenType::TSS) || match(TokenType::CDS) ||
-          match(TokenType::REGION) || match(TokenType::ID)) {
+          match(TokenType::REGION) || match(TokenType::FEATURE) ||
+          match(TokenType::ID)) {
         target = previous().lexeme;
       } else {
         reportError(peek(), "Expected a biological entity or alias after IN.");
@@ -762,7 +769,8 @@ std::unique_ptr<ScanStmtNode> Parser::parseScan() {
             match(TokenType::ENHANCER) || match(TokenType::EXON) ||
             match(TokenType::INTRON) || match(TokenType::UTR) ||
             match(TokenType::TSS) || match(TokenType::CDS) ||
-            match(TokenType::REGION) || match(TokenType::ID)) {
+            match(TokenType::REGION) || match(TokenType::FEATURE) ||
+            match(TokenType::ID)) {
           backgroundSource = previous().lexeme;
         } else {
           reportError(peek(),
@@ -853,7 +861,13 @@ std::unique_ptr<ConditionNode> Parser::parseFactor() {
 
 std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
   std::string prop;
-  if (match(TokenType::LENGTH) || match(TokenType::START) ||
+  std::string reference;
+  if (match(TokenType::ATTRIBUTE)) {
+    prop = previous().lexeme;
+    consume(TokenType::STRING,
+            "Expected a GFF3 attribute name after ATTRIBUTE.");
+    reference = previous().lexeme;
+  } else if (match(TokenType::LENGTH) || match(TokenType::START) ||
       match(TokenType::END) || match(TokenType::STRAND) ||
       match(TokenType::SIMILARITY) ||
       match(TokenType::GC_CONTENT) || match(TokenType::COUNT) ||
@@ -861,7 +875,9 @@ std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
       match(TokenType::MINUS_LOG10_PVALUE) ||
       match(TokenType::MINUS_LOG10_QVALUE) ||
       match(TokenType::EVIDENCE_CLASS) || match(TokenType::SUPPORT_COUNT) ||
-      match(TokenType::ASSAY) ||
+      match(TokenType::ASSAY) || match(TokenType::TYPE) ||
+      match(TokenType::PARENT) || match(TokenType::SOURCE) ||
+      match(TokenType::PHASE) ||
       match(TokenType::SAMPLE) || match(TokenType::CONDITION) ||
       match(TokenType::REPLICATE) || match(TokenType::CONTROL) ||
       match(TokenType::ID)) {
@@ -871,7 +887,6 @@ std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
     throw std::runtime_error("Parse error");
   }
 
-  std::string reference;
   if (prop == "SIMILARITY" && match(TokenType::TO)) {
     consume(TokenType::ID,
             "Expected a result-set alias after 'SIMILARITY TO'.");

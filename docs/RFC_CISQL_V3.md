@@ -29,7 +29,7 @@ how many new statements it adds.
 
 | Priority | Missing capability | Why it matters | Smallest useful acceptance target |
 | :--- | :--- | :--- | :--- |
-| 1 | Transcript-aware GFF3 model | Promoters, UTRs, CDSs, and TSSs cannot be selected rigorously while parent/child relationships and transcript policy are flattened | Preserve attributes and parentage; expose explicit `ALL`, canonical, or named-transcript selection |
+| 1 | Transcript-aware GFF3 selection | Attributes and parentage are now preserved, but transcript graphs and selection policy are not yet first-class | Validate parent graphs; expose explicit `ALL`, canonical, or named-transcript selection |
 | 2 | General scalar and oriented-sequence expressions | Regex can describe complex patterns, but programmers need auditable arithmetic, captures, strand-oriented sequence, translation, and genetic-code policy outside the regex itself | Extend the current `MOD`, `START`, `END`, and `STRAND` foundation with reusable expressions and oriented extraction |
 | 3 | Enrichment with matched backgrounds | Counts alone cannot distinguish motif enrichment from length or composition effects | Declare foreground/background regions, matching policy, effect size, test, and multiple-testing correction |
 | 4 | CRE-to-gene evidence tables | `NEAR` is useful but genomic proximity is only one candidate-linking rule | Import relationship/contact tables and retain typed promoter, distance, contact, expression, and binding evidence per link |
@@ -56,6 +56,31 @@ large annotations, promoter/enhancer evidence, and assembly compatibility.
 7. Coexpression, motif presence, accessibility, conservation, and direct
    experimental validation are distinct evidence classes.
 
+## Annotation foundation: preserved GFF3 hierarchy
+
+Implemented syntax:
+
+```cql
+EXTRACT FEATURE AS coding_features
+  WHERE TYPE = "CDS"
+    AND PARENT = "transcript_1"
+    AND PHASE = "0"
+    AND ATTRIBUTE "protein_id" = "protein_1";
+```
+
+GFF3 import retains source, score, phase, `ID`, `Name`, every `Parent`, the
+decoded attribute map, and the original attribute field for verbatim
+attribute-column re-emission. `ID` and `NAME` are distinct filters. `PARENT`
+tests membership rather than comparing the comma-joined field, and `ATTRIBUTE`
+permits exact queries on source-specific metadata without turning each key into
+a language keyword. JSON and TSV expose the structured annotation evidence.
+
+`FEATURE` means every imported feature type. Cis-QL does not currently decide
+that `mRNA`, `transcript`, `lnc_RNA`, or another source vocabulary should be
+treated as the canonical transcript concept. Parent-graph validation, child or
+descendant traversal, transcript grouping, and explicit transcript-selection
+policies remain planned.
+
 ## Part 1: explicit TSS-relative promoters
 
 Implemented syntax:
@@ -75,8 +100,8 @@ clamped to the active FASTA chromosome. Both distances are mandatory so a query
 cannot silently depend on a biological default.
 
 Transcript-selection policies such as `CANONICAL`, `ALL`, or an explicit
-transcript list are intentionally deferred until the GFF data model preserves
-parent/child relationships and all attributes.
+transcript list remain deferred until the language can validate and traverse
+the preserved parent graph explicitly.
 
 ## Planned language layers
 

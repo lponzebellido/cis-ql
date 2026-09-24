@@ -1,6 +1,7 @@
 #ifndef GENOMIC_REGION_H
 #define GENOMIC_REGION_H
 
+#include "AnnotationEvidence.h"
 #include "MotifEvidence.h"
 #include "SpatialRelationEvidence.h"
 #include "CountEvidence.h"
@@ -20,6 +21,7 @@ struct GenomicRegion {
   std::string type;
   std::string name;
   std::string sequence;
+  AnnotationEvidence annotationEvidence;
   MotifEvidence motifEvidence;
   SpatialRelationEvidence spatialRelation;
   CountEvidence countEvidence;

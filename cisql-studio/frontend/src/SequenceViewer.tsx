@@ -62,6 +62,16 @@ interface CountEvidence {
   count: number;
 }
 
+interface AnnotationEvidence {
+  source: string;
+  score: string;
+  phase: string;
+  id: string;
+  name: string;
+  parents: string[];
+  attributes: Record<string, string>;
+}
+
 interface ConsensusEvidence {
   anchorSet: string;
   minimumSupport: number;
@@ -130,6 +140,7 @@ interface GenomicRegion {
   type: string;
   name: string;
   sequence?: string;
+  annotationEvidence?: AnnotationEvidence;
   motifEvidence?: MotifEvidence;
   spatialRelation?: SpatialRelation;
   countEvidence?: CountEvidence;
@@ -358,6 +369,13 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
                             <div className="seq-body-stats">
                               <span>Length: {region.sequence.length} bp</span>
                               <span>GC Content: {gcContent(region.sequence)}</span>
+                              {region.annotationEvidence && (
+                                <>
+                                  <span>Annotation: ID {region.annotationEvidence.id || 'N/A'}; Name {region.annotationEvidence.name || 'N/A'}</span>
+                                  <span>Parent: {region.annotationEvidence.parents.join(', ') || 'N/A'}; source {region.annotationEvidence.source}; score {region.annotationEvidence.score}; phase {region.annotationEvidence.phase}</span>
+                                  <span>Attributes: {Object.entries(region.annotationEvidence.attributes).map(([key, value]) => `${key}=${value}`).join('; ')}</span>
+                                </>
+                              )}
                               {region.motifEvidence && (
                                 <>
                                   <span>Matrix: {region.motifEvidence.matrixId || region.motifEvidence.matrixAlias}</span>

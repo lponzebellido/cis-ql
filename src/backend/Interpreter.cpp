@@ -126,6 +126,41 @@ std::string Interpreter::jsonEscape(const std::string &s) const {
   return escaped;
 }
 
+std::string Interpreter::serializeAnnotationAttributesJSON(
+    const AnnotationEvidence &evidence) const {
+  std::ostringstream out;
+  out << '{';
+  bool first = true;
+  for (const auto &attribute : evidence.attributes) {
+    if (!first)
+      out << ',';
+    first = false;
+    out << '"' << jsonEscape(attribute.first) << "\":\""
+        << jsonEscape(attribute.second) << '"';
+  }
+  out << '}';
+  return out.str();
+}
+
+std::string Interpreter::serializeAnnotationEvidenceJSON(
+    const AnnotationEvidence &evidence) const {
+  std::ostringstream out;
+  out << "{\"source\":\"" << jsonEscape(evidence.source)
+      << "\",\"score\":\"" << jsonEscape(evidence.score)
+      << "\",\"phase\":\"" << jsonEscape(evidence.phase)
+      << "\",\"id\":\"" << jsonEscape(evidence.id)
+      << "\",\"name\":\"" << jsonEscape(evidence.name)
+      << "\",\"parents\":[";
+  for (size_t index = 0; index < evidence.parents.size(); ++index) {
+    if (index > 0)
+      out << ',';
+    out << '"' << jsonEscape(evidence.parents[index]) << '"';
+  }
+  out << "],\"attributes\":"
+      << serializeAnnotationAttributesJSON(evidence) << '}';
+  return out.str();
+}
+
 std::string
 Interpreter::serializeTrackEvidenceJSON(const TrackEvidence &track) const {
   std::ostringstream out;
@@ -620,16 +655,32 @@ void Interpreter::executeExport(const IRInstruction &instr) {
                                    ? alias + "_" + std::to_string(generatedId++)
                                    : region.name;
       const std::string score =
-          region.motifEvidence.present
+          region.annotationEvidence.present
+              ? region.annotationEvidence.score
+          : region.motifEvidence.present
               ? std::to_string(region.motifEvidence.rawScore)
               : region.trackEvidence.present && region.trackEvidence.hasScore
                     ? std::to_string(region.trackEvidence.score)
                     : ".";
-      out << cleanTabularField(region.chr) << "\tCis-QL\t"
+      const std::string source = region.annotationEvidence.present
+                                     ? region.annotationEvidence.source
+                                     : "Cis-QL";
+      const std::string phase = region.annotationEvidence.present
+                                    ? region.annotationEvidence.phase
+                                    : ".";
+      out << cleanTabularField(region.chr) << '\t'
+          << cleanTabularField(source) << '\t'
           << cleanTabularField(type) << '\t' << (region.start + 1) << '\t'
           << region.end << '\t' << score << '\t' << strand
-          << "\t.\tID=" << gffAttributeEscape(name)
-          << ";Name=" << gffAttributeEscape(name);
+          << '\t' << phase << '\t';
+      if (region.annotationEvidence.present &&
+          !region.annotationEvidence.rawAttributes.empty() &&
+          region.annotationEvidence.rawAttributes != ".") {
+        out << region.annotationEvidence.rawAttributes;
+      } else {
+        out << "ID=" << gffAttributeEscape(name)
+            << ";Name=" << gffAttributeEscape(name);
+      }
       if (region.motifEvidence.present) {
         out << ";MatrixAlias="
             << gffAttributeEscape(region.motifEvidence.matrixAlias)
@@ -837,7 +888,10 @@ void Interpreter::executeExport(const IRInstruction &instr) {
            "\tconsensus_observed_support"
            "\tconsensus_minimum_reciprocal_overlap_percent"
            "\tconsensus_maximum_summit_distance_bp"
-           "\tconsensus_evidence_json\n";
+           "\tconsensus_evidence_json"
+           "\tannotation_source\tannotation_id\tannotation_name"
+           "\tannotation_score\tannotation_phase"
+           "\tannotation_parents_json\tannotation_attributes_json\n";
     for (const auto &region : regionsIt->second) {
       out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
           << region.end << '\t' << cleanTabularField(region.strand) << '\t'
@@ -994,6 +1048,26 @@ void Interpreter::executeExport(const IRInstruction &instr) {
                    serializeConsensusEvidenceJSON(region.consensusEvidence));
       } else {
         out << "\t\t\t\t\t";
+      }
+      out << '\t';
+      if (region.annotationEvidence.present) {
+        out << cleanTabularField(region.annotationEvidence.source) << '\t'
+            << cleanTabularField(region.annotationEvidence.id) << '\t'
+            << cleanTabularField(region.annotationEvidence.name) << '\t'
+            << cleanTabularField(region.annotationEvidence.score) << '\t'
+            << cleanTabularField(region.annotationEvidence.phase) << '\t'
+            << '[';
+        for (size_t index = 0;
+             index < region.annotationEvidence.parents.size(); ++index) {
+          if (index > 0)
+            out << ',';
+          out << '"'
+              << jsonEscape(region.annotationEvidence.parents[index]) << '"';
+        }
+        out << "]\t" << cleanTabularField(
+            serializeAnnotationAttributesJSON(region.annotationEvidence));
+      } else {
+        out << "\t\t\t\t\t\t";
       }
       out << '\n';
     }
@@ -1561,12 +1635,56 @@ bool Interpreter::evaluateRegionCondition(
     return (condition->op == "=" || condition->op == "==") &&
            observed == expected;
   }
+  if (condition->property == "TYPE") {
+    const std::string expected = stripQuotes(condition->value);
+    return (condition->op == "=" || condition->op == "==") &&
+           region.type == expected;
+  }
+  if (condition->property == "PARENT") {
+    if (!region.annotationEvidence.present)
+      return false;
+    const std::string expected = stripQuotes(condition->value);
+    return (condition->op == "=" || condition->op == "==") &&
+           std::find(region.annotationEvidence.parents.begin(),
+                     region.annotationEvidence.parents.end(), expected) !=
+               region.annotationEvidence.parents.end();
+  }
+  if (condition->property == "SOURCE" || condition->property == "PHASE") {
+    if (!region.annotationEvidence.present)
+      return false;
+    const std::string expected = stripQuotes(condition->value);
+    const std::string &observed = condition->property == "SOURCE"
+                                      ? region.annotationEvidence.source
+                                      : region.annotationEvidence.phase;
+    return (condition->op == "=" || condition->op == "==") &&
+           observed == expected;
+  }
+  if (condition->property == "ATTRIBUTE") {
+    if (!region.annotationEvidence.present)
+      return false;
+    const std::string key = stripQuotes(condition->reference);
+    const auto attribute = region.annotationEvidence.attributes.find(key);
+    if (attribute == region.annotationEvidence.attributes.end())
+      return false;
+    const std::string expected = stripQuotes(condition->value);
+    return (condition->op == "=" || condition->op == "==") &&
+           attribute->second == expected;
+  }
   if (condition->property == "ID" || condition->property == "NAME") {
     const std::string expected = stripQuotes(condition->value);
+    const std::string observed =
+        condition->property == "ID" && region.annotationEvidence.present &&
+                !region.annotationEvidence.id.empty()
+            ? region.annotationEvidence.id
+        : condition->property == "NAME" &&
+                  region.annotationEvidence.present &&
+                  !region.annotationEvidence.name.empty()
+            ? region.annotationEvidence.name
+            : region.name;
     if (condition->op == "=" || condition->op == "==")
-      return region.name == expected;
+      return observed == expected;
     if (condition->op == "!=")
-      return region.name != expected;
+      return observed != expected;
   }
   return false;
 }
@@ -1685,7 +1803,8 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
     if (!conditionUsesOnly(
             instr.condition,
             {"LENGTH", "START", "END", "STRAND", "SIMILARITY",
-             "GC_CONTENT", "COUNT", "ID", "NAME",
+             "GC_CONTENT", "COUNT", "ID", "NAME", "TYPE", "PARENT",
+             "SOURCE", "PHASE", "ATTRIBUTE",
              "TRACK_SCORE", "SIGNAL_VALUE", "MINUS_LOG10_PVALUE",
              "MINUS_LOG10_QVALUE", "EVIDENCE_CLASS", "ASSAY", "SAMPLE",
              "CONDITION", "REPLICATE", "CONTROL", "SUPPORT_COUNT"})) {
@@ -2418,6 +2537,10 @@ void Interpreter::dumpResultsJSON() const {
           << "        \"type\": \"" << jsonEscape(r.type) << "\",\n"
           << "        \"name\": \"" << jsonEscape(r.name) << "\",\n"
           << "        \"sequence\": \"" << jsonEscape(r.sequence) << "\"";
+      if (r.annotationEvidence.present) {
+        out << ",\n        \"annotationEvidence\": "
+            << serializeAnnotationEvidenceJSON(r.annotationEvidence);
+      }
       if (r.motifEvidence.present) {
         out << ",\n        \"motifEvidence\": {\n"
             << "          \"matrixAlias\": \""

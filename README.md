@@ -21,12 +21,13 @@ interface.
 
 ## What the language does today
 
-The current implementation reads FASTA sequences, GFF3 annotations, JASPAR
-frequency matrices, and BED or narrowPeak tracks. It can derive strand-aware
-promoters, find literal or IUPAC sequence patterns, scan PWMs with explicit
-background and multiple-testing metadata, combine genomic intervals, describe
-two-site motif modules, count support, select nearby features, and build
-anchor-preserving consensus sets across experimental tracks. Results can be
+The current implementation reads FASTA sequences, hierarchy-preserving GFF3
+annotations, JASPAR frequency matrices, and BED or narrowPeak tracks. It can
+derive strand-aware promoters, find literal or IUPAC sequence patterns, scan
+PWMs with explicit background and multiple-testing metadata, combine genomic
+intervals, describe two-site motif modules, count support, select nearby
+features, and build anchor-preserving consensus sets across experimental
+tracks. Results can be
 inspected as structured JSON and exported to BED, GFF3, or TSV.
 
 A typical query has this shape:
@@ -131,6 +132,12 @@ The example suite also includes the plant MYB profile `MA0054.1` from
 [JASPAR CORE](https://jaspar.elixir.no/matrix/MA0054.1/). The accompanying
 `anthocyanin_regulatory_demo` FASTA/GFF3 pair is synthetic and exists only to
 make expected regulatory-query results small, deterministic, and inspectable.
+
+GFF3 import preserves source, score, phase, `ID`, `Name`, every `Parent`, and
+the complete attribute map. Percent-encoded attribute values are decoded for
+queries, while GFF3 export retains the original attribute field. Cis-QL does
+not guess which Sequence Ontology types constitute a transcript; use
+`EXTRACT FEATURE` with explicit type and attribute filters instead.
 
 `LOAD TRACK` currently accepts BED and narrowPeak. Track coordinates are
 already zero-based and half-open. When a sequence dataset is active, Cis-QL
@@ -301,6 +308,12 @@ EXTRACT GENE AS homologous_genes
     WHERE LENGTH > 1 KB
       AND SIMILARITY TO reference_gene > 70 %;
 
+EXTRACT FEATURE AS coding_features
+    WHERE TYPE = "CDS"
+      AND PARENT = "transcript_1"
+      AND PHASE = "0"
+      AND ATTRIBUTE "protein_id" = "protein_1";
+
 EXTRACT accessibility_peaks AS strong_accessibility
     WHERE TRACK_SCORE >= 600
       AND SIGNAL_VALUE >= 10
@@ -316,7 +329,10 @@ FIND MOTIF "ATG" AS phase_zero_starts
 
 Condition properties are result-specific. Region sets support `LENGTH`,
 `START`, `END`, `STRAND`, `SIMILARITY`, `GC_CONTENT`, and `ID`, plus `COUNT`
-when count evidence is attached. Track-backed regions additionally support
+when count evidence is attached. Annotation-backed regions also support
+`NAME`, `TYPE`, `PARENT`, `SOURCE`, `PHASE`, and arbitrary
+`ATTRIBUTE "key" = "value"` filters. `PARENT` matches any member of a
+multi-parent GFF3 record. Track-backed regions additionally support
 `TRACK_SCORE`,
 `SIGNAL_VALUE`, `MINUS_LOG10_PVALUE`, `MINUS_LOG10_QVALUE`,
 `EVIDENCE_CLASS`, `ASSAY`, `SAMPLE`, `CONDITION`, `REPLICATE`, and `CONTROL`.
@@ -455,12 +471,14 @@ Factor             ::= NOT Factor | SimpleCondition | "(" Condition ")"
 SimpleCondition    ::= NumericProperty NumericModifierOpt RelOp Value
                      | SIMILARITY SimilarityRefOpt NumericModifierOpt RelOp Value
                      | StringProperty RelOp STRING
+                     | ATTRIBUTE STRING RelOp STRING
 NumericModifierOpt ::= MOD (NUM | FLOAT) | λ
 NumericProperty    ::= LENGTH | START | END | GC_CONTENT | COUNT
                      | SUPPORT_COUNT | TRACK_SCORE | SIGNAL_VALUE
                      | MINUS_LOG10_PVALUE | MINUS_LOG10_QVALUE
-StringProperty     ::= ID | NAME | STRAND | EVIDENCE_CLASS | ASSAY | SAMPLE
-                     | CONDITION | REPLICATE | CONTROL
+StringProperty     ::= ID | NAME | STRAND | TYPE | PARENT | SOURCE | PHASE
+                     | EVIDENCE_CLASS | ASSAY | SAMPLE | CONDITION
+                     | REPLICATE | CONTROL
 SimilarityRefOpt   ::= TO ID | λ
 RelOp              ::= ">" | "<" | ">=" | "<=" | "="
 Value              ::= (NUM | FLOAT) Unit | (NUM | FLOAT) PERCENT | NUM | FLOAT | STRING
@@ -469,7 +487,7 @@ Probability        ::= NUM | FLOAT
 Unit               ::= BP | KB | MB | λ
 RequiredUnit       ::= BP | KB | MB
 Direction          ::= UPSTREAM | DOWNSTREAM
-Entity             ::= GENE | PROMOTER | ENHANCER | EXON | INTRON | UTR | TSS | CDS | REGION
+Entity             ::= GENE | PROMOTER | ENHANCER | EXON | INTRON | UTR | TSS | CDS | REGION | FEATURE
 EntityRef          ::= Entity | ID
 EntityName         ::= STRING | λ
 AliasOpt           ::= AS ID | λ
@@ -509,8 +527,8 @@ requirements needed before reporting external benchmark results.
 
 The repository includes runnable `.cql` programs grouped by the capability
 they demonstrate. Scripts 01-11 form one compact, synthetic eukaryotic
-evidence-integration workflow. Script 12 uses an *E. coli* reference to show
-strand-aware regex search and explicit reading-frame constraints. Neither
+evidence-integration workflow. Scripts 12-13 use an *E. coli* reference to show
+sequence-pattern constraints and hierarchy-preserving GFF3 queries. Neither
 fixture defines the intended organism, pathway, or regulatory model of Cis-QL.
 
 The regulatory progression and its expected outputs are described in
@@ -530,6 +548,7 @@ The regulatory progression and its expected outputs are described in
 | `10_accessible_bound_myb_candidates.cql` | Combine filtered accessibility, binding, motif, and proximity | track-evidence `WHERE`, multi-track `overlapEvidence`, `COUNT`, `NEAR` |
 | `11_replicate_supported_candidates.cql` | Require substantial coordinate and summit support from two binding replicates | `CONSENSUS`, reciprocal overlap, summit distance, structured experimental provenance |
 | `12_regex_denovo.cql` | Find in-frame start-to-stop sequence candidates near TATA-like anchors | regex search, strand, `LENGTH MOD 3` |
+| `13_gff3_hierarchy.cql` | Select a real gene and its CDS through preserved annotation identity | `FEATURE`, `ID`, `PARENT`, `PHASE`, `ATTRIBUTE` |
 
 ---
 

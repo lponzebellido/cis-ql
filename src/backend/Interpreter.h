@@ -62,6 +62,10 @@ private:
 
   std::string stripQuotes(const std::string &s) const;
   std::string jsonEscape(const std::string &s) const;
+  std::string serializeAnnotationAttributesJSON(
+      const AnnotationEvidence &evidence) const;
+  std::string serializeAnnotationEvidenceJSON(
+      const AnnotationEvidence &evidence) const;
   std::string serializeTrackEvidenceJSON(const TrackEvidence &track) const;
   std::string serializeConsensusEvidenceJSON(
       const ConsensusEvidence &evidence) const;
