@@ -12,6 +12,8 @@ struct IRCondition {
   Kind kind = Kind::SIMPLE;
   std::string property;
   std::string reference;
+  std::string modifier;
+  std::string modifierValue;
   std::string op;
   std::string value;
   std::shared_ptr<IRCondition> left;

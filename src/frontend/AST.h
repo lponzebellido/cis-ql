@@ -62,11 +62,15 @@ class SimpleConditionNode : public ConditionNode {
 public:
   std::string property;
   std::string reference;
+  std::string modifier;
+  std::string modifierValue;
   std::string op;
   std::string value;
   SimpleConditionNode(std::string prop, std::string o, std::string val,
-                      std::string ref = "")
-      : property(prop), reference(ref), op(o), value(val) {}
+                      std::string ref = "", std::string mod = "",
+                      std::string modValue = "")
+      : property(prop), reference(ref), modifier(mod),
+        modifierValue(modValue), op(o), value(val) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;
 };

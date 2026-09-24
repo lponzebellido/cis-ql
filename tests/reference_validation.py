@@ -49,6 +49,21 @@ def overlapping_exact_matches(sequence: str, motif: str) -> list[int]:
     ]
 
 
+def first_in_frame_start_stop_regions(
+    sequence: str,
+) -> list[tuple[int, int]]:
+    stops = {"TAA", "TAG", "TGA"}
+    regions = []
+    for start in range(len(sequence) - 2):
+        if sequence[start : start + 3] != "ATG":
+            continue
+        for codon_start in range(start + 3, len(sequence) - 2, 3):
+            if sequence[codon_start : codon_start + 3] in stops:
+                regions.append((start, codon_start + 3))
+                break
+    return regions
+
+
 def subtract_intervals(
     intervals: list[tuple[int, int]], masks: list[tuple[int, int]]
 ) -> list[tuple[int, int]]:
@@ -477,6 +492,31 @@ def main() -> int:
             "exact motif coordinates differ from independent reference",
         )
         print("[ok] overlapping exact motif coordinates")
+
+        frame_sequence = "ATGAAATAACCCATGATAACCTAG"
+        (workspace / "frame.fasta").write_text(
+            f">chrFrame\n{frame_sequence}\n", encoding="utf-8"
+        )
+        frame_data = run_query(
+            workspace,
+            "frame_reference",
+            'LOAD SEQUENCE "frame.fasta" AS genome;\n'
+            'FIND MOTIF "ATG(?:(?!TAA|TAG|TGA)[ACGT]{3})*'
+            '(?:TAA|TAG|TGA)" STRAND POSITIVE AS candidates '
+            'WHERE LENGTH MOD 3 = 0;\n',
+        )
+        observed_frame_regions = [
+            (region["start"], region["end"])
+            for region in frame_data["resultSets"]["candidates"]
+        ]
+        require(
+            observed_frame_regions
+            == first_in_frame_start_stop_regions(frame_sequence)
+            == [(0, 9), (12, 24)],
+            "in-frame regex and MOD differ from codon-stepping reference",
+        )
+        print("[ok] in-frame start-to-stop candidates")
+
         expected_modules = define_homotypic_modules(
             [("chr1", start, start + 3, "+")
              for start in observed_motifs],

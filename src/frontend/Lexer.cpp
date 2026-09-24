@@ -72,6 +72,9 @@ void Lexer::initKeywords() {
     keywords["NOT"] = TokenType::NOT;
     keywords["WHERE"] = TokenType::WHERE;
     keywords["LENGTH"] = TokenType::LENGTH;
+    keywords["START"] = TokenType::START;
+    keywords["END"] = TokenType::END;
+    keywords["MOD"] = TokenType::MOD;
     keywords["AS"] = TokenType::AS;
 
     keywords["EXON"] = TokenType::EXON;
@@ -437,6 +440,9 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::NOT: return "NOT";
         case TokenType::WHERE: return "WHERE";
         case TokenType::LENGTH: return "LENGTH";
+        case TokenType::START: return "START";
+        case TokenType::END: return "END";
+        case TokenType::MOD: return "MOD";
         case TokenType::AS: return "AS";
         case TokenType::EXON: return "EXON";
         case TokenType::INTRON: return "INTRON";

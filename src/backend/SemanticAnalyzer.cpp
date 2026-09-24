@@ -431,10 +431,15 @@ void SemanticAnalyzer::visit(NotConditionNode *node) {
 
 void SemanticAnalyzer::visit(SimpleConditionNode *node) {
   static const std::set<std::string> supportedProperties = {
-      "LENGTH", "SIMILARITY", "GC_CONTENT", "COUNT", "ID", "NAME",
+      "LENGTH", "START", "END", "STRAND", "SIMILARITY", "GC_CONTENT",
+      "COUNT", "ID", "NAME",
       "TRACK_SCORE", "SIGNAL_VALUE", "MINUS_LOG10_PVALUE",
       "MINUS_LOG10_QVALUE", "EVIDENCE_CLASS", "ASSAY", "SAMPLE",
       "CONDITION", "REPLICATE", "CONTROL", "SUPPORT_COUNT"};
+  static const std::set<std::string> numericProperties = {
+      "LENGTH", "START", "END", "SIMILARITY", "GC_CONTENT", "COUNT",
+      "TRACK_SCORE", "SIGNAL_VALUE", "MINUS_LOG10_PVALUE",
+      "MINUS_LOG10_QVALUE", "SUPPORT_COUNT"};
   if (!supportedProperties.count(node->property)) {
     reportError("Unsupported condition property '" + node->property + "'.");
     return;
@@ -444,10 +449,33 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
       !sequenceLoaded) {
     reportError(node->property + " requires sequence data.");
   }
+  if (!node->modifier.empty()) {
+    if (!numericProperties.count(node->property)) {
+      reportError(node->modifier + " requires a numeric condition property.");
+    }
+    const double divisor = parseValue(node->modifierValue);
+    if (!std::isfinite(divisor) || divisor <= 0.0) {
+      reportError("MOD divisor must be a finite number greater than zero.");
+    }
+    if (node->value.find(' ') != std::string::npos ||
+        (!node->value.empty() && node->value.front() == '"')) {
+      reportError("A condition using MOD must compare with a unitless numeric "
+                  "value.");
+    }
+  }
   if (node->property == "LENGTH") {
     double length = parseValue(node->value);
     if (length < 0) {
       reportError("LENGTH cannot be negative.");
+    }
+  } else if (node->property == "START" || node->property == "END") {
+    const double coordinate = parseValue(node->value);
+    if (!std::isfinite(coordinate) || coordinate < 0.0 ||
+        node->value.find(' ') != std::string::npos ||
+        (!node->value.empty() && node->value.front() == '"')) {
+      reportError(node->property +
+                  " must be compared with a finite, non-negative unitless "
+                  "number.");
     }
   } else if (node->property == "SIMILARITY") {
     double similarity = parseValue(node->value);
@@ -490,6 +518,14 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
       reportError(node->property +
                   " must be compared with a finite, non-negative number "
                   "without a unit.");
+    }
+  } else if (node->property == "STRAND") {
+    if (node->value != "\"+\"" && node->value != "\"-\"" &&
+        node->value != "\".\"") {
+      reportError("STRAND must be compared with \"+\", \"-\", or \".\".");
+    }
+    if (node->op != "=" && node->op != "==") {
+      reportError("STRAND supports only equality comparison.");
     }
   } else if (node->property == "EVIDENCE_CLASS" ||
              node->property == "ASSAY" || node->property == "SAMPLE" ||

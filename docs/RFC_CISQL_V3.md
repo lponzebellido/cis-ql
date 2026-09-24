@@ -1,7 +1,9 @@
 # Cis-QL v3: regulatory genomics direction
 
-Status: incremental implementation. Parts 1 through 2B3, Parts 3A-3D, and Part
-4A are implemented; later parts are a design contract, not yet accepted syntax.
+Status: incremental implementation. Explicit promoters, calibrated PWM scans,
+evidence-preserving interval operations, two-member modules, imported regulatory
+tracks, replicate consensus, and modular coordinate filters are implemented.
+Later sections are a design contract, not yet accepted syntax.
 
 ## Product definition
 
@@ -19,6 +21,27 @@ It must not equate a motif match or a coexpression edge with direct regulation.
 - Becoming a general-purpose DNA editing or sequence utility language.
 - Reimplementing every motif, alignment, RNA-seq, or phylogenetics algorithm.
 - Reporting regulatory relationships without evidence grades and provenance.
+
+## Work remaining after the regulatory foundation
+
+The next work is ordered by how much it improves real analyses rather than by
+how many new statements it adds.
+
+| Priority | Missing capability | Why it matters | Smallest useful acceptance target |
+| :--- | :--- | :--- | :--- |
+| 1 | Transcript-aware GFF3 model | Promoters, UTRs, CDSs, and TSSs cannot be selected rigorously while parent/child relationships and transcript policy are flattened | Preserve attributes and parentage; expose explicit `ALL`, canonical, or named-transcript selection |
+| 2 | General scalar and oriented-sequence expressions | Regex can describe complex patterns, but programmers need auditable arithmetic, captures, strand-oriented sequence, translation, and genetic-code policy outside the regex itself | Extend the current `MOD`, `START`, `END`, and `STRAND` foundation with reusable expressions and oriented extraction |
+| 3 | Enrichment with matched backgrounds | Counts alone cannot distinguish motif enrichment from length or composition effects | Declare foreground/background regions, matching policy, effect size, test, and multiple-testing correction |
+| 4 | CRE-to-gene evidence tables | `NEAR` is useful but genomic proximity is only one candidate-linking rule | Import relationship/contact tables and retain typed promoter, distance, contact, expression, and binding evidence per link |
+| 5 | General regulatory grammars | Two-site modules cannot express larger heterotypic architectures | Named members, more than two sites, transcript-relative orientation, and grouped aggregation |
+| 6 | Dataset identity and catalogs | File provenance alone cannot prevent assembly, annotation-release, or matrix-version mismatches | Assembly identifiers, annotation releases, sequence dictionaries, and catalog-resolved matrix metadata |
+| 7 | Comparative regulation | Conservation and motif turnover require orthology and assembly-aware mappings | Import ortholog groups and compare position-aware modules without pretending motif presence proves conserved regulation |
+
+Validation should span several organisms and question types. A bacterial
+sequence-pattern fixture tests regex, strand, coordinates, and frame. Yeast can
+test compact promoter architecture. A non-MBW plant workflow can test distal
+regulation and condition-specific accessibility. A human workflow can test
+large annotations, promoter/enhancer evidence, and assembly compatibility.
 
 ## Scientific contracts
 
@@ -196,6 +219,28 @@ Still planned:
 
 - richer JASPAR metadata such as TF family and matrix release/version;
 - installed-FIMO parity fixtures in continuous integration.
+
+### Part 2C: explicit modular coordinate constraints
+
+Implemented syntax:
+
+```cql
+FIND MOTIF "ATG(?:(?!TAA|TAG|TGA)[ACGT]{3})*(?:TAA|TAG|TGA)"
+  STRAND POSITIVE AS start_stop_candidates
+  WHERE LENGTH MOD 3 = 0 AND START MOD 3 = 0;
+```
+
+Numeric conditions may apply `MOD` before their relational comparison.
+`START` and `END` expose zero-based, half-open genomic coordinates, and
+`STRAND` compares with `"+"`, `"-"`, or `"."`. These are general language
+properties rather than an ORF-specific operator. A codon-stepping regex is
+still necessary when the search engine must skip an out-of-frame stop and keep
+looking for the next in-frame stop; filtering a lazy arbitrary-length regex
+after it has already chosen a match cannot change that choice.
+
+The current result sequence is stored in reference orientation. Strand-oriented
+extraction, capture groups, translation, genetic-code selection, and general
+scalar expressions remain planned.
 
 ### Part 3: regulatory interval algebra
 
@@ -428,6 +473,8 @@ Anchor-preserving coordinate consensus is implemented explicitly:
 CONSENSUS FROM [binding_rep1, binding_rep2]
   ANCHOR binding_rep1
   MIN_SUPPORT 2
+  MIN_RECIPROCAL_OVERLAP 50 %
+  MAX_SUMMIT_DISTANCE 20 BP
   AS reproducible_binding
   WHERE SUPPORT_COUNT >= 2;
 ```
@@ -436,11 +483,14 @@ The anchor must be one unique member of a list containing at least two named
 region sets. It supplies output coordinates and primary evidence and counts as
 one supporting set. Every other input contributes at most one support unit per
 anchor interval, while all of its overlapping observations remain auditable.
-`consensusEvidence` records the anchor, input aliases, minimum support, and
-observed support and remains attached when the consensus is later used as an
-`OVERLAPS` reference. `SUPPORT_COUNT` exposes observed support to `WHERE`.
-This operation deliberately does not merge peak geometry, infer replicate
-quality, or claim IDR-equivalent reproducibility.
+`MIN_RECIPROCAL_OVERLAP` can require each accepted pair to cover a declared
+fraction of both intervals. `MAX_SUMMIT_DISTANCE` can additionally require two
+narrowPeak summits within an explicit distance; records without summit data do
+not satisfy that criterion. `consensusEvidence` records the anchor, input
+aliases, thresholds, minimum support, and observed support and remains attached
+when the consensus is later used as an `OVERLAPS` reference. `SUPPORT_COUNT`
+exposes observed support to `WHERE`. This operation deliberately does not merge
+peak geometry, infer replicate quality, or claim IDR-equivalent reproducibility.
 
 Still planned:
 
@@ -456,11 +506,22 @@ Still planned:
 - Conserved modules, motif turnover, and position-aware comparisons.
 - Import CoExp/CoExpPhylo results instead of duplicating their pipelines.
 
-## Target anthocyanin use case
+## Cross-organism validation portfolio
 
-The first biological benchmark should use known maize anthocyanin genes and
-transport machinery. A direct case such as `ZmMRP3` is a positive control;
-`Bz2`, `Wrky33`, transporter families, and ART1-like candidates exercise
-different evidence levels. A successful query must reproduce known evidence,
-rank plausible new candidates, and clearly identify which relationships remain
-predictions.
+No single pathway should define the language or its examples. Reference
+workflows should be small enough to inspect, use versioned public inputs, and
+test a distinct scientific contract:
+
+- *E. coli*: strand-aware sequence patterns, coordinate phase, and candidate
+  start-to-stop regions, without presenting regex hits as gene predictions.
+- *Saccharomyces cerevisiae*: compact promoter architecture with sourced motif
+  models and an independently checkable expected set.
+- *Arabidopsis thaliana*: a stress-, hormone-, or light-response workflow using
+  annotation, accessibility, and TF evidence rather than an MBW showcase.
+- Human: assembly-matched GENCODE-derived annotation and ENCODE-derived tracks
+  to exercise transcript policy, large interval sets, and multi-source
+  promoter/enhancer support.
+
+Each workflow must distinguish deterministic language tests from biological
+validation, document licenses and releases, and state which outputs are direct
+observations, coordinate associations, or predictions.

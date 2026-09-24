@@ -853,7 +853,9 @@ std::unique_ptr<ConditionNode> Parser::parseFactor() {
 
 std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
   std::string prop;
-  if (match(TokenType::LENGTH) || match(TokenType::SIMILARITY) ||
+  if (match(TokenType::LENGTH) || match(TokenType::START) ||
+      match(TokenType::END) || match(TokenType::STRAND) ||
+      match(TokenType::SIMILARITY) ||
       match(TokenType::GC_CONTENT) || match(TokenType::COUNT) ||
       match(TokenType::TRACK_SCORE) || match(TokenType::SIGNAL_VALUE) ||
       match(TokenType::MINUS_LOG10_PVALUE) ||
@@ -874,6 +876,17 @@ std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
     consume(TokenType::ID,
             "Expected a result-set alias after 'SIMILARITY TO'.");
     reference = previous().lexeme;
+  }
+
+  std::string modifier;
+  std::string modifierValue;
+  if (match(TokenType::MOD)) {
+    modifier = previous().lexeme;
+    if (!match(TokenType::NUM) && !match(TokenType::FLOAT)) {
+      reportError(peek(), "Expected a numeric divisor after MOD.");
+      throw std::runtime_error("Parse error");
+    }
+    modifierValue = previous().lexeme;
   }
 
   std::string op;
@@ -900,7 +913,8 @@ std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
   }
 
   return std::unique_ptr<SimpleConditionNode>(
-      new SimpleConditionNode(prop, op, val, reference));
+      new SimpleConditionNode(prop, op, val, reference, modifier,
+                              modifierValue));
 }
 
 std::unique_ptr<AnalyzeStmtNode> Parser::parseAnalyze() {

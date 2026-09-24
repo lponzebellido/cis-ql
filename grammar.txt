@@ -4,8 +4,8 @@ Terminals (Tokens):
 
 LOAD, USE, EXPORT, DEFINE, PROMOTERS, MODULE, OF, SEQUENCE, ANNOTATION, TRACK, MATRIX, STRING, AS, ID, SEMICOLON, FIND, MOTIF, COUNT, WITHIN, NUM,
 FROM, WITH, GENE, PROMOTER, ENHANCER, EXON, INTRON, UTR, TSS, CDS, REGION, STRAND, POSITIVE, NEGATIVE,
-CHR, EXTRACT, WHERE, INTERSECT, UNION, EXCEPT, OVERLAPS, NEAR, CONSENSUS, ANCHOR, MIN_SUPPORT, AND, OR, NOT, LPAREN, RPAREN, LBRACKET, RBRACKET,
-LENGTH, SIMILARITY, GREATER, LESS, GREATER_EQ, LESS_EQ, ASSIGN, FLOAT, PERCENT, BP, KB, MB,
+CHR, EXTRACT, WHERE, INTERSECT, UNION, EXCEPT, OVERLAPS, NEAR, CONSENSUS, ANCHOR, MIN_SUPPORT, MIN_RECIPROCAL_OVERLAP, MAX_SUMMIT_DISTANCE, AND, OR, NOT, LPAREN, RPAREN, LBRACKET, RBRACKET,
+LENGTH, START, END, MOD, SIMILARITY, GREATER, LESS, GREATER_EQ, LESS_EQ, ASSIGN, FLOAT, PERCENT, BP, KB, MB,
 UPSTREAM, DOWNSTREAM, SCAN, THRESHOLD, PVALUE, QVALUE, BACKGROUND, UNIFORM, ANALYZE, GC_CONTENT, CPG_ISLANDS, WINDOW,
 IF, THEN, ELSE, ENDIF, FOREACH, IN, DO, ENDFOR, COMMA, TO, FORMAT, BED, GFF3, TSV,
 SPACING, ORDER, ORIENTATION, ANY, SAME, OPPOSITE, AS_WRITTEN, NARROWPEAK,
@@ -60,8 +60,12 @@ SetOperationStmt   -> (INTERSECT | UNION) EntityRef AND EntityRef AliasOpt Where
                     | NEAR EntityRef TO EntityRef WITHIN (NUM | FLOAT) RequiredUnit AliasOpt WhereClause SEMICOLON
 
 ConsensusStmt      -> CONSENSUS FROM LBRACKET ID COMMA ID ConsensusTail RBRACKET
-                      ANCHOR ID MIN_SUPPORT NUM AS ID WhereClause SEMICOLON
+                      ANCHOR ID MIN_SUPPORT NUM ConsensusCriterionList
+                      AS ID WhereClause SEMICOLON
 ConsensusTail      -> COMMA ID ConsensusTail | λ
+ConsensusCriterionList -> ConsensusCriterion ConsensusCriterionList | λ
+ConsensusCriterion -> MIN_RECIPROCAL_OVERLAP (NUM | FLOAT) PERCENT
+                    | MAX_SUMMIT_DISTANCE (NUM | FLOAT) RequiredUnit
 
 CountStmt          -> COUNT EntityRef IN EntityRef AS ID WhereClause SEMICOLON
 
@@ -81,13 +85,15 @@ Term               -> Factor TermPrime
 TermPrime          -> AND Factor TermPrime | λ
 Factor             -> NOT Factor | SimpleCondition | LPAREN Condition RPAREN
 
-SimpleCondition    -> Property RelOp Value | SIMILARITY SimilarityRefOpt RelOp Value
-Property           -> LENGTH | GC_CONTENT | COUNT | ID
-                    | SUPPORT_COUNT
-                    | TRACK_SCORE | SIGNAL_VALUE
+SimpleCondition    -> NumericProperty NumericModifierOpt RelOp Value
+                    | SIMILARITY SimilarityRefOpt NumericModifierOpt RelOp Value
+                    | StringProperty RelOp STRING
+NumericModifierOpt -> MOD (NUM | FLOAT) | λ
+NumericProperty    -> LENGTH | START | END | GC_CONTENT | COUNT
+                    | SUPPORT_COUNT | TRACK_SCORE | SIGNAL_VALUE
                     | MINUS_LOG10_PVALUE | MINUS_LOG10_QVALUE
-                    | EVIDENCE_CLASS | ASSAY | SAMPLE | CONDITION
-                    | REPLICATE | CONTROL
+StringProperty     -> ID | STRAND | EVIDENCE_CLASS | ASSAY | SAMPLE
+                    | CONDITION | REPLICATE | CONTROL
 SimilarityRefOpt   -> TO ID | λ
 RelOp              -> GREATER | LESS | GREATER_EQ | LESS_EQ | ASSIGN
 Value              -> (NUM | FLOAT) Unit | (NUM | FLOAT) PERCENT | NUM | FLOAT | STRING
@@ -120,3 +126,4 @@ Note on Execution Engine & Studio Integration:
 15. Track-backed region sets can be filtered by `TRACK_SCORE`, `SIGNAL_VALUE`, `MINUS_LOG10_PVALUE`, `MINUS_LOG10_QVALUE`, `EVIDENCE_CLASS`, `ASSAY`, `SAMPLE`, `CONDITION`, `REPLICATE`, and `CONTROL`. Numeric properties require finite non-negative values without units; absent optional narrowPeak values do not match. Metadata uses exact string equality. These properties address the primary `trackEvidence`, so reference tracks should be filtered before `OVERLAPS`.
 16. When the reference side of `OVERLAPS` already contains `overlapEvidence`, that prior provenance is attached recursively as `supportingEvidence` to the new direct reference observation. The hierarchy records the actual chain of interval operations instead of flattening transitive support into false direct overlaps. Coordinate overlap between replicate tracks is descriptive concordance, not IDR or a statistical reproducibility claim.
 17. `CONSENSUS FROM [inputs] ANCHOR anchor MIN_SUPPORT n` retains each complete anchor interval supported by at least `n` distinct input sets under direct half-open coordinate overlap. The anchor must occur once in the unique input list, contributes one support unit, and supplies the result geometry and primary evidence. Each non-anchor set contributes at most one unit even if multiple records overlap; all matching records remain in `overlapEvidence`. Results record the anchor, minimum support, observed support, and input aliases as typed `consensusEvidence`, queryable with `SUPPORT_COUNT`. This is descriptive coordinate concordance, not IDR or a formal reproducibility model.
+18. Numeric conditions may apply `MOD` before comparison. `START` and `END` expose zero-based, half-open genomic coordinates, while `STRAND` supports exact equality with `"+"`, `"-"`, or `"."`. These properties make coordinate phase and orientation testable without embedding those policies in a regular expression.

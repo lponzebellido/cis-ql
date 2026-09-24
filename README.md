@@ -54,12 +54,9 @@ OVERLAPS reproducible_binding WITH promoter_sites AS supported_binding;
 
 The filenames and biological choices in that fragment are intentionally
 generic. Cis-QL does not encode a particular pathway, transcription-factor
-family, organism, or assay. The repository's progressive examples use an
-anthocyanin/MBW-inspired synthetic locus because it exercises promoter,
-enhancer, motif, accessibility, binding, and replicate evidence in one small
-case. The same grammar can express analogous hypotheses in other regulatory
-systems when supplied with appropriate models, annotations, tracks, and
-domain-specific assumptions.
+family, organism, or assay. The repository contains both a compact eukaryotic
+evidence-integration fixture and a bacterial sequence-pattern example. They
+exercise different parts of the language and are not its biological boundary.
 
 ## Project status and boundaries
 
@@ -69,6 +66,9 @@ relationship, or decide whether a PWM and threshold are biologically suitable.
 Those choices remain explicit inputs to the analysis. The value of the
 language is that they can be stated, reviewed, rerun, and exported together
 instead of disappearing inside an ad hoc pipeline.
+
+The prioritized implementation gaps and their acceptance targets are tracked
+in [`docs/RFC_CISQL_V3.md`](docs/RFC_CISQL_V3.md#work-remaining-after-the-regulatory-foundation).
 
 ## Compilation and Execution
 
@@ -92,7 +92,7 @@ Execute a `.cql` script using the `cisql` binary:
 Use the `--debug` flag to inspect compilation phases, including token stream, Abstract Syntax Tree (AST), Symbol Table, Intermediate Representation (IR), and execution steps:
 
 ```bash
-./cisql cql_examples/08_integrated_anthocyanin_query.cql --debug
+./cisql cql_examples/12_regex_denovo.cql --debug
 ```
 
 ### Launching Cis-QL Studio
@@ -113,16 +113,16 @@ npm start
 Load sequence files (FASTA), annotation files (GFF3), and matrix files (JASPAR format):
 
 ```sql
-LOAD SEQUENCE "data_examples/anthocyanin_regulatory_demo.fasta" AS genome;
-LOAD ANNOTATION "data_examples/anthocyanin_regulatory_demo.gff3" AS annotation;
-LOAD MATRIX "matrices/MA0054.1_myb.Ph3.pwm" AS myb_matrix;
-LOAD TRACK "data_examples/anthocyanin_accessibility_demo.narrowPeak"
+LOAD SEQUENCE "genome.fasta" AS genome;
+LOAD ANNOTATION "genes.gff3" AS annotation;
+LOAD MATRIX "tf_model.pwm" AS tf_model;
+LOAD TRACK "accessibility.narrowPeak"
     FORMAT NARROWPEAK
     EVIDENCE ACCESSIBILITY
-    ASSAY "synthetic ATAC-seq-like fixture"
-    SAMPLE "synthetic anthocyanin locus"
-    CONDITION "pigmented petal"
-    REPLICATE "A1"
+    ASSAY "ATAC-seq"
+    SAMPLE "sample_1"
+    CONDITION "treated"
+    REPLICATE "R1"
     CONTROL "input"
     AS accessibility_peaks;
 ```
@@ -157,11 +157,15 @@ USE ANNOTATION annot;
 Locate exact motifs, regular expressions, or IUPAC degenerate strings, with optional spatial constraints relative to other features:
 
 ```sql
-FIND MOTIF "TAACCGTTT" STRAND POSITIVE AS exact_myb_like_sites;
+FIND MOTIF "TATA[AT]A[AT]" STRAND POSITIVE AS promoter_like_patterns;
 
-FIND MOTIF "WAACCGTTT"
+FIND MOTIF "CANNTG"
     WITHIN 100 BP UPSTREAM FROM GENE
-    AS degenerate_upstream_sites;
+    AS degenerate_upstream_patterns;
+
+FIND MOTIF "ATG(?:(?!TAA|TAG|TGA)[ACGT]{3})*(?:TAA|TAG|TGA)"
+    STRAND POSITIVE AS start_stop_candidates
+    WHERE LENGTH >= 15 BP AND LENGTH MOD 3 = 0;
 ```
 
 `FIND MOTIF` is appropriate for exact strings, regular expressions, or
@@ -169,15 +173,22 @@ documented IUPAC patterns. A short consensus is not equivalent to a TF-binding
 model; use `SCAN` with a sourced PWM when TF specificity and calibrated scores
 matter.
 
+The start-to-stop expression consumes complete codons and excludes an internal
+in-frame stop. The explicit `LENGTH MOD 3 = 0` condition makes the frame
+invariant visible to the reader instead of leaving it implicit in the regex.
+It reports sequence candidates, not predicted genes; genetic code, alternative
+starts, minimum coding length, annotation evidence, and the biological question
+remain separate policies.
+
 ### 3. Position Weight Matrix Scanning (`SCAN`)
 
 Scan loaded sequences using Position Weight Matrices with log-odds scoring:
 
 ```sql
-SCAN myb_matrix THRESHOLD 90 % AS high_scoring_myb_sites;
+SCAN tf_model THRESHOLD 90 % AS high_scoring_tf_sites;
 
-SCAN myb_matrix BACKGROUND FROM genome
-    QVALUE <= 0.01 AS supported_myb_sites;
+SCAN tf_model BACKGROUND FROM genome
+    QVALUE <= 0.01 AS significant_tf_sites;
 ```
 
 ### 4. Biological & Structural Analysis (`ANALYZE`)
@@ -195,9 +206,9 @@ ANALYZE CPG_ISLANDS AS cpg_islands;
 Combine or filter interval sets using high-speed interval algebra:
 
 ```sql
-OVERLAPS supported_myb_sites WITH candidate_promoters AS promoter_myb_sites;
-NEAR supported_myb_sites TO GENE WITHIN 2 KB AS proximal_gene_candidates;
-COUNT supported_myb_sites IN candidate_promoters AS promoter_site_counts;
+OVERLAPS significant_tf_sites WITH candidate_promoters AS promoter_tf_sites;
+NEAR significant_tf_sites TO GENE WITHIN 2 KB AS proximal_gene_candidates;
+COUNT significant_tf_sites IN candidate_promoters AS promoter_site_counts;
 EXTRACT promoter_site_counts AS supported_promoters WHERE COUNT >= 1;
 
 CONSENSUS FROM [binding_rep1, binding_rep2]
@@ -259,11 +270,11 @@ constraints:
 
 ```sql
 DEFINE MODULE
-    FROM enhancer_myb_sites WITH enhancer_myb_sites
+    FROM tf_a_sites WITH tf_b_sites
     SPACING 5 BP TO 30 BP
     ORDER ANY
     ORIENTATION ANY
-    AS enhancer_myb_modules;
+    AS candidate_regulatory_modules;
 ```
 
 Spacing is the gap between half-open intervals and both bounds are inclusive;
@@ -281,7 +292,8 @@ hypothesis, reference set, or sensitivity analysis.
 
 ### 7. Feature Extraction & Filtering (`EXTRACT`, `WHERE`)
 
-Filter genomic entities by physical length or alignment similarity:
+Filter genomic entities and motif hits by coordinates, orientation, physical
+length, alignment similarity, or attached evidence:
 
 ```sql
 EXTRACT GENE AS reference_gene WHERE ID = "geneA";
@@ -293,22 +305,34 @@ EXTRACT accessibility_peaks AS strong_accessibility
     WHERE TRACK_SCORE >= 600
       AND SIGNAL_VALUE >= 10
       AND EVIDENCE_CLASS = "ACCESSIBILITY"
-      AND CONDITION = "pigmented petal"
-      AND REPLICATE = "A1";
+      AND CONDITION = "treated"
+      AND REPLICATE = "R1";
+
+FIND MOTIF "ATG" AS phase_zero_starts
+    WHERE START MOD 3 = 0
+      AND END MOD 3 = 0
+      AND STRAND = "+";
 ```
 
-Condition properties are result-specific: region sets support `LENGTH`,
-`SIMILARITY`, `GC_CONTENT`, and `ID`, plus `COUNT` when count evidence is
-attached. Track-backed regions additionally support `TRACK_SCORE`,
+Condition properties are result-specific. Region sets support `LENGTH`,
+`START`, `END`, `STRAND`, `SIMILARITY`, `GC_CONTENT`, and `ID`, plus `COUNT`
+when count evidence is attached. Track-backed regions additionally support
+`TRACK_SCORE`,
 `SIGNAL_VALUE`, `MINUS_LOG10_PVALUE`, `MINUS_LOG10_QVALUE`,
 `EVIDENCE_CLASS`, `ASSAY`, `SAMPLE`, `CONDITION`, `REPLICATE`, and `CONTROL`.
 Missing optional narrowPeak values do not satisfy a numeric condition.
 Metadata uses exact string equality. These properties filter the primary
 track; filter a reference track before combining it with `OVERLAPS`. Motif
-results support `LENGTH` and `GC_CONTENT`; GC profiles support `GC_CONTENT`.
+results support `LENGTH`, `START`, `END`, `STRAND`, and `GC_CONTENT`; GC
+profiles support `GC_CONTENT`.
 `IF` currently evaluates the GC content of the active sequence dataset.
 Regions emitted by `CONSENSUS` additionally support the non-negative integer
 property `SUPPORT_COUNT`.
+
+`MOD` can be applied to numeric properties before comparison, for example
+`LENGTH MOD 3 = 0` or `START MOD 3 = 0`. Coordinates are zero-based and
+half-open. Modular filtering is a general arithmetic constraint; its biological
+meaning comes from the surrounding program.
 
 These filters do not calibrate experimental evidence. BED/narrowPeak scores
 and `signalValue` remain upstream-tool-specific, so thresholds require an
@@ -338,7 +362,7 @@ are rejected.
 Control query execution paths and iterate over collections of loaded matrices:
 
 ```sql
-FOREACH m IN [myb_a, myb_b, myb_c] DO
+FOREACH m IN [tf_model_a, tf_model_b, tf_model_c] DO
     SCAN m BACKGROUND FROM genome QVALUE <= 0.01 AS tf_sites;
 ENDFOR;
 ```
@@ -428,14 +452,15 @@ Term               ::= Factor TermPrime
 TermPrime          ::= AND Factor TermPrime | λ
 Factor             ::= NOT Factor | SimpleCondition | "(" Condition ")"
 
-SimpleCondition    ::= Property RelOp Value
-                     | SIMILARITY SimilarityRefOpt RelOp Value
-Property           ::= LENGTH | GC_CONTENT | COUNT | ID | NAME
-                     | SUPPORT_COUNT
-                     | TRACK_SCORE | SIGNAL_VALUE
+SimpleCondition    ::= NumericProperty NumericModifierOpt RelOp Value
+                     | SIMILARITY SimilarityRefOpt NumericModifierOpt RelOp Value
+                     | StringProperty RelOp STRING
+NumericModifierOpt ::= MOD (NUM | FLOAT) | λ
+NumericProperty    ::= LENGTH | START | END | GC_CONTENT | COUNT
+                     | SUPPORT_COUNT | TRACK_SCORE | SIGNAL_VALUE
                      | MINUS_LOG10_PVALUE | MINUS_LOG10_QVALUE
-                     | EVIDENCE_CLASS | ASSAY | SAMPLE | CONDITION
-                     | REPLICATE | CONTROL
+StringProperty     ::= ID | NAME | STRAND | EVIDENCE_CLASS | ASSAY | SAMPLE
+                     | CONDITION | REPLICATE | CONTROL
 SimilarityRefOpt   ::= TO ID | λ
 RelOp              ::= ">" | "<" | ">=" | "<=" | "="
 Value              ::= (NUM | FLOAT) Unit | (NUM | FLOAT) PERCENT | NUM | FLOAT | STRING
@@ -482,12 +507,11 @@ requirements needed before reporting external benchmark results.
 
 ## Curated Examples Suite (`cql_examples/`)
 
-The repository includes eleven runnable `.cql` analyses built around one
-small, synthetic anthocyanin-regulation case. It is a reference workflow for
-following evidence through the language, not the intended boundary of
-Cis-QL. Adapting the workflow means replacing the sequence, annotation, TF
-model, tracks, and biological constraints; it does not require a different
-grammar. Compiler feature coverage belongs in the automated tests.
+The repository includes runnable `.cql` programs grouped by the capability
+they demonstrate. Scripts 01-11 form one compact, synthetic eukaryotic
+evidence-integration workflow. Script 12 uses an *E. coli* reference to show
+strand-aware regex search and explicit reading-frame constraints. Neither
+fixture defines the intended organism, pathway, or regulatory model of Cis-QL.
 
 The regulatory progression and its expected outputs are described in
 [`cql_examples/README.md`](cql_examples/README.md).
@@ -505,6 +529,7 @@ The regulatory progression and its expected outputs are described in
 | `09_accessible_myb_evidence.cql` | Combine imported accessibility peaks with motif support | narrowPeak provenance, `COUNT`, `NEAR` |
 | `10_accessible_bound_myb_candidates.cql` | Combine filtered accessibility, binding, motif, and proximity | track-evidence `WHERE`, multi-track `overlapEvidence`, `COUNT`, `NEAR` |
 | `11_replicate_supported_candidates.cql` | Require substantial coordinate and summit support from two binding replicates | `CONSENSUS`, reciprocal overlap, summit distance, structured experimental provenance |
+| `12_regex_denovo.cql` | Find in-frame start-to-stop sequence candidates near TATA-like anchors | regex search, strand, `LENGTH MOD 3` |
 
 ---
 

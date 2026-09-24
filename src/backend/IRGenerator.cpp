@@ -58,6 +58,8 @@ IRGenerator::lowerCondition(const ConditionNode *node) const {
     lowered->kind = IRCondition::Kind::SIMPLE;
     lowered->property = simple->property;
     lowered->reference = simple->reference;
+    lowered->modifier = simple->modifier;
+    lowered->modifierValue = simple->modifierValue;
     lowered->op = simple->op;
     lowered->value = simple->value;
   } else if (const auto *binary =

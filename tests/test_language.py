@@ -105,6 +105,9 @@ def main() -> int:
         (workspace / "module.fasta").write_text(
             ">chrModule\nAATTAA\n", encoding="utf-8"
         )
+        (workspace / "reading_frame.fasta").write_text(
+            ">chrFrame\nATGAAATAACCCATGAAAATAA\n", encoding="utf-8"
+        )
         (workspace / "alternate.gff3").write_text(
             "##gff-version 3\n"
             "chr1\ttest\tgene\t101\t200\t.\t-\t.\tID=alternate\n",
@@ -701,6 +704,65 @@ def main() -> int:
                 all(item["end"] - item["start"] == 150
                     for item in data["resultSets"]["long_runs"]),
                 "motif length filtering")
+
+        data, _ = run_query(
+            workspace,
+            "reading_frame_filter",
+            'LOAD SEQUENCE "reading_frame.fasta" AS genome;\n'
+            'FIND MOTIF "ATG.*?(?:TAA|TAG|TGA)" STRAND POSITIVE '
+            'AS frame_checked WHERE LENGTH MOD 3 = 0;\n',
+        )
+        frame_checked = data["resultSets"]["frame_checked"]
+        require(len(frame_checked) == 1 and
+                frame_checked[0]["start"] == 0 and
+                frame_checked[0]["end"] == 9 and
+                frame_checked[0]["strand"] == "+",
+                "MOD filters regex matches by reading-frame length")
+
+        data, _ = run_query(
+            workspace,
+            "coordinate_and_strand_filter",
+            'LOAD SEQUENCE "reading_frame.fasta" AS genome;\n'
+            'FIND MOTIF "ATG" AS aligned_starts '
+            'WHERE START MOD 3 = 0 AND END MOD 3 = 0 '
+            'AND STRAND = "+";\n',
+        )
+        aligned_starts = data["resultSets"]["aligned_starts"]
+        require([(item["start"], item["end"], item["strand"])
+                 for item in aligned_starts] == [(0, 3, "+"), (12, 15, "+")],
+                "START, END, MOD, and STRAND motif filters")
+
+        data, _ = run_query(
+            workspace,
+            "region_coordinate_filter",
+            'LOAD ANNOTATION "fixture.gff3" AS annotation;\n'
+            'EXTRACT GENE AS phase_zero_genes '
+            'WHERE START MOD 1000 = 0 AND STRAND = "+";\n',
+        )
+        require([(item["start"], item["end"])
+                 for item in data["resultSets"]["phase_zero_genes"]]
+                == [(0, 1200), (3000, 3400)],
+                "START, MOD, and STRAND region filters")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "zero_modulus",
+            'LOAD SEQUENCE "reading_frame.fasta" AS genome;\n'
+            'FIND MOTIF "ATG" AS invalid WHERE LENGTH MOD 0 = 0;\n',
+            3,
+        )
+        require("MOD divisor must be" in semantic_error,
+                "zero MOD divisor is rejected")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "modulo_string_property",
+            'LOAD SEQUENCE "reading_frame.fasta" AS genome;\n'
+            'FIND MOTIF "ATG" AS invalid WHERE STRAND MOD 3 = 0;\n',
+            3,
+        )
+        require("MOD requires a numeric" in semantic_error,
+                "MOD on a string property is rejected")
 
         data, _ = run_query(
             workspace,

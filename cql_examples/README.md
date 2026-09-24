@@ -1,13 +1,13 @@
 # Cis-QL regulatory analysis examples
 
-These eleven runnable programs form a progressive analysis of one synthetic
-anthocyanin-regulatory locus. The locus and the MYB model make the examples
-concrete; neither is built into Cis-QL. The sequence of operations is the
-reusable part: define the regulatory search space, score a TF model, calibrate
-and filter its matches, relate them to annotations and experimental tracks,
-then retain the evidence used to form each candidate.
+These runnable programs demonstrate distinct language capabilities with small,
+inspectable inputs. They are a portfolio, not one prescribed biological
+workflow. Scripts 01-11 follow a synthetic eukaryotic regulatory locus through
+motif calibration and experimental-evidence integration. Script 12 uses an
+*E. coli* reference to demonstrate strand-aware sequence patterns and explicit
+reading-frame constraints. Neither fixture is built into Cis-QL.
 
-## Adapting the workflow
+## Regulatory evidence-integration workflow
 
 To use the same programs for another regulatory question, replace each input
 according to its role rather than copying the anthocyanin interpretation:
@@ -26,7 +26,12 @@ binding around a microbial promoter. Cis-QL evaluates the declared coordinate
 and motif relationships; it does not supply the biological assumptions or
 make those examples equivalent across systems.
 
-## Progressive reference workflow
+The first workflow uses a plant-inspired synthetic locus only because one
+compact dataset can exercise promoters, candidate enhancers, PWM hits,
+accessibility, binding, replicate consensus, and proximity. The reusable object
+is the query structure, not MBW, anthocyanin biology, or the chosen TF model.
+
+### Progressive programs
 
 1. `01_define_promoters.cql` derives three strand-aware promoter windows from
    explicit TSS-relative bounds.
@@ -73,6 +78,21 @@ make those examples equivalent across systems.
     accessibility and motif support. The result records all three criteria;
     downstream overlap evidence retains the consensus rule and the R2
     observation.
+
+## Sequence-pattern and coordinate workflow
+
+12. `12_regex_denovo.cql` searches an *E. coli* FASTA for TATA-like sequence
+    anchors and then searches the following positive-strand windows for
+    start-to-stop candidates. Its regex advances in complete codons and excludes
+    internal in-frame stops; `LENGTH MOD 3 = 0` independently exposes the frame
+    invariant in the query. The output is a set of sequence candidates, not gene
+    predictions or evidence that a TATA-like match is a functional promoter.
+
+The same operators are useful outside coding-sequence examples. `START MOD n`,
+`END MOD n`, strand filters, scoped regex search, and interval relationships can
+express phased repeats, periodic sequence architectures, strand-specific
+anchors, or assay-specific coordinate conventions. Their interpretation remains
+the responsibility of the program.
 
 The shared `anthocyanin_regulatory_demo` FASTA and GFF3 files contain three
 annotated genes, one candidate enhancer, two promoter-local MYB instances, and
@@ -121,7 +141,9 @@ Interpret the outputs conservatively:
   Choosing an anchor, support threshold, overlap fraction, and summit distance
   remains an analysis decision that must be justified.
 
-The removed historical examples mixed eukaryotic TF models and promoter
-assumptions with an *E. coli* fixture. Their language constructs remain covered
-by automated tests, but they are intentionally not presented as scientific
-workflows.
+Future reference workflows should add independently sourced data from yeast,
+plants, and humans rather than stretching one synthetic locus across unrelated
+questions. Candidate additions are a yeast promoter-architecture benchmark, a
+plant stress-response motif/accessibility workflow, and a human
+promoter/enhancer evidence-integration workflow with assembly-matched GENCODE
+and ENCODE-derived inputs.

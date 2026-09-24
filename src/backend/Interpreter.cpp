@@ -1451,6 +1451,17 @@ bool Interpreter::compareValues(double left, const std::string &op,
   return false;
 }
 
+bool Interpreter::compareConditionValue(
+    double left, const std::shared_ptr<IRCondition> &condition) const {
+  if (condition->modifier == "MOD") {
+    const double divisor = std::atof(condition->modifierValue.c_str());
+    if (!std::isfinite(divisor) || divisor <= 0.0)
+      return false;
+    left = std::fmod(left, divisor);
+  }
+  return compareValues(left, condition->op, condition->value);
+}
+
 bool Interpreter::evaluateRegionCondition(
     const std::shared_ptr<IRCondition> &condition, const GenomicRegion &region,
     const std::string &referenceSequence) const {
@@ -1468,14 +1479,18 @@ bool Interpreter::evaluateRegionCondition(
     return !evaluateRegionCondition(condition->left, region, referenceSequence);
 
   if (condition->property == "LENGTH")
-    return compareValues(static_cast<double>(region.length()), condition->op,
-                         condition->value);
+    return compareConditionValue(static_cast<double>(region.length()),
+                                 condition);
+  if (condition->property == "START")
+    return compareConditionValue(static_cast<double>(region.start), condition);
+  if (condition->property == "END")
+    return compareConditionValue(static_cast<double>(region.end), condition);
   if (condition->property == "SIMILARITY") {
     if (referenceSequence.empty() || region.sequence.empty())
       return false;
     const double similarity =
         SmithWaterman::computeSimilarity(referenceSequence, region.sequence);
-    return compareValues(similarity, condition->op, condition->value);
+    return compareConditionValue(similarity, condition);
   }
   if (condition->property == "GC_CONTENT") {
     if (region.sequence.empty())
@@ -1488,41 +1503,44 @@ bool Interpreter::evaluateRegionCondition(
     }
     const double percent =
         100.0 * static_cast<double>(gc) / region.sequence.size();
-    return compareValues(percent, condition->op, condition->value);
+    return compareConditionValue(percent, condition);
   }
   if (condition->property == "COUNT") {
     return region.countEvidence.present &&
-           compareValues(static_cast<double>(region.countEvidence.count),
-                         condition->op, condition->value);
+           compareConditionValue(
+               static_cast<double>(region.countEvidence.count), condition);
   }
   if (condition->property == "SUPPORT_COUNT") {
     return region.consensusEvidence.present &&
-           compareValues(
+           compareConditionValue(
                static_cast<double>(region.consensusEvidence.observedSupport),
-               condition->op, condition->value);
+               condition);
   }
   if (condition->property == "TRACK_SCORE") {
     return region.trackEvidence.present && region.trackEvidence.hasScore &&
-           compareValues(region.trackEvidence.score, condition->op,
-                         condition->value);
+           compareConditionValue(region.trackEvidence.score, condition);
   }
   if (condition->property == "SIGNAL_VALUE") {
     return region.trackEvidence.present &&
            region.trackEvidence.hasSignalValue &&
-           compareValues(region.trackEvidence.signalValue, condition->op,
-                         condition->value);
+           compareConditionValue(region.trackEvidence.signalValue, condition);
   }
   if (condition->property == "MINUS_LOG10_PVALUE") {
     return region.trackEvidence.present &&
            region.trackEvidence.hasMinusLog10PValue &&
-           compareValues(region.trackEvidence.minusLog10PValue,
-                         condition->op, condition->value);
+           compareConditionValue(region.trackEvidence.minusLog10PValue,
+                                 condition);
   }
   if (condition->property == "MINUS_LOG10_QVALUE") {
     return region.trackEvidence.present &&
            region.trackEvidence.hasMinusLog10QValue &&
-           compareValues(region.trackEvidence.minusLog10QValue,
-                         condition->op, condition->value);
+           compareConditionValue(region.trackEvidence.minusLog10QValue,
+                                 condition);
+  }
+  if (condition->property == "STRAND") {
+    const std::string expected = stripQuotes(condition->value);
+    return (condition->op == "=" || condition->op == "==") &&
+           region.strand == expected;
   }
   if (condition->property == "EVIDENCE_CLASS" ||
       condition->property == "ASSAY" || condition->property == "SAMPLE" ||
@@ -1596,8 +1614,19 @@ bool Interpreter::evaluateMotifCondition(
   if (condition->kind == IRCondition::Kind::NOT)
     return !evaluateMotifCondition(condition->left, match);
   if (condition->property == "LENGTH")
-    return compareValues(static_cast<double>(match.matchLength), condition->op,
-                         condition->value);
+    return compareConditionValue(static_cast<double>(match.matchLength),
+                                 condition);
+  if (condition->property == "START")
+    return compareConditionValue(static_cast<double>(match.position),
+                                 condition);
+  if (condition->property == "END")
+    return compareConditionValue(
+        static_cast<double>(match.position + match.matchLength), condition);
+  if (condition->property == "STRAND") {
+    const std::string expected = stripQuotes(condition->value);
+    return (condition->op == "=" || condition->op == "==") &&
+           match.strand == expected;
+  }
   if (condition->property == "GC_CONTENT") {
     const auto dataset = sequenceChrMaps.find(activeSequenceAlias);
     if (dataset == sequenceChrMaps.end())
@@ -1615,8 +1644,8 @@ bool Interpreter::evaluateMotifCondition(
       if (c == 'G' || c == 'C')
         ++gc;
     }
-    return compareValues(100.0 * static_cast<double>(gc) / match.matchLength,
-                         condition->op, condition->value);
+    return compareConditionValue(
+        100.0 * static_cast<double>(gc) / match.matchLength, condition);
   }
   return false;
 }
@@ -1635,7 +1664,7 @@ bool Interpreter::evaluateGCCondition(
   if (condition->kind == IRCondition::Kind::NOT)
     return !evaluateGCCondition(condition->left, window);
   return condition->property == "GC_CONTENT" &&
-         compareValues(window.gcPercent, condition->op, condition->value);
+         compareConditionValue(window.gcPercent, condition);
 }
 
 void Interpreter::executeFilterCondition(const IRInstruction &instr) {
@@ -1655,7 +1684,8 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
   } else if (resultSets.count(resultId)) {
     if (!conditionUsesOnly(
             instr.condition,
-            {"LENGTH", "SIMILARITY", "GC_CONTENT", "COUNT", "ID", "NAME",
+            {"LENGTH", "START", "END", "STRAND", "SIMILARITY",
+             "GC_CONTENT", "COUNT", "ID", "NAME",
              "TRACK_SCORE", "SIGNAL_VALUE", "MINUS_LOG10_PVALUE",
              "MINUS_LOG10_QVALUE", "EVIDENCE_CLASS", "ASSAY", "SAMPLE",
              "CONDITION", "REPLICATE", "CONTROL", "SUPPORT_COUNT"})) {
@@ -1768,9 +1798,12 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
     }
     regions = std::move(filtered);
   } else if (motifResults.count(resultId)) {
-    if (!conditionUsesOnly(instr.condition, {"LENGTH", "GC_CONTENT"})) {
+    if (!conditionUsesOnly(
+            instr.condition,
+            {"LENGTH", "START", "END", "STRAND", "GC_CONTENT"})) {
       reportRuntimeError(
-          "Motif matches can only be filtered by LENGTH or GC_CONTENT.");
+          "Motif matches support LENGTH, START, END, STRAND, and GC_CONTENT "
+          "filters.");
       return;
     }
     auto &matches = motifResults[resultId];
@@ -2638,7 +2671,7 @@ bool Interpreter::evaluateGlobalCondition(
     leftVal = std::atof(prop.c_str());
   }
 
-  return compareValues(leftVal, condition->op, condition->value);
+  return compareConditionValue(leftVal, condition);
 }
 
 void Interpreter::execute(const std::vector<IRInstruction> &program,
