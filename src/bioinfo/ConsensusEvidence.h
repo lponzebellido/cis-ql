@@ -12,6 +12,8 @@ struct ConsensusEvidence {
   size_t observedSupport = 0;
   bool hasMinimumReciprocalOverlap = false;
   double minimumReciprocalOverlapPercent = 0.0;
+  bool hasMaximumSummitDistance = false;
+  size_t maximumSummitDistanceBp = 0;
   std::vector<std::string> inputSets;
 };
 

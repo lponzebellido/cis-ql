@@ -169,6 +169,9 @@ std::string Interpreter::serializeConsensusEvidenceJSON(
   if (evidence.hasMinimumReciprocalOverlap)
     out << ",\"minimumReciprocalOverlapPercent\":"
         << evidence.minimumReciprocalOverlapPercent;
+  if (evidence.hasMaximumSummitDistance)
+    out << ",\"maximumSummitDistanceBp\":"
+        << evidence.maximumSummitDistanceBp;
   out << ",\"inputSets\":[";
   for (size_t index = 0; index < evidence.inputSets.size(); ++index) {
     if (index > 0)
@@ -301,6 +304,9 @@ void Interpreter::printRegions(const std::vector<GenomicRegion> &regions,
         std::cout << " reciprocal-overlap:"
                   << r.consensusEvidence.minimumReciprocalOverlapPercent
                   << "%";
+      if (r.consensusEvidence.hasMaximumSummitDistance)
+        std::cout << " summit-distance:"
+                  << r.consensusEvidence.maximumSummitDistanceBp << " BP";
       std::cout << std::endl;
     }
     if (r.trackEvidence.present) {
@@ -707,6 +713,9 @@ void Interpreter::executeExport(const IRInstruction &instr) {
         if (consensus.hasMinimumReciprocalOverlap)
           out << ";ConsensusMinimumReciprocalOverlapPercent="
               << consensus.minimumReciprocalOverlapPercent;
+        if (consensus.hasMaximumSummitDistance)
+          out << ";ConsensusMaximumSummitDistanceBp="
+              << consensus.maximumSummitDistanceBp;
         out << ";ConsensusEvidenceJSON="
             << gffAttributeEscape(
                    serializeConsensusEvidenceJSON(consensus));
@@ -827,6 +836,7 @@ void Interpreter::executeExport(const IRInstruction &instr) {
            "\tconsensus_anchor_set\tconsensus_minimum_support"
            "\tconsensus_observed_support"
            "\tconsensus_minimum_reciprocal_overlap_percent"
+           "\tconsensus_maximum_summit_distance_bp"
            "\tconsensus_evidence_json\n";
     for (const auto &region : regionsIt->second) {
       out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
@@ -977,10 +987,13 @@ void Interpreter::executeExport(const IRInstruction &instr) {
             << region.consensusEvidence.observedSupport << '\t';
         if (region.consensusEvidence.hasMinimumReciprocalOverlap)
           out << region.consensusEvidence.minimumReciprocalOverlapPercent;
+        out << '\t';
+        if (region.consensusEvidence.hasMaximumSummitDistance)
+          out << region.consensusEvidence.maximumSummitDistanceBp;
         out << '\t' << cleanTabularField(
                    serializeConsensusEvidenceJSON(region.consensusEvidence));
       } else {
-        out << "\t\t\t\t";
+        out << "\t\t\t\t\t";
       }
       out << '\n';
     }
@@ -1837,6 +1850,11 @@ void Interpreter::executeConsensus(const IRInstruction &instr) {
       static_cast<size_t>(std::strtoull(instr.arg2.c_str(), nullptr, 10));
   const double minimumReciprocalOverlapPercent =
       instr.arg4.empty() ? 0.0 : std::strtod(instr.arg4.c_str(), nullptr);
+  const bool hasMaximumSummitDistance = !instr.arg5.empty();
+  const size_t maximumSummitDistanceBp =
+      hasMaximumSummitDistance
+          ? toBasePairs(std::strtod(instr.arg5.c_str(), nullptr), instr.arg6)
+          : 0;
   const std::vector<GenomicRegion> anchor = resolveEntity(anchorSet);
   std::vector<std::pair<std::string, std::vector<GenomicRegion>>> supportSets;
   for (const auto &inputSet : instr.listArgs) {
@@ -1856,12 +1874,16 @@ void Interpreter::executeConsensus(const IRInstruction &instr) {
     if (minimumReciprocalOverlapPercent > 0.0)
       std::cout << " MIN_RECIPROCAL_OVERLAP "
                 << minimumReciprocalOverlapPercent << "%";
+    if (hasMaximumSummitDistance)
+      std::cout << " MAX_SUMMIT_DISTANCE " << maximumSummitDistanceBp
+                << " BP";
     std::cout << std::endl;
   }
 
   resultSets[instr.arg3] = SetOperations::consensus(
       anchor, anchorSet, supportSets, instr.listArgs, minimumSupport,
-      minimumReciprocalOverlapPercent);
+      minimumReciprocalOverlapPercent, hasMaximumSummitDistance,
+      maximumSummitDistanceBp);
 }
 
 void Interpreter::executeCountOverlaps(const IRInstruction &instr) {

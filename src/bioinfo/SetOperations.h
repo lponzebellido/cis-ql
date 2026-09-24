@@ -18,14 +18,18 @@ public:
       const std::vector<GenomicRegion> &query,
       const std::vector<GenomicRegion> &reference,
       const std::string &referenceSet = "",
-      double minimumReciprocalOverlapPercent = 0.0);
+      double minimumReciprocalOverlapPercent = 0.0,
+      bool hasMaximumSummitDistance = false,
+      size_t maximumSummitDistanceBp = 0);
   static std::vector<GenomicRegion> consensus(
       const std::vector<GenomicRegion> &anchor,
       const std::string &anchorSet,
       const std::vector<std::pair<std::string, std::vector<GenomicRegion>>>
           &supportSets,
       const std::vector<std::string> &inputSets, size_t minimumSupport,
-      double minimumReciprocalOverlapPercent = 0.0);
+      double minimumReciprocalOverlapPercent = 0.0,
+      bool hasMaximumSummitDistance = false,
+      size_t maximumSummitDistanceBp = 0);
   static std::vector<GenomicRegion> selectNear(
       const std::vector<GenomicRegion> &query,
       const std::vector<GenomicRegion> &reference,

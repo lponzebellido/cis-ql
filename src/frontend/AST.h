@@ -229,6 +229,8 @@ public:
   std::string anchor;
   std::string minimumSupport;
   std::string minimumReciprocalOverlap;
+  std::string maximumSummitDistanceValue;
+  std::string maximumSummitDistanceUnit;
   std::string alias;
   std::unique_ptr<ConditionNode> whereClause;
   SetOpStmtNode(std::string o, std::string e1, std::string e2,

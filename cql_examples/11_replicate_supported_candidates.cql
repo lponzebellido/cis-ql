@@ -53,6 +53,7 @@ CONSENSUS FROM [strong_myb_binding_rep1, strong_myb_binding_rep2]
     ANCHOR strong_myb_binding_rep1
     MIN_SUPPORT 2
     MIN_RECIPROCAL_OVERLAP 50 %
+    MAX_SUMMIT_DISTANCE 5 BP
     AS replicate_supported_binding_peaks
     WHERE SUPPORT_COUNT >= 2;
 

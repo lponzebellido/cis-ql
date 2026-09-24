@@ -170,6 +170,41 @@ def anchor_consensus(
     return result
 
 
+def anchor_summit_consensus(
+    anchor: list[tuple[str, int, int, int]],
+    supporting_sets: list[list[tuple[str, int, int, int]]],
+    minimum_support: int,
+    minimum_reciprocal_overlap_percent: float,
+    maximum_summit_distance: int,
+) -> list[tuple[tuple[str, int, int, int], int]]:
+    result = []
+    for interval in anchor:
+        observed_support = 1 + sum(
+            any(
+                interval[0] == candidate[0]
+                and interval[1] < candidate[2]
+                and interval[2] > candidate[1]
+                and (
+                    min(interval[2], candidate[2])
+                    - max(interval[1], candidate[1])
+                ) / (interval[2] - interval[1]) * 100
+                >= minimum_reciprocal_overlap_percent
+                and (
+                    min(interval[2], candidate[2])
+                    - max(interval[1], candidate[1])
+                ) / (candidate[2] - candidate[1]) * 100
+                >= minimum_reciprocal_overlap_percent
+                and abs(interval[3] - candidate[3])
+                <= maximum_summit_distance
+                for candidate in support_set
+            )
+            for support_set in supporting_sets
+        )
+        if observed_support >= minimum_support:
+            result.append((interval, observed_support))
+    return result
+
+
 def define_homotypic_modules(
     sites: list[tuple[str, int, int, str]],
     minimum_spacing: int,
@@ -637,6 +672,56 @@ def main() -> int:
             "CONSENSUS differs from independent reciprocal-overlap reference",
         )
         print("[ok] reciprocal-overlap, anchor-preserving consensus")
+
+        (workspace / "summit_anchor.narrowPeak").write_text(
+            "chr1\t0\t10\tanchor_first\t100\t.\t10\t5\t4\t5\n"
+            "chr1\t20\t30\tanchor_second\t100\t.\t10\t5\t4\t2\n",
+            encoding="utf-8",
+        )
+        (workspace / "summit_support.narrowPeak").write_text(
+            "chr1\t1\t9\tsupport_first\t100\t.\t10\t5\t4\t4\n"
+            "chr1\t21\t29\tsupport_second\t100\t.\t10\t5\t4\t7\n",
+            encoding="utf-8",
+        )
+        summit_data = run_query(
+            workspace,
+            "summit_consensus_reference",
+            'LOAD TRACK "summit_anchor.narrowPeak" FORMAT NARROWPEAK '
+            'EVIDENCE BINDING AS summit_anchor;\n'
+            'LOAD TRACK "summit_support.narrowPeak" FORMAT NARROWPEAK '
+            'EVIDENCE BINDING AS summit_support;\n'
+            'CONSENSUS FROM [summit_anchor, summit_support] '
+            'ANCHOR summit_anchor MIN_SUPPORT 2 '
+            'MAX_SUMMIT_DISTANCE 2 BP '
+            'MIN_RECIPROCAL_OVERLAP 50 % AS summit_consensus;\n',
+        )
+        observed_summit_consensus = summit_data["resultSets"][
+            "summit_consensus"
+        ]
+        expected_summit_consensus = anchor_summit_consensus(
+            [("chr1", 0, 10, 5), ("chr1", 20, 30, 22)],
+            [[("chr1", 1, 9, 5), ("chr1", 21, 29, 28)]],
+            2,
+            50.0,
+            2,
+        )
+        require(
+            [
+                (
+                    (
+                        region["chr"], region["start"], region["end"],
+                        region["trackEvidence"]["peakPosition"],
+                    ),
+                    region["consensusEvidence"]["observedSupport"],
+                )
+                for region in observed_summit_consensus
+            ] == expected_summit_consensus
+            == [(('chr1', 0, 10, 5), 2)] and
+            observed_summit_consensus[0]["consensusEvidence"]
+                ["maximumSummitDistanceBp"] == 2,
+            "CONSENSUS differs from independent summit-distance reference",
+        )
+        print("[ok] summit-distance consensus")
 
         (workspace / "similarity.fasta").write_text(
             ">chr1\nACGTNNACGA\n", encoding="utf-8"

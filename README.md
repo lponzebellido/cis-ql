@@ -47,7 +47,8 @@ SCAN tf_model IN candidate_promoters BACKGROUND FROM genome
     QVALUE <= 0.01 AS promoter_sites;
 CONSENSUS FROM [binding_rep1, binding_rep2]
     ANCHOR binding_rep1 MIN_SUPPORT 2
-    MIN_RECIPROCAL_OVERLAP 50 % AS reproducible_binding;
+    MIN_RECIPROCAL_OVERLAP 50 %
+    MAX_SUMMIT_DISTANCE 20 BP AS reproducible_binding;
 OVERLAPS reproducible_binding WITH promoter_sites AS supported_binding;
 ```
 
@@ -201,7 +202,8 @@ EXTRACT promoter_site_counts AS supported_promoters WHERE COUNT >= 1;
 
 CONSENSUS FROM [binding_rep1, binding_rep2]
     ANCHOR binding_rep1 MIN_SUPPORT 2
-    MIN_RECIPROCAL_OVERLAP 50 % AS reproducible_binding;
+    MIN_RECIPROCAL_OVERLAP 50 %
+    MAX_SUMMIT_DISTANCE 20 BP AS reproducible_binding;
 ```
 
 `INTERSECT` emits the clipped overlap geometry. `OVERLAPS query WITH reference`
@@ -222,8 +224,12 @@ contributes at most one, regardless of how many of its records overlap. The
 optional `MIN_RECIPROCAL_OVERLAP p %` clause requires each accepted match to
 cover at least `p` percent of both the anchor interval and the supporting
 interval, preventing a marginal one-base overlap from counting as replicate
-support. The result records the criterion, requested and observed support, all
-input aliases, every matching observation, and the anchor geometry.
+support. `MAX_SUMMIT_DISTANCE d` additionally requires both matching records
+to provide narrowPeak summits no farther apart than `d`; records without a
+summit cannot satisfy that criterion. The two optional clauses can be combined
+and written in either order. The result records the criteria, requested and
+observed support, all input aliases, every matching observation, and the
+anchor geometry.
 `SUPPORT_COUNT` makes the observed number queryable in `WHERE`. This remains
 coordinate-level concordance, not IDR or a statistical reproducibility test.
 
@@ -399,9 +405,10 @@ SetOperationStmt   ::= (INTERSECT | UNION) EntityRef AND EntityRef AliasOpt Wher
                          (NUM | FLOAT) RequiredUnit AliasOpt WhereClause SEMICOLON
 
 ConsensusStmt      ::= CONSENSUS FROM "[" ID ("," ID)+ "]"
-                       ANCHOR ID MIN_SUPPORT NUM
-                       (MIN_RECIPROCAL_OVERLAP (NUM | FLOAT) PERCENT)?
+                       ANCHOR ID MIN_SUPPORT NUM ConsensusCriterion*
                        AS ID WhereClause SEMICOLON
+ConsensusCriterion ::= MIN_RECIPROCAL_OVERLAP (NUM | FLOAT) PERCENT
+                     | MAX_SUMMIT_DISTANCE (NUM | FLOAT) RequiredUnit
 
 CountStmt          ::= COUNT EntityRef IN EntityRef AS ID WhereClause SEMICOLON
 
@@ -497,7 +504,7 @@ The regulatory progression and its expected outputs are described in
 | `08_integrated_anthocyanin_query.cql` | Connect the complete evidence path | promoters, calibrated sites, modules, counts, candidate links |
 | `09_accessible_myb_evidence.cql` | Combine imported accessibility peaks with motif support | narrowPeak provenance, `COUNT`, `NEAR` |
 | `10_accessible_bound_myb_candidates.cql` | Combine filtered accessibility, binding, motif, and proximity | track-evidence `WHERE`, multi-track `overlapEvidence`, `COUNT`, `NEAR` |
-| `11_replicate_supported_candidates.cql` | Require substantial coordinate support from two binding replicates | `CONSENSUS`, reciprocal overlap, structured experimental provenance |
+| `11_replicate_supported_candidates.cql` | Require substantial coordinate and summit support from two binding replicates | `CONSENSUS`, reciprocal overlap, summit distance, structured experimental provenance |
 
 ---
 

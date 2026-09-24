@@ -67,6 +67,7 @@ interface ConsensusEvidence {
   minimumSupport: number;
   observedSupport: number;
   minimumReciprocalOverlapPercent?: number;
+  maximumSummitDistanceBp?: number;
   inputSets: string[];
 }
 
@@ -693,6 +694,7 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                 <>
                   <br /><span className="tt-label">Consensus:</span> {hoveredRegion.consensusEvidence.observedSupport}/{hoveredRegion.consensusEvidence.inputSets.length} sets (minimum {hoveredRegion.consensusEvidence.minimumSupport})
                   {hoveredRegion.consensusEvidence.minimumReciprocalOverlapPercent !== undefined && <><br /><span className="tt-label">Reciprocal overlap:</span> ≥ {hoveredRegion.consensusEvidence.minimumReciprocalOverlapPercent}%</>}
+                  {hoveredRegion.consensusEvidence.maximumSummitDistanceBp !== undefined && <><br /><span className="tt-label">Summit distance:</span> ≤ {hoveredRegion.consensusEvidence.maximumSummitDistanceBp} bp</>}
                   <br /><span className="tt-label">Anchor:</span> {hoveredRegion.consensusEvidence.anchorSet}
                 </>
               )}
@@ -863,6 +865,7 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                     {selectedRegion.consensusEvidence.observedSupport}/{selectedRegion.consensusEvidence.inputSets.length} supporting sets · minimum {selectedRegion.consensusEvidence.minimumSupport}<br />
                     anchor {selectedRegion.consensusEvidence.anchorSet}<br />
                     {selectedRegion.consensusEvidence.minimumReciprocalOverlapPercent !== undefined && <>reciprocal overlap ≥ {selectedRegion.consensusEvidence.minimumReciprocalOverlapPercent}%<br /></>}
+                    {selectedRegion.consensusEvidence.maximumSummitDistanceBp !== undefined && <>summit distance ≤ {selectedRegion.consensusEvidence.maximumSummitDistanceBp} bp<br /></>}
                     {selectedRegion.consensusEvidence.inputSets.join(', ')}
                   </span>
                 </div>
@@ -878,7 +881,7 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                         {item.trackEvidence?.condition ? ` · condition ${item.trackEvidence.condition}` : ''}
                         {item.trackEvidence?.replicate ? ` · replicate ${item.trackEvidence.replicate}` : ''}
                         {item.trackEvidence?.control ? ` · control ${item.trackEvidence.control}` : ''}
-                        {item.consensusEvidence ? ` · consensus ${item.consensusEvidence.observedSupport}/${item.consensusEvidence.inputSets.length} (minimum ${item.consensusEvidence.minimumSupport}${item.consensusEvidence.minimumReciprocalOverlapPercent !== undefined ? `; reciprocal overlap ≥ ${item.consensusEvidence.minimumReciprocalOverlapPercent}%` : ''})` : ''}
+                        {item.consensusEvidence ? ` · consensus ${item.consensusEvidence.observedSupport}/${item.consensusEvidence.inputSets.length} (minimum ${item.consensusEvidence.minimumSupport}${item.consensusEvidence.minimumReciprocalOverlapPercent !== undefined ? `; reciprocal overlap ≥ ${item.consensusEvidence.minimumReciprocalOverlapPercent}%` : ''}${item.consensusEvidence.maximumSummitDistanceBp !== undefined ? `; summit distance ≤ ${item.consensusEvidence.maximumSummitDistanceBp} bp` : ''})` : ''}
                         {item.supportingEvidence?.map((support, supportIndex) => (
                           <span key={`${support.referenceSet}-${support.reference.chr}-${support.reference.start}-${supportIndex}`} style={{ display: 'block', paddingLeft: 12 }}>
                             ↳ {support.referenceSet}: {support.reference.name || support.reference.type}

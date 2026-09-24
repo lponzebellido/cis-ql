@@ -514,15 +514,44 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
             "Expected a whole-number support threshold after MIN_SUPPORT.");
     const std::string minimumSupport = previous().lexeme;
     std::string minimumReciprocalOverlap;
-    if (match(TokenType::MIN_RECIPROCAL_OVERLAP)) {
-      if (!match(TokenType::NUM) && !match(TokenType::FLOAT)) {
-        reportError(peek(), "Expected a percentage after "
-                            "MIN_RECIPROCAL_OVERLAP.");
-        throw std::runtime_error("Parse error");
+    std::string maximumSummitDistanceValue;
+    std::string maximumSummitDistanceUnit;
+    while (check(TokenType::MIN_RECIPROCAL_OVERLAP) ||
+           check(TokenType::MAX_SUMMIT_DISTANCE)) {
+      if (match(TokenType::MIN_RECIPROCAL_OVERLAP)) {
+        if (!minimumReciprocalOverlap.empty()) {
+          reportError(previous(),
+                      "Duplicate MIN_RECIPROCAL_OVERLAP clause.");
+          throw std::runtime_error("Parse error");
+        }
+        if (!match(TokenType::NUM) && !match(TokenType::FLOAT)) {
+          reportError(peek(), "Expected a percentage after "
+                              "MIN_RECIPROCAL_OVERLAP.");
+          throw std::runtime_error("Parse error");
+        }
+        minimumReciprocalOverlap = previous().lexeme;
+        consume(TokenType::PERCENT,
+                "Expected '%' after MIN_RECIPROCAL_OVERLAP percentage.");
+      } else {
+        match(TokenType::MAX_SUMMIT_DISTANCE);
+        if (!maximumSummitDistanceValue.empty()) {
+          reportError(previous(), "Duplicate MAX_SUMMIT_DISTANCE clause.");
+          throw std::runtime_error("Parse error");
+        }
+        if (!match(TokenType::NUM) && !match(TokenType::FLOAT)) {
+          reportError(peek(),
+                      "Expected a distance after MAX_SUMMIT_DISTANCE.");
+          throw std::runtime_error("Parse error");
+        }
+        maximumSummitDistanceValue = previous().lexeme;
+        if (!match(TokenType::BP) && !match(TokenType::KB) &&
+            !match(TokenType::MB)) {
+          reportError(peek(), "Expected BP, KB, or MB after "
+                              "MAX_SUMMIT_DISTANCE.");
+          throw std::runtime_error("Parse error");
+        }
+        maximumSummitDistanceUnit = previous().lexeme;
       }
-      minimumReciprocalOverlap = previous().lexeme;
-      consume(TokenType::PERCENT,
-              "Expected '%' after MIN_RECIPROCAL_OVERLAP percentage.");
     }
     consume(TokenType::AS, "Expected 'AS' after the CONSENSUS threshold.");
     consume(TokenType::ID, "Expected an alias identifier after AS.");
@@ -536,6 +565,8 @@ std::unique_ptr<SetOpStmtNode> Parser::parseSetOperation() {
     node->anchor = anchor;
     node->minimumSupport = minimumSupport;
     node->minimumReciprocalOverlap = minimumReciprocalOverlap;
+    node->maximumSummitDistanceValue = maximumSummitDistanceValue;
+    node->maximumSummitDistanceUnit = maximumSummitDistanceUnit;
     return node;
   }
   if (match(TokenType::INTERSECT))

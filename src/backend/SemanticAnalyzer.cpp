@@ -296,6 +296,27 @@ void SemanticAnalyzer::visit(SetOpStmtNode *node) {
                     "0% and at most 100%.");
       }
     }
+    if (!node->maximumSummitDistanceValue.empty()) {
+      const long double factor =
+          node->maximumSummitDistanceUnit == "MB" ? 1000000.0L
+          : node->maximumSummitDistanceUnit == "KB" ? 1000.0L
+                                                     : 1.0L;
+      const long double maximumSummitDistance =
+          std::strtold(node->maximumSummitDistanceValue.c_str(), nullptr) *
+          factor;
+      const long double coordinateLimit =
+          static_cast<long double>(std::numeric_limits<size_t>::max());
+      if (!std::isfinite(maximumSummitDistance) ||
+          maximumSummitDistance < 0.0L ||
+          maximumSummitDistance >= coordinateLimit) {
+        reportError("CONSENSUS MAX_SUMMIT_DISTANCE must be a finite, "
+                    "non-negative genomic distance within the coordinate "
+                    "range.");
+      } else if (!resolvesToWholeBasePairs(maximumSummitDistance)) {
+        reportError("CONSENSUS MAX_SUMMIT_DISTANCE must resolve to a whole "
+                    "number of base pairs.");
+      }
+    }
     for (const auto &entity : node->entities) {
       if (!symbolTable.lookup(entity)) {
         reportError("CONSENSUS input alias '" + entity +

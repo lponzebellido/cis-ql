@@ -96,6 +96,7 @@ void Lexer::initKeywords() {
     keywords["MIN_SUPPORT"] = TokenType::MIN_SUPPORT;
     keywords["MIN_RECIPROCAL_OVERLAP"] =
         TokenType::MIN_RECIPROCAL_OVERLAP;
+    keywords["MAX_SUMMIT_DISTANCE"] = TokenType::MAX_SUMMIT_DISTANCE;
 
     keywords["SIMILARITY"] = TokenType::SIMILARITY;
     keywords["REVERSE_COMPLEMENT"] = TokenType::REVERSE_COMPLEMENT;
@@ -457,6 +458,7 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::MIN_SUPPORT: return "MIN_SUPPORT";
         case TokenType::MIN_RECIPROCAL_OVERLAP:
             return "MIN_RECIPROCAL_OVERLAP";
+        case TokenType::MAX_SUMMIT_DISTANCE: return "MAX_SUMMIT_DISTANCE";
         case TokenType::SIMILARITY: return "SIMILARITY";
         case TokenType::REVERSE_COMPLEMENT: return "REVERSE_COMPLEMENT";
         case TokenType::MATRIX: return "MATRIX";

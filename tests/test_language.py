@@ -264,7 +264,7 @@ def main() -> int:
         track_tsv = (workspace / "accessible.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(track_tsv) == 102 and track_tsv[81:96] == [
+        require(len(track_tsv) == 103 and track_tsv[81:96] == [
                     "accessible", "accessibility.narrowPeak", "NARROWPEAK",
                     "ACCESSIBILITY", "ATAC-seq", "leaf", "pigmented",
                     "R1", "input", "500", "12.5",
@@ -275,7 +275,7 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()[1].split("\t")
         combined_overlap = json.loads(combined_tsv[96])
-        require(len(combined_tsv) == 102 and
+        require(len(combined_tsv) == 103 and
                 combined_overlap[0]["referenceSet"] == "bound" and
                 combined_overlap[0]["trackEvidence"]["evidenceClass"]
                 == "BINDING" and
@@ -393,6 +393,21 @@ def main() -> int:
         )
         require("must be greater than 0% and at most 100%" in semantic_error,
                 "CONSENSUS bounds reciprocal-overlap percentages")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "consensus_checks_summit_distance",
+            'LOAD TRACK "accessibility.narrowPeak" FORMAT NARROWPEAK '
+            'EVIDENCE ACCESSIBILITY AS first;\n'
+            'LOAD TRACK "binding.narrowPeak" FORMAT NARROWPEAK '
+            'EVIDENCE BINDING AS second;\n'
+            'CONSENSUS FROM [first, second] ANCHOR first '
+            'MIN_SUPPORT 2 MAX_SUMMIT_DISTANCE 0.5 BP AS invalid;\n',
+            3,
+        )
+        require("must resolve to a whole number of base pairs"
+                in semantic_error,
+                "CONSENSUS requires integral summit distances")
 
         runtime_error = run_invalid_query(
             workspace,
@@ -654,6 +669,7 @@ def main() -> int:
                 "\tconsensus_anchor_set\tconsensus_minimum_support"
                 "\tconsensus_observed_support"
                 "\tconsensus_minimum_reciprocal_overlap_percent"
+                "\tconsensus_maximum_summit_distance_bp"
                 "\tconsensus_evidence_json",
                 "region TSV export")
         profile_lines = (workspace / "profile.tsv").read_text(
@@ -827,7 +843,7 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()
         first_tsv_site = tsv_rows[1].split("\t")
-        require(len(tsv_rows) == 10 and len(first_tsv_site) == 102 and
+        require(len(tsv_rows) == 10 and len(first_tsv_site) == 103 and
                 first_tsv_site[7:11]
                 == ["matrix", "TEST", "test", "fixture.pwm"] and
                 float(first_tsv_site[11]) > 0 and
@@ -843,7 +859,7 @@ def main() -> int:
                 abs(float(first_tsv_site[31]) - 0.1) < 1e-12 and
                 first_tsv_site[32:34] == ["short_promoter", "promoter"] and
                 first_tsv_site[36] == "0" and
-                first_tsv_site[37:] == [""] * 65,
+                first_tsv_site[37:] == [""] * 66,
                 "motif TSV export retains evidence columns")
 
         data, _ = run_query(
@@ -881,7 +897,7 @@ def main() -> int:
         promoter_overlap_tsv = (workspace / "promoter_sites.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(promoter_overlap_tsv) == 102 and
+        require(len(promoter_overlap_tsv) == 103 and
                 json.loads(promoter_overlap_tsv[96])[0]["reference"]
                     ["name"] == "short_promoter",
                 "OVERLAPS TSV evidence identifies the matching reference")
@@ -933,10 +949,10 @@ def main() -> int:
         linked_tsv = (workspace / "linked.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(linked_tsv) == 102 and linked_tsv[37:48] == [
+        require(len(linked_tsv) == 103 and linked_tsv[37:48] == [
                     "NEAR", "GENE", "chr1", "0", "1200", "+", "gene",
                     "short", "0", "0", "true",
-                ] and linked_tsv[48:] == [""] * 54,
+                ] and linked_tsv[48:] == [""] * 55,
                 "TSV export retains typed nearest-reference evidence")
 
         data, _ = run_query(
@@ -980,9 +996,9 @@ def main() -> int:
         count_tsv = (workspace / "counts.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(count_tsv) == 102 and count_tsv[48:52] == [
+        require(len(count_tsv) == 103 and count_tsv[48:52] == [
                     "OVERLAPS", "sites", "promoters", "20",
-                ] and count_tsv[52:] == [""] * 50,
+                ] and count_tsv[52:] == [""] * 51,
                 "TSV export retains count provenance")
 
         data, _ = run_query(
@@ -1042,7 +1058,7 @@ def main() -> int:
         module_tsv = (workspace / "modules.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(module_tsv) == 102 and
+        require(len(module_tsv) == 103 and
                 module_tsv[52:59] == [
                     "2", "2", "2", "ANY", "FIRST_BEFORE_SECOND",
                     "SAME", "SAME",
@@ -1334,6 +1350,7 @@ def main() -> int:
                     "minimumSupport": 2,
                     "observedSupport": 2,
                     "minimumReciprocalOverlapPercent": 50,
+                    "maximumSummitDistanceBp": 5,
                     "inputSets": ["strong_myb_binding_rep1",
                                   "strong_myb_binding_rep2"],
                 } for peak in binding_consensus) and
@@ -1371,16 +1388,18 @@ def main() -> int:
             workspace / "replicate_supported_binding_peaks.tsv"
         ).read_text(encoding="utf-8").splitlines()[1].split("\t")
         require(
-            len(consensus_tsv) == 102 and
+            len(consensus_tsv) == 103 and
             consensus_tsv[97:100] == [
                 "strong_myb_binding_rep1", "2", "2",
             ] and
             consensus_tsv[100] == "50" and
-            json.loads(consensus_tsv[101]) == {
+            consensus_tsv[101] == "5" and
+            json.loads(consensus_tsv[102]) == {
                 "anchorSet": "strong_myb_binding_rep1",
                 "minimumSupport": 2,
                 "observedSupport": 2,
                 "minimumReciprocalOverlapPercent": 50,
+                "maximumSummitDistanceBp": 5,
                 "inputSets": ["strong_myb_binding_rep1",
                               "strong_myb_binding_rep2"],
             },
@@ -1394,6 +1413,7 @@ def main() -> int:
             "ConsensusMinimumSupport=2" in consensus_gff and
             "ConsensusObservedSupport=2" in consensus_gff and
             "ConsensusMinimumReciprocalOverlapPercent=50" in consensus_gff and
+            "ConsensusMaximumSummitDistanceBp=5" in consensus_gff and
             "ConsensusEvidenceJSON=" in consensus_gff,
             "GFF3 exports typed coordinate-consensus evidence",
         )

@@ -267,6 +267,8 @@ void IRGenerator::visit(SetOpStmtNode* node) {
     consensus.arg2 = node->minimumSupport;
     consensus.arg3 = currentTemp;
     consensus.arg4 = node->minimumReciprocalOverlap;
+    consensus.arg5 = node->maximumSummitDistanceValue;
+    consensus.arg6 = node->maximumSummitDistanceUnit;
     consensus.listArgs = node->entities;
     instructions.push_back(consensus);
 

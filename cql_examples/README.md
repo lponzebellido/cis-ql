@@ -68,10 +68,11 @@ make those examples equivalent across systems.
 11. `11_replicate_supported_candidates.cql` attaches condition, replicate,
     and control labels to accessibility and binding tracks, filters each
     replicate explicitly, and uses an anchor-preserving `CONSENSUS` requiring
-    two distinct supporting sets and at least 50% reciprocal interval overlap
-    before combining binding with accessibility and motif support. The result
-    records both criteria; downstream overlap evidence retains the consensus
-    rule and the R2 observation.
+    two distinct supporting sets, at least 50% reciprocal interval overlap,
+    and summits no farther than 5 bp apart before combining binding with
+    accessibility and motif support. The result records all three criteria;
+    downstream overlap evidence retains the consensus rule and the R2
+    observation.
 
 The shared `anthocyanin_regulatory_demo` FASTA and GFF3 files contain three
 annotated genes, one candidate enhancer, two promoter-local MYB instances, and
@@ -115,9 +116,10 @@ Interpret the outputs conservatively:
   itself a formal reproducibility assessment.
 - `CONSENSUS` counts distinct input sets, not individual overlapping peaks,
   and retains the declared anchor geometry. Its optional reciprocal-overlap
-  threshold rejects marginal intersections, but it is still not IDR. Choosing
-  an anchor, support threshold, and overlap fraction remains an analysis
-  decision that must be justified.
+  threshold rejects marginal intersections, while its summit-distance
+  threshold can require closer narrowPeak support. Neither criterion is IDR.
+  Choosing an anchor, support threshold, overlap fraction, and summit distance
+  remains an analysis decision that must be justified.
 
 The removed historical examples mixed eukaryotic TF models and promoter
 assumptions with an *E. coli* fixture. Their language constructs remain covered

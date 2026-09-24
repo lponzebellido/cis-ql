@@ -194,6 +194,46 @@ int main() {
                   "replicate_three",
           "consensus applies reciprocal overlap per distinct supporting set");
 
+  GenomicRegion summitAnchorOne = region(0, 10);
+  summitAnchorOne.name = "summit_anchor_one";
+  summitAnchorOne.trackEvidence.present = true;
+  summitAnchorOne.trackEvidence.hasPeak = true;
+  summitAnchorOne.trackEvidence.peakPosition = 5;
+  GenomicRegion summitAnchorTwo = region(20, 30);
+  summitAnchorTwo.name = "summit_anchor_two";
+  summitAnchorTwo.trackEvidence.present = true;
+  summitAnchorTwo.trackEvidence.hasPeak = true;
+  summitAnchorTwo.trackEvidence.peakPosition = 22;
+  GenomicRegion summitSupportOne = region(1, 9);
+  summitSupportOne.name = "summit_support_one";
+  summitSupportOne.trackEvidence.present = true;
+  summitSupportOne.trackEvidence.hasPeak = true;
+  summitSupportOne.trackEvidence.peakPosition = 5;
+  GenomicRegion summitSupportTwo = region(21, 29);
+  summitSupportTwo.name = "summit_support_two";
+  summitSupportTwo.trackEvidence.present = true;
+  summitSupportTwo.trackEvidence.hasPeak = true;
+  summitSupportTwo.trackEvidence.peakPosition = 28;
+  const auto summitConsensus = SetOperations::consensus(
+      {summitAnchorOne, summitAnchorTwo}, "summit_anchor",
+      {{"summit_support", {summitSupportOne, summitSupportTwo}}},
+      {"summit_anchor", "summit_support"}, 2, 50.0, true, 2);
+  require(summitConsensus.size() == 1 &&
+              summitConsensus[0].name == "summit_anchor_one" &&
+              summitConsensus[0].consensusEvidence
+                  .hasMaximumSummitDistance &&
+              summitConsensus[0].consensusEvidence
+                      .maximumSummitDistanceBp == 2,
+          "consensus rejects support with distant or absent summits");
+
+  const auto missingSummitConsensus = SetOperations::consensus(
+      {anchorPeakOne}, "anchor_without_summit",
+      {{"support_without_summit", {replicateTwoFirst}}},
+      {"anchor_without_summit", "support_without_summit"}, 2, 0.0, true,
+      2);
+  require(missingSummitConsensus.empty(),
+          "summit consensus requires summit-bearing intervals");
+
   std::vector<GenomicRegion> indexedReferences;
   std::vector<GenomicRegion> indexedQueries;
   for (size_t index = 0; index < 250; ++index) {

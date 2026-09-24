@@ -280,7 +280,9 @@ std::vector<GenomicRegion> SetOperations::selectOverlapping(
     const std::vector<GenomicRegion> &query,
     const std::vector<GenomicRegion> &reference,
     const std::string &referenceSet,
-    double minimumReciprocalOverlapPercent) {
+    double minimumReciprocalOverlapPercent,
+    bool hasMaximumSummitDistance,
+    size_t maximumSummitDistanceBp) {
   const auto referenceOrder = [](const GenomicRegion *left,
                                  const GenomicRegion *right) {
     if (left->start != right->start)
@@ -388,13 +390,15 @@ std::vector<GenomicRegion> SetOperations::selectOverlapping(
     std::vector<const GenomicRegion *> matches;
     collectOverlaps(chromosome->second.get(), region.start, region.end,
                     matches);
-    if (minimumReciprocalOverlapPercent > 0.0) {
+    if (minimumReciprocalOverlapPercent > 0.0 ||
+        hasMaximumSummitDistance) {
       const double minimumFraction =
           minimumReciprocalOverlapPercent / 100.0;
       matches.erase(
           std::remove_if(
               matches.begin(), matches.end(),
-              [&region, minimumFraction](const GenomicRegion *candidate) {
+              [&region, minimumFraction, hasMaximumSummitDistance,
+               maximumSummitDistanceBp](const GenomicRegion *candidate) {
                 const size_t overlapStart =
                     std::max(region.start, candidate->start);
                 const size_t overlapEnd = std::min(region.end, candidate->end);
@@ -404,8 +408,23 @@ std::vector<GenomicRegion> SetOperations::selectOverlapping(
                     overlapLength / static_cast<double>(region.length());
                 const double referenceFraction =
                     overlapLength / static_cast<double>(candidate->length());
-                return queryFraction < minimumFraction ||
-                       referenceFraction < minimumFraction;
+                if (queryFraction < minimumFraction ||
+                    referenceFraction < minimumFraction)
+                  return true;
+                if (!hasMaximumSummitDistance)
+                  return false;
+                if (!region.trackEvidence.hasPeak ||
+                    !candidate->trackEvidence.hasPeak)
+                  return true;
+                const size_t querySummit =
+                    region.trackEvidence.peakPosition;
+                const size_t referenceSummit =
+                    candidate->trackEvidence.peakPosition;
+                const size_t summitDistance =
+                    querySummit > referenceSummit
+                        ? querySummit - referenceSummit
+                        : referenceSummit - querySummit;
+                return summitDistance > maximumSummitDistanceBp;
               }),
           matches.end());
     }
@@ -437,7 +456,9 @@ std::vector<GenomicRegion> SetOperations::consensus(
     const std::vector<std::pair<std::string, std::vector<GenomicRegion>>>
         &supportSets,
     const std::vector<std::string> &inputSets, size_t minimumSupport,
-    double minimumReciprocalOverlapPercent) {
+    double minimumReciprocalOverlapPercent,
+    bool hasMaximumSummitDistance,
+    size_t maximumSummitDistanceBp) {
   std::vector<GenomicRegion> candidates = anchor;
   std::vector<size_t> observedSupport(anchor.size(), 1);
 
@@ -451,7 +472,8 @@ std::vector<GenomicRegion> SetOperations::consensus(
   for (const auto &supportSet : supportSets) {
     const std::vector<GenomicRegion> supported = selectOverlapping(
         anchor, supportSet.second, supportSet.first,
-        minimumReciprocalOverlapPercent);
+        minimumReciprocalOverlapPercent, hasMaximumSummitDistance,
+        maximumSummitDistanceBp);
     size_t supportedIndex = 0;
     for (size_t anchorIndex = 0;
          anchorIndex < anchor.size() && supportedIndex < supported.size();
@@ -483,6 +505,11 @@ std::vector<GenomicRegion> SetOperations::consensus(
       candidates[index].consensusEvidence.hasMinimumReciprocalOverlap = true;
       candidates[index].consensusEvidence.minimumReciprocalOverlapPercent =
           minimumReciprocalOverlapPercent;
+    }
+    if (hasMaximumSummitDistance) {
+      candidates[index].consensusEvidence.hasMaximumSummitDistance = true;
+      candidates[index].consensusEvidence.maximumSummitDistanceBp =
+          maximumSummitDistanceBp;
     }
     candidates[index].consensusEvidence.inputSets = inputSets;
     result.push_back(std::move(candidates[index]));
