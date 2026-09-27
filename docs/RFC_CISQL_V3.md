@@ -71,6 +71,10 @@ EXTRACT GENE AS selected_gene WHERE ID = "gene_1";
 EXTRACT CHILDREN OF selected_gene AS direct_components;
 EXTRACT DESCENDANTS OF selected_gene AS coding_descendants
   WHERE TYPE = "CDS";
+
+EXTRACT PARENTS OF coding_descendants AS direct_parents;
+EXTRACT ANCESTORS OF coding_descendants AS enclosing_genes
+  WHERE TYPE = "gene";
 ```
 
 GFF3 import retains source, score, phase, `ID`, `Name`, every `Parent`, the
@@ -83,9 +87,13 @@ a language keyword. JSON and TSV expose the structured annotation evidence.
 `CHILDREN` follows one `Parent` edge from every identified source region.
 `DESCENDANTS` follows the relation transitively, excludes the source IDs,
 preserves annotation-file order, and cannot loop indefinitely on cyclic input.
-Sources without GFF3 identity are rejected rather than matched by coordinate.
-Each loaded annotation has a reusable parent index, so traversal does not
-rescan the full GFF3 for every query.
+Downward sources without GFF3 identity are rejected rather than matched by
+coordinate.
+`PARENTS` and `ANCESTORS` traverse in the opposite direction. They require
+annotation evidence but can start from a record without `ID` when it declares
+`Parent`. Unresolved identifiers are not replaced by coordinate-based guesses.
+Each loaded annotation has reusable parent and identity indices, so traversal
+does not rescan the full GFF3 for every query.
 
 `FEATURE` means every imported feature type. Cis-QL does not currently decide
 that `mRNA`, `transcript`, `lnc_RNA`, or another source vocabulary should be

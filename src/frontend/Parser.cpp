@@ -469,7 +469,8 @@ std::unique_ptr<FindStmtNode> Parser::parseFind() {
 }
 
 std::unique_ptr<ExtractStmtNode> Parser::parseExtract() {
-  if (match(TokenType::CHILDREN) || match(TokenType::DESCENDANTS)) {
+  if (match(TokenType::CHILDREN) || match(TokenType::DESCENDANTS) ||
+      match(TokenType::PARENTS) || match(TokenType::ANCESTORS)) {
     const std::string relation = previous().lexeme;
     consume(TokenType::OF, "Expected 'OF' after " + relation + ".");
     consume(TokenType::ID,

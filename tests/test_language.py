@@ -91,16 +91,34 @@ def main() -> int:
             "ID=gene1;Name=GENE%201;gene_biotype=protein_coding\n"
             "chrH\tcurated\tmRNA\t1\t900\t.\t+\t.\t"
             "ID=tx1;Parent=gene1;Name=Transcript%201\n"
+            "chrH\tcurated\tmRNA\t1\t900\t.\t+\t.\t"
+            "ID=tx2;Parent=gene1;Name=Transcript%202\n"
             "chrH\tcurated\texon\t1\t100\t.\t+\t.\t"
             "ID=ex1;Parent=tx1,tx2;rank=1\n"
             "chrH\tcurated\tCDS\t10\t90\t7.5\t+\t0\t"
             "ID=cds1;Parent=tx1;protein_id=P1\n"
-            "chrH\tcurated\tregion\t1101\t1200\t.\t.\t.\t"
-            "Name=anonymous\n"
             "chrH\tcurated\tgene\t1301\t1400\t.\t+\t.\t"
             "ID=cycleA;Parent=cycleB\n"
             "chrH\tcurated\tmRNA\t1301\t1400\t.\t+\t.\t"
             "ID=cycleB;Parent=cycleA\n",
+            encoding="utf-8",
+        )
+        (workspace / "nameless_child.gff3").write_text(
+            "##gff-version 3\n"
+            "chrN\ttest\tgene\t1\t100\t.\t+\t.\tID=root\n"
+            "chrN\ttest\tregion\t1\t50\t.\t+\t.\t"
+            "Name=nameless;Parent=root\n",
+            encoding="utf-8",
+        )
+        (workspace / "discontinuous.gff3").write_text(
+            "##gff-version 3\n"
+            "chrD\ttest\tgene\t1\t500\t.\t+\t.\tID=rootD\n"
+            "chrD\ttest\texon\t1\t100\t.\t+\t.\t"
+            "ID=multi;Parent=rootD\n"
+            "chrD\ttest\texon\t201\t300\t.\t+\t.\t"
+            "ID=multi;Parent=rootD\n"
+            "chrD\ttest\tCDS\t20\t80\t.\t+\t0\t"
+            "ID=leafD;Parent=multi\n",
             encoding="utf-8",
         )
         (workspace / "fixture.pwm").write_text(
@@ -529,13 +547,18 @@ def main() -> int:
             'EXTRACT DESCENDANTS OF selected_gene AS descendants;\n'
             'EXTRACT DESCENDANTS OF selected_gene AS descendant_coding '
             'WHERE TYPE = "CDS";\n'
+            'EXTRACT FEATURE AS selected_exon WHERE ID = "ex1";\n'
+            'EXTRACT PARENTS OF selected_exon AS direct_parents;\n'
+            'EXTRACT ANCESTORS OF selected_exon AS ancestors;\n'
+            'EXTRACT ANCESTORS OF selected_exon AS ancestor_genes '
+            'WHERE TYPE = "gene";\n'
             'EXPORT transcripts TO "transcripts.gff3" FORMAT GFF3;\n'
             'EXPORT coding TO "coding.tsv" FORMAT TSV;\n',
         )
         transcript = data["resultSets"]["transcripts"][0]
         coding = data["resultSets"]["coding"][0]
         require(
-            len(data["resultSets"]["transcripts"]) == 1 and
+            len(data["resultSets"]["transcripts"]) == 2 and
             transcript["annotationEvidence"]["id"] == "tx1" and
             transcript["annotationEvidence"]["name"] == "Transcript 1" and
             transcript["annotationEvidence"]["parents"] == ["gene1"] and
@@ -551,12 +574,18 @@ def main() -> int:
             data["resultSets"]["selected_gene"][0]
                 ["annotationEvidence"]["id"] == "gene1" and
             [item["annotationEvidence"]["id"] for item in
-             data["resultSets"]["direct_children"]] == ["tx1"] and
+             data["resultSets"]["direct_children"]] == ["tx1", "tx2"] and
             [item["annotationEvidence"]["id"] for item in
              data["resultSets"]["descendants"]]
-            == ["tx1", "ex1", "cds1"] and
+            == ["tx1", "tx2", "ex1", "cds1"] and
             [item["annotationEvidence"]["id"] for item in
-             data["resultSets"]["descendant_coding"]] == ["cds1"],
+             data["resultSets"]["descendant_coding"]] == ["cds1"] and
+            [item["annotationEvidence"]["id"] for item in
+             data["resultSets"]["direct_parents"]] == ["tx1", "tx2"] and
+            [item["annotationEvidence"]["id"] for item in
+             data["resultSets"]["ancestors"]] == ["gene1", "tx1", "tx2"] and
+            [item["annotationEvidence"]["id"] for item in
+             data["resultSets"]["ancestor_genes"]] == ["gene1"],
             "GFF3 hierarchy, identity, and attributes remain queryable",
         )
         transcript_gff = (workspace / "transcripts.gff3").read_text(
@@ -594,12 +623,15 @@ def main() -> int:
             "annotation_cycle_is_bounded",
             'LOAD ANNOTATION "hierarchy.gff3" AS annotation;\n'
             'EXTRACT FEATURE AS cycle_root WHERE ID = "cycleA";\n'
-            'EXTRACT DESCENDANTS OF cycle_root AS cycle_descendants;\n',
+            'EXTRACT DESCENDANTS OF cycle_root AS cycle_descendants;\n'
+            'EXTRACT ANCESTORS OF cycle_root AS cycle_ancestors;\n',
         )
         require(
             [item["annotationEvidence"]["id"] for item in
-             data["resultSets"]["cycle_descendants"]] == ["cycleB"],
-            "descendant traversal terminates without returning its root",
+             data["resultSets"]["cycle_descendants"]] == ["cycleB"] and
+            [item["annotationEvidence"]["id"] for item in
+             data["resultSets"]["cycle_ancestors"]] == ["cycleB"],
+            "transitive traversal terminates without returning its root",
         )
 
         semantic_error = run_invalid_query(
@@ -626,13 +658,44 @@ def main() -> int:
         runtime_error = run_invalid_query(
             workspace,
             "annotation_hierarchy_requires_ids",
-            'LOAD ANNOTATION "hierarchy.gff3" AS annotation;\n'
-            'EXTRACT FEATURE AS anonymous WHERE NAME = "anonymous";\n'
-            'EXTRACT CHILDREN OF anonymous AS invalid;\n',
+            'LOAD ANNOTATION "nameless_child.gff3" AS annotation;\n'
+            'EXTRACT FEATURE AS nameless WHERE NAME = "nameless";\n'
+            'EXTRACT CHILDREN OF nameless AS invalid;\n',
             4,
         )
         require("contains a region without a GFF3 ID" in runtime_error,
                 "hierarchy traversal rejects sources without identity")
+
+        data, _ = run_query(
+            workspace,
+            "annotation_parent_from_nameless_child",
+            'LOAD ANNOTATION "nameless_child.gff3" AS annotation;\n'
+            'EXTRACT FEATURE AS nameless WHERE NAME = "nameless";\n'
+            'EXTRACT PARENTS OF nameless AS resolved_parent;\n',
+        )
+        require(
+            [item["annotationEvidence"]["id"] for item in
+             data["resultSets"]["resolved_parent"]] == ["root"],
+            "parent traversal accepts an identified parent of a nameless child",
+        )
+
+        data, _ = run_query(
+            workspace,
+            "annotation_multi_record_identity",
+            'LOAD ANNOTATION "discontinuous.gff3" AS annotation;\n'
+            'EXTRACT FEATURE AS leaf WHERE ID = "leafD";\n'
+            'EXTRACT PARENTS OF leaf AS parent_records;\n'
+            'EXTRACT ANCESTORS OF leaf AS ancestor_records;\n',
+        )
+        require(
+            [(item["annotationEvidence"]["id"], item["start"], item["end"])
+             for item in data["resultSets"]["parent_records"]]
+            == [("multi", 0, 100), ("multi", 200, 300)] and
+            [item["annotationEvidence"]["id"] for item in
+             data["resultSets"]["ancestor_records"]]
+            == ["rootD", "multi", "multi"],
+            "hierarchy traversal preserves every record for a repeated ID",
+        )
 
         semantic_error = run_invalid_query(
             workspace,

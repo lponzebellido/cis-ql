@@ -139,7 +139,9 @@ queries, while GFF3 export retains the original attribute field. Cis-QL does
 not guess which Sequence Ontology types constitute a transcript; use
 `EXTRACT FEATURE` with explicit type and attribute filters instead.
 Named annotation result sets can be traversed with `EXTRACT CHILDREN OF` for
-one `Parent` edge or `EXTRACT DESCENDANTS OF` for transitive relationships.
+one downward `Parent` edge or `EXTRACT DESCENDANTS OF` for transitive
+relationships. `EXTRACT PARENTS OF` and `EXTRACT ANCESTORS OF` navigate in
+the opposite direction.
 
 `LOAD TRACK` currently accepts BED and narrowPeak. Track coordinates are
 already zero-based and half-open. When a sequence dataset is active, Cis-QL
@@ -321,6 +323,10 @@ EXTRACT CHILDREN OF selected_gene AS direct_components;
 EXTRACT DESCENDANTS OF selected_gene AS coding_descendants
     WHERE TYPE = "CDS";
 
+EXTRACT PARENTS OF coding_descendants AS direct_parents;
+EXTRACT ANCESTORS OF coding_descendants AS enclosing_genes
+    WHERE TYPE = "gene";
+
 EXTRACT accessibility_peaks AS strong_accessibility
     WHERE TRACK_SCORE >= 600
       AND SIGNAL_VALUE >= 10
@@ -349,13 +355,16 @@ track; filter a reference track before combining it with `OVERLAPS`. Motif
 results support `LENGTH`, `START`, `END`, `STRAND`, and `GC_CONTENT`; GC
 profiles support `GC_CONTENT`.
 
-Hierarchy traversal uses the active annotation dataset and the preserved GFF3
-identities in the source result set. A per-dataset parent index is built at
-load time. `CHILDREN` follows one `Parent` edge;
+Hierarchy traversal uses the active annotation dataset and preserved GFF3
+relationships. Per-dataset parent and identity indices are built at load time.
+`CHILDREN` follows one `Parent` edge;
 `DESCENDANTS` follows all reachable edges, excludes the source IDs, preserves
 annotation-file order, and terminates even if the input graph contains a
 cycle. A source region without `ID` is rejected because it cannot identify a
-graph node. Traversal does not choose a transcript vocabulary or canonical
+parent graph node. `PARENTS` and `ANCESTORS` resolve relationships in the
+opposite direction; they can start from an annotation record without `ID` if
+it declares `Parent`. Unresolved parent identifiers are not inferred from
+coordinates. Traversal does not choose a transcript vocabulary or canonical
 isoform.
 
 `IF` currently evaluates the GC content of the active sequence dataset.
@@ -471,7 +480,7 @@ CountStmt          ::= COUNT EntityRef IN EntityRef AS ID WhereClause SEMICOLON
 
 ExtractStmt        ::= EXTRACT ExtractSource AliasOpt WhereClause SEMICOLON
 ExtractSource      ::= EntityRef | HierarchyRelation OF ID
-HierarchyRelation  ::= CHILDREN | DESCENDANTS
+HierarchyRelation  ::= CHILDREN | DESCENDANTS | PARENTS | ANCESTORS
 
 IfStmt             ::= IF Condition THEN StatementList (ELSE StatementList)? ENDIF (SEMICOLON)?
 
@@ -567,7 +576,7 @@ The regulatory progression and its expected outputs are described in
 | `10_accessible_bound_myb_candidates.cql` | Combine filtered accessibility, binding, motif, and proximity | track-evidence `WHERE`, multi-track `overlapEvidence`, `COUNT`, `NEAR` |
 | `11_replicate_supported_candidates.cql` | Require substantial coordinate and summit support from two binding replicates | `CONSENSUS`, reciprocal overlap, summit distance, structured experimental provenance |
 | `12_regex_denovo.cql` | Find in-frame start-to-stop sequence candidates near TATA-like anchors | regex search, strand, `LENGTH MOD 3` |
-| `13_gff3_hierarchy.cql` | Select a real gene, navigate its hierarchy, and retain its CDS evidence | `FEATURE`, `CHILDREN`, `DESCENDANTS`, `ID`, `PHASE`, `ATTRIBUTE` |
+| `13_gff3_hierarchy.cql` | Select a real gene, navigate its hierarchy in both directions, and retain its CDS evidence | `FEATURE`, `CHILDREN`, `DESCENDANTS`, `PARENTS`, `ANCESTORS`, `ATTRIBUTE` |
 
 ---
 

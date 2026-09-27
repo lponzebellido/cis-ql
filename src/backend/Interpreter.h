@@ -49,6 +49,10 @@ private:
       std::string,
       std::unordered_map<std::string, std::vector<size_t>>>
       annotationChildrenByParent;
+  std::unordered_map<
+      std::string,
+      std::unordered_map<std::string, std::vector<size_t>>>
+      annotationRecordsById;
   std::unordered_map<std::string, std::vector<GenomicRegion>> resultSets;
   std::unordered_map<std::string, std::vector<MotifMatch>> motifResults;
   std::unordered_map<std::string, std::vector<GenomicRegion>> namedRegions;

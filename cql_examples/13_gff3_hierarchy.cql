@@ -14,6 +14,12 @@ EXTRACT DESCENDANTS OF thra_gene AS thra_coding_sequence
     AND PHASE = "0"
     AND ATTRIBUTE "protein_id" = "AAC73113.1";
 
+EXTRACT PARENTS OF thra_coding_sequence AS thra_direct_parents;
+
+EXTRACT ANCESTORS OF thra_coding_sequence AS thra_ancestor_genes
+  WHERE TYPE = "gene";
+
 EXPORT thra_gene TO "thra_gene.tsv" FORMAT TSV;
 EXPORT thra_direct_features TO "thra_direct_features.tsv" FORMAT TSV;
 EXPORT thra_coding_sequence TO "thra_coding_sequence.gff3" FORMAT GFF3;
+EXPORT thra_ancestor_genes TO "thra_ancestor_genes.tsv" FORMAT TSV;

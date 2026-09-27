@@ -483,9 +483,14 @@ void Interpreter::executeLoadAnnot(const IRInstruction &instr) {
   }
   annotationDatasets[alias] = annotations;
   auto &childrenByParent = annotationChildrenByParent[alias];
+  auto &recordsById = annotationRecordsById[alias];
   for (size_t index = 0; index < annotations.size(); ++index) {
     for (const auto &parent : annotations[index].annotationEvidence.parents) {
       childrenByParent[parent].push_back(index);
+    }
+    const std::string &id = annotations[index].annotationEvidence.id;
+    if (!id.empty()) {
+      recordsById[id].push_back(index);
     }
   }
   activeAnnotationAlias = alias;
@@ -1404,6 +1409,9 @@ void Interpreter::executeExtractRelated(const IRInstruction &instr) {
   const std::string &relation = instr.arg1;
   const std::string &sourceAlias = instr.arg2;
   const std::string &resultId = instr.arg3;
+  const bool downward = relation == "CHILDREN" || relation == "DESCENDANTS";
+  const bool transitive =
+      relation == "DESCENDANTS" || relation == "ANCESTORS";
   if (debugMode) {
     std::cout << "> EXTRACT " << relation << " OF " << sourceAlias
               << std::endl;
@@ -1423,51 +1431,99 @@ void Interpreter::executeExtractRelated(const IRInstruction &instr) {
   }
   const auto hierarchy =
       annotationChildrenByParent.find(activeAnnotationAlias);
-  if (hierarchy == annotationChildrenByParent.end()) {
+  const auto identities = annotationRecordsById.find(activeAnnotationAlias);
+  if (downward && hierarchy == annotationChildrenByParent.end()) {
     reportRuntimeError("No hierarchy index is available for annotation '" +
+                       activeAnnotationAlias + "'.");
+    return;
+  }
+  if (!downward && identities == annotationRecordsById.end()) {
+    reportRuntimeError("No identity index is available for annotation '" +
                        activeAnnotationAlias + "'.");
     return;
   }
 
   std::set<std::string> rootIds;
+  std::vector<std::string> pending;
+  std::set<std::string> scheduled;
   for (const auto &region : source->second) {
-    if (!region.annotationEvidence.present ||
-        region.annotationEvidence.id.empty()) {
+    if (!region.annotationEvidence.present) {
       reportRuntimeError("EXTRACT " + relation + " source alias '" +
                          sourceAlias +
-                         "' contains a region without a GFF3 ID.");
+                         "' contains a region without GFF3 annotation "
+                         "evidence.");
       return;
     }
-    rootIds.insert(region.annotationEvidence.id);
+    if (!region.annotationEvidence.id.empty()) {
+      rootIds.insert(region.annotationEvidence.id);
+    }
+    if (downward) {
+      if (region.annotationEvidence.id.empty()) {
+        reportRuntimeError("EXTRACT " + relation + " source alias '" +
+                           sourceAlias +
+                           "' contains a region without a GFF3 ID.");
+        return;
+      }
+      if (scheduled.insert(region.annotationEvidence.id).second) {
+        pending.push_back(region.annotationEvidence.id);
+      }
+    } else {
+      for (const auto &parent : region.annotationEvidence.parents) {
+        if (scheduled.insert(parent).second) {
+          pending.push_back(parent);
+        }
+      }
+    }
   }
 
   const auto &annotations = annotation->second;
   std::vector<bool> selected(annotations.size(), false);
   std::vector<size_t> selectedIndices;
-  std::vector<std::string> pending(rootIds.begin(), rootIds.end());
-  std::set<std::string> expanded;
   for (size_t cursor = 0; cursor < pending.size(); ++cursor) {
-    const std::string parentId = pending[cursor];
-    if (!expanded.insert(parentId).second) {
-      continue;
-    }
-    const auto children = hierarchy->second.find(parentId);
-    if (children == hierarchy->second.end()) {
-      continue;
-    }
-    for (const size_t index : children->second) {
-      const std::string &childId =
-          annotations[index].annotationEvidence.id;
-      if (!childId.empty() && rootIds.count(childId)) {
+    const std::string relatedId = pending[cursor];
+    if (downward) {
+      const auto children = hierarchy->second.find(relatedId);
+      if (children == hierarchy->second.end()) {
         continue;
       }
-      if (!selected[index]) {
-        selected[index] = true;
-        selectedIndices.push_back(index);
+      for (const size_t index : children->second) {
+        const std::string &childId =
+            annotations[index].annotationEvidence.id;
+        if (!childId.empty() && rootIds.count(childId)) {
+          continue;
+        }
+        if (!selected[index]) {
+          selected[index] = true;
+          selectedIndices.push_back(index);
+        }
+        if (transitive && !childId.empty() &&
+            scheduled.insert(childId).second) {
+          pending.push_back(childId);
+        }
       }
-      if (relation == "DESCENDANTS" && !childId.empty() &&
-          !expanded.count(childId)) {
-        pending.push_back(childId);
+    } else {
+      const auto records = identities->second.find(relatedId);
+      if (records == identities->second.end()) {
+        continue;
+      }
+      for (const size_t index : records->second) {
+        const std::string &recordId =
+            annotations[index].annotationEvidence.id;
+        if (!recordId.empty() && rootIds.count(recordId)) {
+          continue;
+        }
+        if (!selected[index]) {
+          selected[index] = true;
+          selectedIndices.push_back(index);
+        }
+        if (transitive) {
+          for (const auto &parent :
+               annotations[index].annotationEvidence.parents) {
+            if (scheduled.insert(parent).second) {
+              pending.push_back(parent);
+            }
+          }
+        }
       }
     }
   }

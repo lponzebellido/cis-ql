@@ -85,6 +85,8 @@ void Lexer::initKeywords() {
     keywords["FEATURE"] = TokenType::FEATURE;
     keywords["CHILDREN"] = TokenType::CHILDREN;
     keywords["DESCENDANTS"] = TokenType::DESCENDANTS;
+    keywords["PARENTS"] = TokenType::PARENTS;
+    keywords["ANCESTORS"] = TokenType::ANCESTORS;
     keywords["TYPE"] = TokenType::TYPE;
     keywords["PARENT"] = TokenType::PARENT;
     keywords["SOURCE"] = TokenType::SOURCE;
@@ -460,6 +462,8 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::FEATURE: return "FEATURE";
         case TokenType::CHILDREN: return "CHILDREN";
         case TokenType::DESCENDANTS: return "DESCENDANTS";
+        case TokenType::PARENTS: return "PARENTS";
+        case TokenType::ANCESTORS: return "ANCESTORS";
         case TokenType::TYPE: return "TYPE";
         case TokenType::PARENT: return "PARENT";
         case TokenType::SOURCE: return "SOURCE";
