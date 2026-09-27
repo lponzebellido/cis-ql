@@ -213,11 +213,14 @@ public:
 class ExtractStmtNode : public StatementNode {
 public:
   std::string entity;
+  std::string relation;
+  std::string source;
   std::string alias;
   std::unique_ptr<ConditionNode> whereClause;
-  ExtractStmtNode(std::string e, std::string a,
-                  std::unique_ptr<ConditionNode> w)
-      : entity(e), alias(a), whereClause(std::move(w)) {}
+  ExtractStmtNode(std::string e, std::string r, std::string s,
+                  std::string a, std::unique_ptr<ConditionNode> w)
+      : entity(e), relation(r), source(s), alias(a),
+        whereClause(std::move(w)) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;
 };

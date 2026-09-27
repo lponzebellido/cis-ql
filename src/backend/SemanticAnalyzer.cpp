@@ -242,6 +242,31 @@ void SemanticAnalyzer::visit(FindOptNode *node) {
 }
 
 void SemanticAnalyzer::visit(ExtractStmtNode *node) {
+  if (!node->relation.empty()) {
+    if (!annotationLoaded) {
+      reportError("EXTRACT " + node->relation +
+                  " requires annotation data.");
+    }
+    if (!symbolTable.lookup(node->source)) {
+      reportError("Hierarchy source alias '" + node->source +
+                  "' is not defined.");
+    } else if (symbolTable.typeOf(node->source) != "RESULT_SET") {
+      reportError("EXTRACT " + node->relation +
+                  " expects a result-set alias, but '" + node->source +
+                  "' has type " + symbolTable.typeOf(node->source) + ".");
+    }
+    if (node->whereClause) {
+      node->whereClause->accept(*this);
+    }
+    if (!node->alias.empty()) {
+      if (symbolTable.lookup(node->alias)) {
+        reportError("Alias '" + node->alias + "' is already defined.");
+      } else {
+        symbolTable.insert(node->alias, "RESULT_SET");
+      }
+    }
+    return;
+  }
   if (isBuiltinEntity(node->entity) && !annotationLoaded) {
     reportError("EXTRACT " + node->entity +
                 " requires annotation data. Use: LOAD ANNOTATION \"file.gff3\" "

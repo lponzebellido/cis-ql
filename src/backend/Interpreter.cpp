@@ -482,6 +482,12 @@ void Interpreter::executeLoadAnnot(const IRInstruction &instr) {
     return;
   }
   annotationDatasets[alias] = annotations;
+  auto &childrenByParent = annotationChildrenByParent[alias];
+  for (size_t index = 0; index < annotations.size(); ++index) {
+    for (const auto &parent : annotations[index].annotationEvidence.parents) {
+      childrenByParent[parent].push_back(index);
+    }
+  }
   activeAnnotationAlias = alias;
   if (debugMode) {
     std::cout << "  Loaded " << annotations.size()
@@ -1386,6 +1392,101 @@ void Interpreter::executeExtract(const IRInstruction &instr) {
         const std::string &seq = chrMap.at(r.chr).sequence;
         if (r.start < seq.size() && r.end <= seq.size()) {
           r.sequence = seq.substr(r.start, r.end - r.start);
+        }
+      }
+    }
+  }
+
+  resultSets[resultId] = regions;
+}
+
+void Interpreter::executeExtractRelated(const IRInstruction &instr) {
+  const std::string &relation = instr.arg1;
+  const std::string &sourceAlias = instr.arg2;
+  const std::string &resultId = instr.arg3;
+  if (debugMode) {
+    std::cout << "> EXTRACT " << relation << " OF " << sourceAlias
+              << std::endl;
+  }
+
+  const auto source = resultSets.find(sourceAlias);
+  if (source == resultSets.end()) {
+    reportRuntimeError("Hierarchy source alias '" + sourceAlias +
+                       "' is not available.");
+    return;
+  }
+  const auto annotation = annotationDatasets.find(activeAnnotationAlias);
+  if (annotation == annotationDatasets.end()) {
+    reportRuntimeError("EXTRACT " + relation +
+                       " requires an active annotation dataset.");
+    return;
+  }
+  const auto hierarchy =
+      annotationChildrenByParent.find(activeAnnotationAlias);
+  if (hierarchy == annotationChildrenByParent.end()) {
+    reportRuntimeError("No hierarchy index is available for annotation '" +
+                       activeAnnotationAlias + "'.");
+    return;
+  }
+
+  std::set<std::string> rootIds;
+  for (const auto &region : source->second) {
+    if (!region.annotationEvidence.present ||
+        region.annotationEvidence.id.empty()) {
+      reportRuntimeError("EXTRACT " + relation + " source alias '" +
+                         sourceAlias +
+                         "' contains a region without a GFF3 ID.");
+      return;
+    }
+    rootIds.insert(region.annotationEvidence.id);
+  }
+
+  const auto &annotations = annotation->second;
+  std::vector<bool> selected(annotations.size(), false);
+  std::vector<size_t> selectedIndices;
+  std::vector<std::string> pending(rootIds.begin(), rootIds.end());
+  std::set<std::string> expanded;
+  for (size_t cursor = 0; cursor < pending.size(); ++cursor) {
+    const std::string parentId = pending[cursor];
+    if (!expanded.insert(parentId).second) {
+      continue;
+    }
+    const auto children = hierarchy->second.find(parentId);
+    if (children == hierarchy->second.end()) {
+      continue;
+    }
+    for (const size_t index : children->second) {
+      const std::string &childId =
+          annotations[index].annotationEvidence.id;
+      if (!childId.empty() && rootIds.count(childId)) {
+        continue;
+      }
+      if (!selected[index]) {
+        selected[index] = true;
+        selectedIndices.push_back(index);
+      }
+      if (relation == "DESCENDANTS" && !childId.empty() &&
+          !expanded.count(childId)) {
+        pending.push_back(childId);
+      }
+    }
+  }
+
+  std::vector<GenomicRegion> regions;
+  std::sort(selectedIndices.begin(), selectedIndices.end());
+  regions.reserve(selectedIndices.size());
+  for (const size_t index : selectedIndices) {
+    regions.push_back(annotations[index]);
+  }
+
+  if (!sequenceDatasets.empty()) {
+    const auto &chrMap = sequenceChrMaps[activeSequenceAlias];
+    for (auto &region : regions) {
+      if (region.sequence.empty() && chrMap.count(region.chr)) {
+        const std::string &sequence = chrMap.at(region.chr).sequence;
+        if (region.start < sequence.size() && region.end <= sequence.size()) {
+          region.sequence =
+              sequence.substr(region.start, region.end - region.start);
         }
       }
     }
@@ -2906,6 +3007,9 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
       break;
     case IROpCode::EXTRACT:
       executeExtract(instr);
+      break;
+    case IROpCode::EXTRACT_RELATED:
+      executeExtractRelated(instr);
       break;
     case IROpCode::FILTER_LENGTH:
       executeFilterLength(instr);

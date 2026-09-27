@@ -89,7 +89,11 @@ void FindStmtNode::print(std::string prefix, bool isLast) const {
 }
 
 void ExtractStmtNode::print(std::string prefix, bool isLast) const {
-    std::cout << prefix << (isLast ? "└── " : "├── ") << "ExtractStmt(Entity: " << entity;
+    std::cout << prefix << (isLast ? "└── " : "├── ") << "ExtractStmt(";
+    if (relation.empty())
+        std::cout << "Entity: " << entity;
+    else
+        std::cout << "Relation: " << relation << ", Source: " << source;
     if (!alias.empty()) std::cout << ", AS: " << alias;
     std::cout << ")" << std::endl;
     std::string childPrefix = prefix + (isLast ? "    " : "│   ");

@@ -16,6 +16,7 @@ std::string irOpcodeToString(IROpCode op) {
     case IROpCode::FIND_EXEC:        return "FIND_EXEC";
     case IROpCode::FIND_ALIAS:       return "FIND_ALIAS";
     case IROpCode::EXTRACT:          return "EXTRACT";
+    case IROpCode::EXTRACT_RELATED:  return "EXTRACT_RELATED";
     case IROpCode::FILTER_LENGTH:    return "FILTER_LENGTH";
     case IROpCode::FILTER_SIMILARITY:return "FILTER_SIMILARITY";
     case IROpCode::FILTER_CONDITION: return "FILTER_CONDITION";
@@ -237,12 +238,21 @@ void IRGenerator::visit(FindOptNode* node) {
 }
 
 void IRGenerator::visit(ExtractStmtNode* node) {
-  currentTemp = newTemp("Extract_" + node->entity);
+  currentTemp = newTemp("Extract_" +
+                        (node->relation.empty() ? node->entity
+                                                : node->relation));
 
   IRInstruction extractInstr;
-  extractInstr.opcode = IROpCode::EXTRACT;
-  extractInstr.arg1 = node->entity;
-  extractInstr.arg2 = currentTemp;
+  if (node->relation.empty()) {
+    extractInstr.opcode = IROpCode::EXTRACT;
+    extractInstr.arg1 = node->entity;
+    extractInstr.arg2 = currentTemp;
+  } else {
+    extractInstr.opcode = IROpCode::EXTRACT_RELATED;
+    extractInstr.arg1 = node->relation;
+    extractInstr.arg2 = node->source;
+    extractInstr.arg3 = currentTemp;
+  }
   instructions.push_back(extractInstr);
 
   emitFilter(node->whereClause.get(), currentTemp);
@@ -256,7 +266,7 @@ void IRGenerator::visit(ExtractStmtNode* node) {
   IRInstruction printInstr;
   printInstr.opcode = IROpCode::PRINT_RESULTS;
   printInstr.arg1 = node->alias.empty() ? currentTemp : node->alias;
-  printInstr.arg2 = "EXTRACT";
+  printInstr.arg2 = node->relation.empty() ? "EXTRACT" : node->relation;
   instructions.push_back(printInstr);
 }
 

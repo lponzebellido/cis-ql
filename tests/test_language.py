@@ -94,7 +94,13 @@ def main() -> int:
             "chrH\tcurated\texon\t1\t100\t.\t+\t.\t"
             "ID=ex1;Parent=tx1,tx2;rank=1\n"
             "chrH\tcurated\tCDS\t10\t90\t7.5\t+\t0\t"
-            "ID=cds1;Parent=tx1;protein_id=P1\n",
+            "ID=cds1;Parent=tx1;protein_id=P1\n"
+            "chrH\tcurated\tregion\t1101\t1200\t.\t.\t.\t"
+            "Name=anonymous\n"
+            "chrH\tcurated\tgene\t1301\t1400\t.\t+\t.\t"
+            "ID=cycleA;Parent=cycleB\n"
+            "chrH\tcurated\tmRNA\t1301\t1400\t.\t+\t.\t"
+            "ID=cycleB;Parent=cycleA\n",
             encoding="utf-8",
         )
         (workspace / "fixture.pwm").write_text(
@@ -519,6 +525,10 @@ def main() -> int:
             'EXTRACT FEATURE AS shared_children WHERE PARENT = "tx2";\n'
             'EXTRACT GENE AS selected_gene WHERE ID = "gene1" '
             'AND NAME = "GENE 1";\n'
+            'EXTRACT CHILDREN OF selected_gene AS direct_children;\n'
+            'EXTRACT DESCENDANTS OF selected_gene AS descendants;\n'
+            'EXTRACT DESCENDANTS OF selected_gene AS descendant_coding '
+            'WHERE TYPE = "CDS";\n'
             'EXPORT transcripts TO "transcripts.gff3" FORMAT GFF3;\n'
             'EXPORT coding TO "coding.tsv" FORMAT TSV;\n',
         )
@@ -539,7 +549,14 @@ def main() -> int:
             data["resultSets"]["shared_children"][0]
                 ["annotationEvidence"]["parents"] == ["tx1", "tx2"] and
             data["resultSets"]["selected_gene"][0]
-                ["annotationEvidence"]["id"] == "gene1",
+                ["annotationEvidence"]["id"] == "gene1" and
+            [item["annotationEvidence"]["id"] for item in
+             data["resultSets"]["direct_children"]] == ["tx1"] and
+            [item["annotationEvidence"]["id"] for item in
+             data["resultSets"]["descendants"]]
+            == ["tx1", "ex1", "cds1"] and
+            [item["annotationEvidence"]["id"] for item in
+             data["resultSets"]["descendant_coding"]] == ["cds1"],
             "GFF3 hierarchy, identity, and attributes remain queryable",
         )
         transcript_gff = (workspace / "transcripts.gff3").read_text(
@@ -571,6 +588,51 @@ def main() -> int:
         )
         require("ATTRIBUTE supports only equality" in semantic_error,
                 "annotation attributes use exact string equality")
+
+        data, _ = run_query(
+            workspace,
+            "annotation_cycle_is_bounded",
+            'LOAD ANNOTATION "hierarchy.gff3" AS annotation;\n'
+            'EXTRACT FEATURE AS cycle_root WHERE ID = "cycleA";\n'
+            'EXTRACT DESCENDANTS OF cycle_root AS cycle_descendants;\n',
+        )
+        require(
+            [item["annotationEvidence"]["id"] for item in
+             data["resultSets"]["cycle_descendants"]] == ["cycleB"],
+            "descendant traversal terminates without returning its root",
+        )
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "annotation_hierarchy_requires_defined_source",
+            'LOAD ANNOTATION "hierarchy.gff3" AS annotation;\n'
+            'EXTRACT CHILDREN OF missing AS invalid;\n',
+            3,
+        )
+        require("Hierarchy source alias 'missing' is not defined"
+                in semantic_error,
+                "hierarchy traversal requires a defined result set")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "annotation_hierarchy_rejects_dataset_source",
+            'LOAD ANNOTATION "hierarchy.gff3" AS annotation;\n'
+            'EXTRACT CHILDREN OF annotation AS invalid;\n',
+            3,
+        )
+        require("expects a result-set alias" in semantic_error,
+                "hierarchy traversal rejects dataset aliases")
+
+        runtime_error = run_invalid_query(
+            workspace,
+            "annotation_hierarchy_requires_ids",
+            'LOAD ANNOTATION "hierarchy.gff3" AS annotation;\n'
+            'EXTRACT FEATURE AS anonymous WHERE NAME = "anonymous";\n'
+            'EXTRACT CHILDREN OF anonymous AS invalid;\n',
+            4,
+        )
+        require("contains a region without a GFF3 ID" in runtime_error,
+                "hierarchy traversal rejects sources without identity")
 
         semantic_error = run_invalid_query(
             workspace,

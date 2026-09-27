@@ -469,6 +469,22 @@ std::unique_ptr<FindStmtNode> Parser::parseFind() {
 }
 
 std::unique_ptr<ExtractStmtNode> Parser::parseExtract() {
+  if (match(TokenType::CHILDREN) || match(TokenType::DESCENDANTS)) {
+    const std::string relation = previous().lexeme;
+    consume(TokenType::OF, "Expected 'OF' after " + relation + ".");
+    consume(TokenType::ID,
+            "Expected a result-set alias after " + relation + " OF.");
+    const std::string source = previous().lexeme;
+    std::string alias;
+    if (match(TokenType::AS)) {
+      consume(TokenType::ID, "Expected an alias identifier after AS.");
+      alias = previous().lexeme;
+    }
+    auto whereClause = parseWhereClause();
+    consume(TokenType::SEMICOLON, "Expected ';' at the end of EXTRACT.");
+    return std::unique_ptr<ExtractStmtNode>(new ExtractStmtNode(
+        "", relation, source, alias, std::move(whereClause)));
+  }
   if (match(TokenType::GENE) || match(TokenType::PROMOTER) ||
       match(TokenType::ENHANCER) || match(TokenType::EXON) ||
       match(TokenType::INTRON) || match(TokenType::UTR) ||
@@ -484,7 +500,7 @@ std::unique_ptr<ExtractStmtNode> Parser::parseExtract() {
     auto whereClause = parseWhereClause();
     consume(TokenType::SEMICOLON, "Expected ';' at the end of EXTRACT.");
     return std::unique_ptr<ExtractStmtNode>(
-        new ExtractStmtNode(entity, alias, std::move(whereClause)));
+        new ExtractStmtNode(entity, "", "", alias, std::move(whereClause)));
   }
   reportError(peek(), "Expected an entity or alias for EXTRACT.");
   throw std::runtime_error("Parse error");

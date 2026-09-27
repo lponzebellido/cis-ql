@@ -29,7 +29,7 @@ how many new statements it adds.
 
 | Priority | Missing capability | Why it matters | Smallest useful acceptance target |
 | :--- | :--- | :--- | :--- |
-| 1 | Transcript-aware GFF3 selection | Attributes and parentage are now preserved, but transcript graphs and selection policy are not yet first-class | Validate parent graphs; expose explicit `ALL`, canonical, or named-transcript selection |
+| 1 | Transcript-aware GFF3 selection | Parent graphs can now be navigated, but validation, grouping, and transcript-selection policy are not yet first-class | Validate parent graphs; expose explicit `ALL`, canonical, or named-transcript selection |
 | 2 | General scalar and oriented-sequence expressions | Regex can describe complex patterns, but programmers need auditable arithmetic, captures, strand-oriented sequence, translation, and genetic-code policy outside the regex itself | Extend the current `MOD`, `START`, `END`, and `STRAND` foundation with reusable expressions and oriented extraction |
 | 3 | Enrichment with matched backgrounds | Counts alone cannot distinguish motif enrichment from length or composition effects | Declare foreground/background regions, matching policy, effect size, test, and multiple-testing correction |
 | 4 | CRE-to-gene evidence tables | `NEAR` is useful but genomic proximity is only one candidate-linking rule | Import relationship/contact tables and retain typed promoter, distance, contact, expression, and binding evidence per link |
@@ -66,6 +66,11 @@ EXTRACT FEATURE AS coding_features
     AND PARENT = "transcript_1"
     AND PHASE = "0"
     AND ATTRIBUTE "protein_id" = "protein_1";
+
+EXTRACT GENE AS selected_gene WHERE ID = "gene_1";
+EXTRACT CHILDREN OF selected_gene AS direct_components;
+EXTRACT DESCENDANTS OF selected_gene AS coding_descendants
+  WHERE TYPE = "CDS";
 ```
 
 GFF3 import retains source, score, phase, `ID`, `Name`, every `Parent`, the
@@ -75,11 +80,18 @@ tests membership rather than comparing the comma-joined field, and `ATTRIBUTE`
 permits exact queries on source-specific metadata without turning each key into
 a language keyword. JSON and TSV expose the structured annotation evidence.
 
+`CHILDREN` follows one `Parent` edge from every identified source region.
+`DESCENDANTS` follows the relation transitively, excludes the source IDs,
+preserves annotation-file order, and cannot loop indefinitely on cyclic input.
+Sources without GFF3 identity are rejected rather than matched by coordinate.
+Each loaded annotation has a reusable parent index, so traversal does not
+rescan the full GFF3 for every query.
+
 `FEATURE` means every imported feature type. Cis-QL does not currently decide
 that `mRNA`, `transcript`, `lnc_RNA`, or another source vocabulary should be
-treated as the canonical transcript concept. Parent-graph validation, child or
-descendant traversal, transcript grouping, and explicit transcript-selection
-policies remain planned.
+treated as the canonical transcript concept. Parent-graph validation,
+multi-record feature grouping, and explicit transcript-selection policies
+remain planned.
 
 ## Part 1: explicit TSS-relative promoters
 

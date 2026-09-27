@@ -45,6 +45,10 @@ private:
   std::unordered_map<std::string, std::unordered_map<std::string, FastaRecord>> sequenceChrMaps;
   std::unordered_map<std::string, std::vector<GenomicRegion>>
       annotationDatasets;
+  std::unordered_map<
+      std::string,
+      std::unordered_map<std::string, std::vector<size_t>>>
+      annotationChildrenByParent;
   std::unordered_map<std::string, std::vector<GenomicRegion>> resultSets;
   std::unordered_map<std::string, std::vector<MotifMatch>> motifResults;
   std::unordered_map<std::string, std::vector<GenomicRegion>> namedRegions;
@@ -95,6 +99,7 @@ private:
   void executeFindExec(const IRInstruction &instr);
   void executeFindAlias(const IRInstruction &instr);
   void executeExtract(const IRInstruction &instr);
+  void executeExtractRelated(const IRInstruction &instr);
   void executeFilterLength(const IRInstruction &instr);
   void executeFilterSimilarity(const IRInstruction &instr);
   void executeFilterCondition(const IRInstruction &instr);
