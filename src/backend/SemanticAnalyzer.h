@@ -36,6 +36,7 @@ public:
   void visit(CountStmtNode *node) override;
   void visit(ScanStmtNode *node) override;
   void visit(AnalyzeStmtNode *node) override;
+  void visit(ValidateStmtNode *node) override;
   void visit(IfStmtNode *node) override;
   void visit(ForeachStmtNode *node) override;
   void visit(ProgramNode *node) override;

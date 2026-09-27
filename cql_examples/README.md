@@ -97,19 +97,20 @@ the responsibility of the program.
 ## Annotation hierarchy workflow
 
 13. `13_gff3_hierarchy.cql` loads the *E. coli* K-12 MG1655 `U00096.3`
-    sequence and its NCBI annotation, then selects `thrA` and its CDS using
-    preserved GFF3 identity and parentage. The query distinguishes `ID` from
-    `Name`, obtains direct children, traverses descendants and ancestors, tests
-    phase, and queries `locus_tag` and `protein_id` without adding
-    organism-specific keywords to the language.
+    sequence and its NCBI annotation, validates the identity and parent graph,
+    then selects `thrA` and its CDS using preserved GFF3 parentage. The query
+    distinguishes `ID` from `Name`, obtains direct children, traverses
+    descendants and ancestors, tests phase, and queries `locus_tag` and
+    `protein_id` without adding organism-specific keywords to the language.
 
 `EXTRACT FEATURE` deliberately returns the annotation vocabulary as supplied.
 The programmer chooses `TYPE = "mRNA"`, `TYPE = "CDS"`, a Sequence Ontology
 term, or another source-specific type. Cis-QL preserves the hierarchy but does
-not currently validate the parent graph, resolve canonical transcripts, or
-infer a transcript policy. `CHILDREN`, `DESCENDANTS`, `PARENTS`, and
-`ANCESTORS` navigate the structure that the file declares; they do not
-reinterpret it.
+not resolve canonical transcripts or infer a transcript policy. `VALIDATE
+ANNOTATION` reports unresolved parents, incompatible repeated identities, and
+cycles while treating compatible multi-record identities as informational.
+`CHILDREN`, `DESCENDANTS`, `PARENTS`, and `ANCESTORS` navigate the structure
+that the file declares; they do not reinterpret it.
 
 The shared `anthocyanin_regulatory_demo` FASTA and GFF3 files contain three
 annotated genes, one candidate enhancer, two promoter-local MYB instances, and

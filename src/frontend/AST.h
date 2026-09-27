@@ -22,6 +22,7 @@ class SetOpStmtNode;
 class CountStmtNode;
 class ScanStmtNode;
 class AnalyzeStmtNode;
+class ValidateStmtNode;
 class IfStmtNode;
 class ForeachStmtNode;
 class ProgramNode;
@@ -44,6 +45,7 @@ public:
   virtual void visit(CountStmtNode* node) = 0;
   virtual void visit(ScanStmtNode* node) = 0;
   virtual void visit(AnalyzeStmtNode* node) = 0;
+  virtual void visit(ValidateStmtNode* node) = 0;
   virtual void visit(IfStmtNode* node) = 0;
   virtual void visit(ForeachStmtNode* node) = 0;
   virtual void visit(ProgramNode* node) = 0;
@@ -299,6 +301,16 @@ public:
                   std::unique_ptr<ConditionNode> w)
       : analysisType(at), windowSize(ws), alias(a),
         whereClause(std::move(w)) {}
+  void print(std::string prefix = "", bool isLast = true) const override;
+  void accept(ASTVisitor& visitor) override;
+};
+
+class ValidateStmtNode : public StatementNode {
+public:
+  std::string annotationAlias;
+  std::string alias;
+  ValidateStmtNode(std::string annotation, std::string reportAlias)
+      : annotationAlias(annotation), alias(reportAlias) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;
 };

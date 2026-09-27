@@ -5,6 +5,7 @@ import { cqlLanguageDef } from './cql-monarch';
 import { TrackViewer } from './TrackViewer';
 import { FileExplorer } from './FileExplorer';
 import { SequenceViewer } from './SequenceViewer';
+import { AnnotationReportViewer } from './AnnotationReportViewer';
 import './App.css';
 
 const EXT_COLORS: Record<string, string> = {
@@ -32,9 +33,10 @@ function App() {
   const [stdout, setStdout] = useState('Welcome to Cis-QL Studio.');
   const [results, setResults] = useState<Record<string, any[]>>({});
   const [gcProfiles, setGcProfiles] = useState<Record<string, any>>({});
+  const [annotationReports, setAnnotationReports] = useState<Record<string, any>>({});
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeVisTab, setActiveVisTab] = useState<'track' | 'sequence'>('track');
+  const [activeVisTab, setActiveVisTab] = useState<'track' | 'sequence' | 'validation'>('track');
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [highlightedRegion, setHighlightedRegion] = useState<any>(null);
@@ -134,6 +136,7 @@ function App() {
     setStdout('Executing...\n');
     setResults({});
     setGcProfiles({});
+    setAnnotationReports({});
     try {
       const response = await fetch('http://localhost:3001/api/execute', {
         method: 'POST',
@@ -154,6 +157,9 @@ function App() {
       }
       if (data.results && data.results.gcProfiles) {
         setGcProfiles(data.results.gcProfiles);
+      }
+      if (data.results && data.results.annotationReports) {
+        setAnnotationReports(data.results.annotationReports);
       }
     } catch (err) {
       setStdout('Error connecting to the backend server.');
@@ -327,6 +333,12 @@ function App() {
                   >
                     Sequence
                   </div>
+                  <div
+                    className={`visualizer-tab ${activeVisTab === 'validation' ? 'active' : ''}`}
+                    onClick={() => setActiveVisTab('validation')}
+                  >
+                    Validation
+                  </div>
                 </div>
               </div>
               <div className="pane-content">
@@ -339,8 +351,10 @@ function App() {
                       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }, 100);
                   }} />
-                ) : (
+                ) : activeVisTab === 'sequence' ? (
                   <SequenceViewer results={results} highlightedRegion={highlightedRegion} />
+                ) : (
+                  <AnnotationReportViewer reports={annotationReports} />
                 )}
               </div>
             </div>

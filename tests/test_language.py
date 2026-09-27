@@ -121,6 +121,23 @@ def main() -> int:
             "ID=leafD;Parent=multi\n",
             encoding="utf-8",
         )
+        (workspace / "validation.gff3").write_text(
+            "##gff-version 3\n"
+            "chrV\ttest\tgene\t1\t500\t.\t+\t.\tID=rootV\n"
+            "chrV\ttest\texon\t1\t100\t.\t+\t.\t"
+            "ID=multiV;Parent=rootV\n"
+            "chrV\ttest\texon\t201\t300\t.\t+\t.\t"
+            "ID=multiV;Parent=rootV\n"
+            "chrV\ttest\tgene\t501\t600\t.\t+\t.\tID=conflictV\n"
+            "chrW\ttest\tmRNA\t1\t100\t.\t-\t.\tID=conflictV\n"
+            "chrV\ttest\tregion\t601\t700\t.\t+\t.\t"
+            "ID=orphanV;Parent=missingV\n"
+            "chrV\ttest\tgene\t701\t800\t.\t+\t.\t"
+            "ID=cycleA;Parent=cycleB\n"
+            "chrV\ttest\tmRNA\t701\t800\t.\t+\t.\t"
+            "ID=cycleB;Parent=cycleA\n",
+            encoding="utf-8",
+        )
         (workspace / "fixture.pwm").write_text(
             ">TEST test\n"
             "A [ 10 10 ]\n"
@@ -696,6 +713,83 @@ def main() -> int:
             == ["rootD", "multi", "multi"],
             "hierarchy traversal preserves every record for a repeated ID",
         )
+
+        data, _ = run_query(
+            workspace,
+            "annotation_validation_report",
+            'LOAD ANNOTATION "fixture.gff3" AS valid_annotation;\n'
+            'LOAD ANNOTATION "validation.gff3" AS invalid_annotation;\n'
+            'VALIDATE ANNOTATION valid_annotation AS valid_report;\n'
+            'VALIDATE ANNOTATION invalid_annotation AS invalid_report;\n'
+            'EXPORT invalid_report TO "validation.tsv" FORMAT TSV;\n',
+        )
+        valid_report = data["annotationReports"]["valid_report"]
+        invalid_report = data["annotationReports"]["invalid_report"]
+        require(
+            valid_report["valid"] is True and
+            valid_report["summary"] == {
+                "totalRecords": 3,
+                "recordsWithId": 3,
+                "uniqueIds": 3,
+                "parentReferences": 0,
+                "multiRecordIds": 0,
+                "unresolvedParents": 0,
+                "identityConflicts": 0,
+                "cycles": 0,
+            } and
+            invalid_report["valid"] is False and
+            invalid_report["summary"] == {
+                "totalRecords": 8,
+                "recordsWithId": 8,
+                "uniqueIds": 6,
+                "parentReferences": 5,
+                "multiRecordIds": 2,
+                "unresolvedParents": 1,
+                "identityConflicts": 1,
+                "cycles": 1,
+            } and
+            [item["id"] for item in
+             invalid_report["multiRecordIdentities"]]
+            == ["conflictV", "multiV"] and
+            invalid_report["unresolvedParents"][0]["parentId"]
+            == "missingV" and
+            invalid_report["identityConflicts"][0]["id"]
+            == "conflictV" and
+            invalid_report["cycles"] == [["cycleA", "cycleB", "cycleA"]],
+            "annotation validation distinguishes information from errors",
+        )
+        validation_tsv = (workspace / "validation.tsv").read_text(
+            encoding="utf-8"
+        ).splitlines()
+        require(
+            len(validation_tsv[0].split("\t")) == 11 and
+            all(len(line.split("\t")) == 11 for line in validation_tsv) and
+            [line.split("\t")[0] for line in validation_tsv[1:]]
+            == ["SUMMARY", "MULTI_RECORD_ID", "MULTI_RECORD_ID",
+                "UNRESOLVED_PARENT", "IDENTITY_CONFLICT", "CYCLE"],
+            "annotation validation TSV has stable diagnostic rows",
+        )
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "annotation_validation_requires_dataset",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'VALIDATE ANNOTATION genome AS invalid;\n',
+            3,
+        )
+        require("expects an annotation dataset alias" in semantic_error,
+                "VALIDATE ANNOTATION rejects non-annotation datasets")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "annotation_report_requires_tsv",
+            'LOAD ANNOTATION "fixture.gff3" AS annotation;\n'
+            'VALIDATE ANNOTATION annotation AS report;\n'
+            'EXPORT report TO "report.gff3" FORMAT GFF3;\n',
+            3,
+        )
+        require("can be exported only as TSV" in semantic_error,
+                "annotation reports reject genomic export formats")
 
         semantic_error = run_invalid_query(
             workspace,

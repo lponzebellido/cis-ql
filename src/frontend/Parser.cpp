@@ -56,6 +56,7 @@ void Parser::synchronize() {
     case TokenType::USE:
     case TokenType::EXPORT:
     case TokenType::DEFINE:
+    case TokenType::VALIDATE:
     case TokenType::FIND:
     case TokenType::EXTRACT:
     case TokenType::INTERSECT:
@@ -95,6 +96,8 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
     return parseUse();
   if (match(TokenType::EXPORT))
     return parseExport();
+  if (match(TokenType::VALIDATE))
+    return parseValidate();
   if (match(TokenType::DEFINE)) {
     if (check(TokenType::PROMOTERS))
       return parseDefinePromoters();
@@ -130,8 +133,25 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
 
   reportError(peek(), "Expected start of a statement (LOAD, USE, EXPORT, FIND, "
                       "EXTRACT, INTERSECT, UNION, EXCEPT, OVERLAPS, NEAR, "
-                      "CONSENSUS, SCAN, COUNT, ANALYZE, IF, FOREACH, DEFINE)");
+                      "CONSENSUS, SCAN, COUNT, ANALYZE, VALIDATE, IF, FOREACH, "
+                      "DEFINE)");
   throw std::runtime_error("Parse error");
+}
+
+std::unique_ptr<ValidateStmtNode> Parser::parseValidate() {
+  consume(TokenType::ANNOTATION,
+          "Expected 'ANNOTATION' after VALIDATE.");
+  consume(TokenType::ID,
+          "Expected an annotation dataset alias after VALIDATE ANNOTATION.");
+  const std::string annotationAlias = previous().lexeme;
+  consume(TokenType::AS,
+          "Expected 'AS' after the annotation dataset alias.");
+  consume(TokenType::ID, "Expected a report alias after AS.");
+  const std::string alias = previous().lexeme;
+  consume(TokenType::SEMICOLON,
+          "Expected ';' at the end of VALIDATE ANNOTATION.");
+  return std::unique_ptr<ValidateStmtNode>(
+      new ValidateStmtNode(annotationAlias, alias));
 }
 
 std::unique_ptr<DefinePromotersStmtNode> Parser::parseDefinePromoters() {

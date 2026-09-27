@@ -108,12 +108,16 @@ void SemanticAnalyzer::visit(ExportStmtNode *node) {
   const std::string type = symbolTable.typeOf(node->alias);
   if (type != "RESULT_SET" && type != "MOTIF_HITS" &&
       type != "REGULATORY_TRACK" &&
-      type != "GC_PROFILE") {
-    reportError("EXPORT expects a result-set or GC-profile alias, but '" +
+      type != "GC_PROFILE" && type != "ANNOTATION_REPORT") {
+    reportError("EXPORT expects a result-set, GC-profile, or annotation-report "
+                "alias, but '" +
                 node->alias + "' has type " + type + ".");
   }
   if (type == "GC_PROFILE" && node->format != "TSV") {
     reportError("GC profiles can currently be exported only as TSV.");
+  }
+  if (type == "ANNOTATION_REPORT" && node->format != "TSV") {
+    reportError("Annotation validation reports can be exported only as TSV.");
   }
 }
 
@@ -685,6 +689,22 @@ void SemanticAnalyzer::visit(AnalyzeStmtNode *node) {
                                           ? "GC_PROFILE"
                                           : "RESULT_SET");
     }
+  }
+}
+
+void SemanticAnalyzer::visit(ValidateStmtNode *node) {
+  if (!symbolTable.lookup(node->annotationAlias)) {
+    reportError("Annotation dataset alias '" + node->annotationAlias +
+                "' is not defined.");
+  } else if (symbolTable.typeOf(node->annotationAlias) != "ANNOTATION_DATA") {
+    reportError("VALIDATE ANNOTATION expects an annotation dataset alias, "
+                "but '" + node->annotationAlias + "' has type " +
+                symbolTable.typeOf(node->annotationAlias) + ".");
+  }
+  if (symbolTable.lookup(node->alias)) {
+    reportError("Alias '" + node->alias + "' is already defined.");
+  } else {
+    symbolTable.insert(node->alias, "ANNOTATION_REPORT");
   }
 }
 

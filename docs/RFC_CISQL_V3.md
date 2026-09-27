@@ -29,7 +29,7 @@ how many new statements it adds.
 
 | Priority | Missing capability | Why it matters | Smallest useful acceptance target |
 | :--- | :--- | :--- | :--- |
-| 1 | Transcript-aware GFF3 selection | Parent graphs can now be navigated, but validation, grouping, and transcript-selection policy are not yet first-class | Validate parent graphs; expose explicit `ALL`, canonical, or named-transcript selection |
+| 1 | Transcript-aware GFF3 selection | Parent graphs can now be validated and navigated, but feature grouping and transcript-selection policy are not yet first-class | Group discontinuous features; expose explicit `ALL`, canonical, or named-transcript selection |
 | 2 | General scalar and oriented-sequence expressions | Regex can describe complex patterns, but programmers need auditable arithmetic, captures, strand-oriented sequence, translation, and genetic-code policy outside the regex itself | Extend the current `MOD`, `START`, `END`, and `STRAND` foundation with reusable expressions and oriented extraction |
 | 3 | Enrichment with matched backgrounds | Counts alone cannot distinguish motif enrichment from length or composition effects | Declare foreground/background regions, matching policy, effect size, test, and multiple-testing correction |
 | 4 | CRE-to-gene evidence tables | `NEAR` is useful but genomic proximity is only one candidate-linking rule | Import relationship/contact tables and retain typed promoter, distance, contact, expression, and binding evidence per link |
@@ -75,6 +75,9 @@ EXTRACT DESCENDANTS OF selected_gene AS coding_descendants
 EXTRACT PARENTS OF coding_descendants AS direct_parents;
 EXTRACT ANCESTORS OF coding_descendants AS enclosing_genes
   WHERE TYPE = "gene";
+
+VALIDATE ANNOTATION annotation AS hierarchy_report;
+EXPORT hierarchy_report TO "hierarchy_report.tsv" FORMAT TSV;
 ```
 
 GFF3 import retains source, score, phase, `ID`, `Name`, every `Parent`, the
@@ -95,11 +98,18 @@ annotation evidence but can start from a record without `ID` when it declares
 Each loaded annotation has reusable parent and identity indices, so traversal
 does not rescan the full GFF3 for every query.
 
+`VALIDATE ANNOTATION` produces a typed report over the complete named dataset.
+It identifies unresolved `Parent` references, cycles, and repeated IDs whose
+records disagree on chromosome, feature type, or strand. Compatible repeated
+IDs are listed separately because GFF3 can represent one discontinuous feature
+with multiple lines. Validation is explicit rather than a load-time failure so
+partial annotations remain usable. JSON retains structured diagnostics, TSV
+provides summary and diagnostic rows, and Studio displays the same report.
+
 `FEATURE` means every imported feature type. Cis-QL does not currently decide
 that `mRNA`, `transcript`, `lnc_RNA`, or another source vocabulary should be
-treated as the canonical transcript concept. Parent-graph validation,
-multi-record feature grouping, and explicit transcript-selection policies
-remain planned.
+treated as the canonical transcript concept. Multi-record feature grouping and
+explicit transcript-selection policies remain planned.
 
 ## Part 1: explicit TSS-relative promoters
 

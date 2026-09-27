@@ -11,6 +11,7 @@
 #include "../bioinfo/PWMScanner.h"
 #include "../bioinfo/RegulatoryRegions.h"
 #include "../bioinfo/GCAnalyzer.h"
+#include "../bioinfo/AnnotationValidation.h"
 #include "IRGenerator.h"
 #include <future>
 #include <string>
@@ -58,6 +59,8 @@ private:
   std::unordered_map<std::string, std::vector<GenomicRegion>> namedRegions;
   std::unordered_map<std::string, PWMatrix> loadedMatrices;
   std::unordered_map<std::string, std::vector<GCWindow>> gcResults;
+  std::unordered_map<std::string, AnnotationValidationReport>
+      annotationReports;
 
   FindContext currentFind;
   ScanContext currentScan;
@@ -74,6 +77,8 @@ private:
       const AnnotationEvidence &evidence) const;
   std::string serializeAnnotationEvidenceJSON(
       const AnnotationEvidence &evidence) const;
+  std::string serializeAnnotationValidationJSON(
+      const AnnotationValidationReport &report) const;
   std::string serializeTrackEvidenceJSON(const TrackEvidence &track) const;
   std::string serializeConsensusEvidenceJSON(
       const ConsensusEvidence &evidence) const;
@@ -121,6 +126,7 @@ private:
   void executeResultAlias(const IRInstruction &instr);
   void executeAnalyzeGC(const IRInstruction &instr);
   void executeAnalyzeCpG(const IRInstruction &instr);
+  void executeValidateAnnotation(const IRInstruction &instr);
   bool compareValues(double left, const std::string &op,
                      const std::string &right) const;
   bool compareConditionValue(

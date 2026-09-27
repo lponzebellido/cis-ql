@@ -5,8 +5,10 @@
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
+#include <map>
 #include <set>
 #include <sstream>
 #include <thread>
@@ -44,6 +46,35 @@ std::string cleanTabularField(const std::string &value) {
       c = ' ';
   }
   return cleaned;
+}
+
+std::vector<std::string>
+canonicalCycle(const std::vector<std::string> &cycle) {
+  if (cycle.empty())
+    return cycle;
+  std::vector<std::string> best = cycle;
+  for (size_t offset = 1; offset < cycle.size(); ++offset) {
+    std::vector<std::string> rotated;
+    rotated.reserve(cycle.size());
+    for (size_t index = 0; index < cycle.size(); ++index) {
+      rotated.push_back(cycle[(offset + index) % cycle.size()]);
+    }
+    if (rotated < best)
+      best = rotated;
+  }
+  best.push_back(best.front());
+  return best;
+}
+
+std::string joinValues(const std::vector<std::string> &values,
+                       const std::string &separator) {
+  std::ostringstream out;
+  for (size_t index = 0; index < values.size(); ++index) {
+    if (index > 0)
+      out << separator;
+    out << values[index];
+  }
+  return out.str();
 }
 
 std::string gffAttributeEscape(const std::string &value) {
@@ -158,6 +189,90 @@ std::string Interpreter::serializeAnnotationEvidenceJSON(
   }
   out << "],\"attributes\":"
       << serializeAnnotationAttributesJSON(evidence) << '}';
+  return out.str();
+}
+
+std::string Interpreter::serializeAnnotationValidationJSON(
+    const AnnotationValidationReport &report) const {
+  const auto writeStrings = [this](std::ostringstream &out,
+                                   const std::vector<std::string> &values) {
+    out << '[';
+    for (size_t index = 0; index < values.size(); ++index) {
+      if (index > 0)
+        out << ',';
+      out << '"' << jsonEscape(values[index]) << '"';
+    }
+    out << ']';
+  };
+  const auto writeNumbers = [](std::ostringstream &out,
+                               const std::vector<size_t> &values) {
+    out << '[';
+    for (size_t index = 0; index < values.size(); ++index) {
+      if (index > 0)
+        out << ',';
+      out << values[index];
+    }
+    out << ']';
+  };
+
+  std::ostringstream out;
+  out << "{\"annotationAlias\":\"" << jsonEscape(report.annotationAlias)
+      << "\",\"valid\":" << (report.valid() ? "true" : "false")
+      << ",\"summary\":{\"totalRecords\":" << report.totalRecords
+      << ",\"recordsWithId\":" << report.recordsWithId
+      << ",\"uniqueIds\":" << report.uniqueIds
+      << ",\"parentReferences\":" << report.parentReferences
+      << ",\"multiRecordIds\":" << report.multiRecordIds.size()
+      << ",\"unresolvedParents\":" << report.unresolvedParents.size()
+      << ",\"identityConflicts\":" << report.identityConflicts.size()
+      << ",\"cycles\":" << report.cycles.size() << "},";
+
+  out << "\"multiRecordIdentities\":[";
+  for (size_t index = 0; index < report.multiRecordIds.size(); ++index) {
+    if (index > 0)
+      out << ',';
+    const auto &identity = report.multiRecordIds[index];
+    out << "{\"id\":\"" << jsonEscape(identity.id)
+        << "\",\"recordNumbers\":";
+    writeNumbers(out, identity.recordNumbers);
+    out << '}';
+  }
+  out << "],\"unresolvedParents\":[";
+  for (size_t index = 0; index < report.unresolvedParents.size(); ++index) {
+    if (index > 0)
+      out << ',';
+    const auto &issue = report.unresolvedParents[index];
+    out << "{\"recordNumber\":" << issue.recordNumber
+        << ",\"chr\":\"" << jsonEscape(issue.chr)
+        << "\",\"type\":\"" << jsonEscape(issue.type)
+        << "\",\"childId\":\"" << jsonEscape(issue.childId)
+        << "\",\"childName\":\"" << jsonEscape(issue.childName)
+        << "\",\"parentId\":\"" << jsonEscape(issue.parentId)
+        << "\"}";
+  }
+  out << "],\"identityConflicts\":[";
+  for (size_t index = 0; index < report.identityConflicts.size(); ++index) {
+    if (index > 0)
+      out << ',';
+    const auto &conflict = report.identityConflicts[index];
+    out << "{\"id\":\"" << jsonEscape(conflict.id)
+        << "\",\"recordNumbers\":";
+    writeNumbers(out, conflict.recordNumbers);
+    out << ",\"chromosomes\":";
+    writeStrings(out, conflict.chromosomes);
+    out << ",\"types\":";
+    writeStrings(out, conflict.types);
+    out << ",\"strands\":";
+    writeStrings(out, conflict.strands);
+    out << '}';
+  }
+  out << "],\"cycles\":[";
+  for (size_t index = 0; index < report.cycles.size(); ++index) {
+    if (index > 0)
+      out << ',';
+    writeStrings(out, report.cycles[index]);
+  }
+  out << "]}";
   return out.str();
 }
 
@@ -594,6 +709,128 @@ void Interpreter::executeUseDataset(const IRInstruction &instr) {
     std::cout << "> USE ANNOTATION " << alias << std::endl;
 }
 
+void Interpreter::executeValidateAnnotation(const IRInstruction &instr) {
+  const std::string &annotationAlias = instr.arg1;
+  const std::string &reportAlias = instr.arg2;
+  const auto dataset = annotationDatasets.find(annotationAlias);
+  const auto identities = annotationRecordsById.find(annotationAlias);
+  if (dataset == annotationDatasets.end() ||
+      identities == annotationRecordsById.end()) {
+    reportRuntimeError("Annotation dataset '" + annotationAlias +
+                       "' is not available for validation.");
+    return;
+  }
+
+  const auto &annotations = dataset->second;
+  const auto &recordsById = identities->second;
+  AnnotationValidationReport report;
+  report.annotationAlias = annotationAlias;
+  report.totalRecords = annotations.size();
+  report.uniqueIds = recordsById.size();
+
+  std::vector<std::string> ids;
+  ids.reserve(recordsById.size());
+  for (const auto &entry : recordsById)
+    ids.push_back(entry.first);
+  std::sort(ids.begin(), ids.end());
+
+  std::map<std::string, std::set<std::string>> parentsByChild;
+  for (const auto &id : ids)
+    parentsByChild[id];
+
+  for (const auto &id : ids) {
+    const auto &indices = recordsById.at(id);
+    report.recordsWithId += indices.size();
+    if (indices.size() > 1) {
+      AnnotationMultiRecordIdentity identity;
+      identity.id = id;
+      for (const size_t index : indices)
+        identity.recordNumbers.push_back(index + 1);
+      report.multiRecordIds.push_back(identity);
+
+      std::set<std::string> chromosomes;
+      std::set<std::string> types;
+      std::set<std::string> strands;
+      for (const size_t index : indices) {
+        chromosomes.insert(annotations[index].chr);
+        types.insert(annotations[index].type);
+        strands.insert(annotations[index].strand);
+      }
+      if (chromosomes.size() > 1 || types.size() > 1 ||
+          strands.size() > 1) {
+        AnnotationIdentityConflict conflict;
+        conflict.id = id;
+        conflict.recordNumbers = identity.recordNumbers;
+        conflict.chromosomes.assign(chromosomes.begin(), chromosomes.end());
+        conflict.types.assign(types.begin(), types.end());
+        conflict.strands.assign(strands.begin(), strands.end());
+        report.identityConflicts.push_back(conflict);
+      }
+    }
+  }
+
+  for (size_t index = 0; index < annotations.size(); ++index) {
+    const auto &region = annotations[index];
+    report.parentReferences += region.annotationEvidence.parents.size();
+    for (const auto &parent : region.annotationEvidence.parents) {
+      if (!recordsById.count(parent)) {
+        AnnotationUnresolvedParent issue;
+        issue.recordNumber = index + 1;
+        issue.chr = region.chr;
+        issue.type = region.type;
+        issue.childId = region.annotationEvidence.id;
+        issue.childName = region.annotationEvidence.name;
+        issue.parentId = parent;
+        report.unresolvedParents.push_back(issue);
+      } else if (!region.annotationEvidence.id.empty()) {
+        parentsByChild[region.annotationEvidence.id].insert(parent);
+      }
+    }
+  }
+
+  std::map<std::string, int> state;
+  std::vector<std::string> stack;
+  std::map<std::string, std::vector<std::string>> cycles;
+  std::function<void(const std::string &)> visit =
+      [&](const std::string &id) {
+        state[id] = 1;
+        stack.push_back(id);
+        for (const auto &parent : parentsByChild[id]) {
+          if (state[parent] == 0) {
+            visit(parent);
+          } else if (state[parent] == 1) {
+            const auto start = std::find(stack.begin(), stack.end(), parent);
+            if (start != stack.end()) {
+              const std::vector<std::string> raw(start, stack.end());
+              const std::vector<std::string> cycle = canonicalCycle(raw);
+              cycles[joinValues(cycle, "\x1f")] = cycle;
+            }
+          }
+        }
+        stack.pop_back();
+        state[id] = 2;
+      };
+
+  for (const auto &entry : parentsByChild) {
+    if (state[entry.first] == 0)
+      visit(entry.first);
+  }
+  for (const auto &entry : cycles)
+    report.cycles.push_back(entry.second);
+
+  annotationReports[reportAlias] = report;
+  if (debugMode) {
+    std::cout << "> VALIDATE ANNOTATION " << annotationAlias << " AS "
+              << reportAlias << std::endl;
+    std::cout << "  " << (report.valid() ? "VALID" : "INVALID") << ": "
+              << report.totalRecords << " records, " << report.uniqueIds
+              << " unique IDs, " << report.unresolvedParents.size()
+              << " unresolved parents, " << report.identityConflicts.size()
+              << " identity conflicts, " << report.cycles.size()
+              << " cycles." << std::endl;
+  }
+}
+
 void Interpreter::executeExport(const IRInstruction &instr) {
   const std::string &alias = instr.arg1;
   const std::string filename = stripQuotes(instr.arg2);
@@ -608,12 +845,19 @@ void Interpreter::executeExport(const IRInstruction &instr) {
 
   const auto regionsIt = resultSets.find(alias);
   const auto gcIt = gcResults.find(alias);
-  if (regionsIt == resultSets.end() && gcIt == gcResults.end()) {
+  const auto reportIt = annotationReports.find(alias);
+  if (regionsIt == resultSets.end() && gcIt == gcResults.end() &&
+      reportIt == annotationReports.end()) {
     reportRuntimeError("Result alias '" + alias + "' is not available.");
     return;
   }
   if (gcIt != gcResults.end() && format != "TSV") {
     reportRuntimeError("GC profiles can currently be exported only as TSV.");
+    return;
+  }
+  if (reportIt != annotationReports.end() && format != "TSV") {
+    reportRuntimeError(
+        "Annotation validation reports can currently be exported only as TSV.");
     return;
   }
   if (regionsIt != resultSets.end() && format != "BED" && format != "GFF3" &&
@@ -629,7 +873,59 @@ void Interpreter::executeExport(const IRInstruction &instr) {
   }
   out << std::setprecision(17);
 
-  if (gcIt != gcResults.end()) {
+  if (reportIt != annotationReports.end()) {
+    const auto joinNumbers = [](const std::vector<size_t> &values) {
+      std::vector<std::string> rendered;
+      rendered.reserve(values.size());
+      for (const size_t value : values)
+        rendered.push_back(std::to_string(value));
+      return joinValues(rendered, ",");
+    };
+    const auto &report = reportIt->second;
+    out << "category\tseverity\tannotation\trecord_numbers\tchromosome"
+           "\tfeature_type\tfeature_id\tfeature_name\trelated_id\tpath"
+           "\tdetails\n";
+    out << "SUMMARY\t" << (report.valid() ? "PASS" : "FAIL") << '\t'
+        << cleanTabularField(report.annotationAlias)
+        << "\t\t\t\t\t\t\t\ttotal_records=" << report.totalRecords
+        << ";records_with_id=" << report.recordsWithId
+        << ";unique_ids=" << report.uniqueIds
+        << ";parent_references=" << report.parentReferences
+        << ";multi_record_ids=" << report.multiRecordIds.size()
+        << ";unresolved_parents=" << report.unresolvedParents.size()
+        << ";identity_conflicts=" << report.identityConflicts.size()
+        << ";cycles=" << report.cycles.size() << '\n';
+    for (const auto &identity : report.multiRecordIds) {
+      out << "MULTI_RECORD_ID\tINFO\t"
+          << cleanTabularField(report.annotationAlias) << '\t'
+          << joinNumbers(identity.recordNumbers) << "\t\t\t"
+          << cleanTabularField(identity.id)
+          << "\t\t\t\trecords=" << identity.recordNumbers.size() << '\n';
+    }
+    for (const auto &issue : report.unresolvedParents) {
+      out << "UNRESOLVED_PARENT\tERROR\t"
+          << cleanTabularField(report.annotationAlias) << '\t'
+          << issue.recordNumber << '\t' << cleanTabularField(issue.chr) << '\t'
+          << cleanTabularField(issue.type) << '\t'
+          << cleanTabularField(issue.childId) << '\t'
+          << cleanTabularField(issue.childName) << '\t'
+          << cleanTabularField(issue.parentId) << "\t\t\n";
+    }
+    for (const auto &conflict : report.identityConflicts) {
+      out << "IDENTITY_CONFLICT\tERROR\t"
+          << cleanTabularField(report.annotationAlias) << '\t'
+          << joinNumbers(conflict.recordNumbers) << '\t'
+          << cleanTabularField(joinValues(conflict.chromosomes, ",")) << '\t'
+          << cleanTabularField(joinValues(conflict.types, ",")) << '\t'
+          << cleanTabularField(conflict.id) << "\t\t\t\tstrands="
+          << cleanTabularField(joinValues(conflict.strands, ",")) << '\n';
+    }
+    for (const auto &cycle : report.cycles) {
+      out << "CYCLE\tERROR\t" << cleanTabularField(report.annotationAlias)
+          << "\t\t\t\t\t\t\t"
+          << cleanTabularField(joinValues(cycle, " -> ")) << "\t\n";
+    }
+  } else if (gcIt != gcResults.end()) {
     out << "chromosome\tstart\tgc_percent\n";
     for (const auto &window : gcIt->second) {
       out << cleanTabularField(window.chr) << '\t' << window.position << '\t'
@@ -2911,6 +3207,19 @@ void Interpreter::dumpResultsJSON() const {
     out << "\n  }";
   }
 
+  if (!annotationReports.empty()) {
+    out << ",\n  \"annotationReports\": {\n";
+    bool firstReport = true;
+    for (const auto &pair : annotationReports) {
+      if (!firstReport)
+        out << ",\n";
+      firstReport = false;
+      out << "    \"" << jsonEscape(pair.first) << "\": "
+          << serializeAnnotationValidationJSON(pair.second);
+    }
+    out << "\n  }";
+  }
+
   out << "\n}\n";
 }
 
@@ -3121,6 +3430,9 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
       break;
     case IROpCode::ANALYZE_CPG:
       executeAnalyzeCpG(instr);
+      break;
+    case IROpCode::VALIDATE_ANNOTATION:
+      executeValidateAnnotation(instr);
       break;
     default:
       break;

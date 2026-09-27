@@ -56,6 +56,7 @@ enum class IROpCode {
   RESULT_ALIAS,
   ANALYZE_GC,
   ANALYZE_CPG,
+  VALIDATE_ANNOTATION,
   DEFINE_PROMOTERS,
   DEFINE_MODULE,
   IF_BEGIN,
@@ -113,6 +114,7 @@ public:
   void visit(CountStmtNode *node) override;
   void visit(ScanStmtNode *node) override;
   void visit(AnalyzeStmtNode *node) override;
+  void visit(ValidateStmtNode *node) override;
   void visit(IfStmtNode *node) override;
   void visit(ForeachStmtNode *node) override;
   void visit(ProgramNode *node) override;

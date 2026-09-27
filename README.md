@@ -23,6 +23,7 @@ interface.
 
 The current implementation reads FASTA sequences, hierarchy-preserving GFF3
 annotations, JASPAR frequency matrices, and BED or narrowPeak tracks. It can
+validate GFF3 identity and parent graphs, navigate annotation relationships,
 derive strand-aware promoters, find literal or IUPAC sequence patterns, scan
 PWMs with explicit background and multiple-testing metadata, combine genomic
 intervals, describe two-site motif modules, count support, select nearby
@@ -35,6 +36,7 @@ A typical query has this shape:
 ```sql
 LOAD SEQUENCE "genome.fasta" AS genome;
 LOAD ANNOTATION "genes.gff3" AS annotation;
+VALIDATE ANNOTATION annotation AS annotation_report;
 LOAD MATRIX "tf_model.pwm" AS tf_model;
 LOAD TRACK "binding_rep1.narrowPeak" FORMAT NARROWPEAK
     EVIDENCE BINDING REPLICATE "R1" AS binding_rep1;
@@ -142,6 +144,21 @@ Named annotation result sets can be traversed with `EXTRACT CHILDREN OF` for
 one downward `Parent` edge or `EXTRACT DESCENDANTS OF` for transitive
 relationships. `EXTRACT PARENTS OF` and `EXTRACT ANCESTORS OF` navigate in
 the opposite direction.
+
+Validation is an explicit operation, so a partial or imperfect annotation can
+still be loaded and queried:
+
+```sql
+VALIDATE ANNOTATION annotation AS annotation_report;
+EXPORT annotation_report TO "annotation_report.tsv" FORMAT TSV;
+```
+
+The report counts records, identities, and parent references; lists unresolved
+parents; detects cycles; and flags repeated identities that disagree on
+chromosome, feature type, or strand. Repeated IDs with compatible fields are
+reported separately as information because GFF3 permits one discontinuous
+feature to occupy multiple records. Reports appear in structured JSON, TSV,
+and the Validation panel in Cis-QL Studio.
 
 `LOAD TRACK` currently accepts BED and narrowPeak. Track coordinates are
 already zero-based and half-open. When a sequence dataset is active, Cis-QL
@@ -367,6 +384,11 @@ it declares `Parent`. Unresolved parent identifiers are not inferred from
 coordinates. Traversal does not choose a transcript vocabulary or canonical
 isoform.
 
+`VALIDATE ANNOTATION` audits the complete named annotation rather than a
+derived result set. It reports unresolved parents, incompatible reuse of an
+identity, and cycles without silently repairing them. A compatible identity
+spread across multiple records is informational, not an error.
+
 `IF` currently evaluates the GC content of the active sequence dataset.
 Regions emitted by `CONSENSUS` additionally support the non-negative integer
 property `SUPPORT_COUNT`.
@@ -392,6 +414,7 @@ EXPORT homologous_genes TO "homologous_genes.bed" FORMAT BED;
 EXPORT homologous_genes TO "homologous_genes.gff3" FORMAT GFF3;
 EXPORT homologous_genes TO "homologous_genes.tsv" FORMAT TSV;
 EXPORT gc_profile TO "gc_profile.tsv" FORMAT TSV;
+EXPORT annotation_report TO "annotation_report.tsv" FORMAT TSV;
 ```
 
 Internal and BED coordinates are zero-based and half-open. GFF3 exports convert
@@ -425,7 +448,7 @@ the authoritative grammar:
 Program            ::= StatementList
 StatementList      ::= Statement StatementList | λ
 
-Statement          ::= LoadStmt | UseStmt | ExportStmt | FindStmt | ExtractStmt
+Statement          ::= LoadStmt | UseStmt | ValidateStmt | ExportStmt | FindStmt | ExtractStmt
                      | DefinePromotersStmt | DefineModuleStmt
                      | SetOperationStmt | ConsensusStmt | CountStmt
                      | ScanStmt | AnalyzeStmt
@@ -438,6 +461,7 @@ LoadStmt           ::= LOAD (SEQUENCE | ANNOTATION | MATRIX) STRING AS ID SEMICO
 TrackMetadata      ::= ASSAY STRING | SAMPLE STRING | CONDITION STRING
                      | REPLICATE STRING | CONTROL STRING
 UseStmt            ::= USE (SEQUENCE | ANNOTATION) ID SEMICOLON
+ValidateStmt       ::= VALIDATE ANNOTATION ID AS ID SEMICOLON
 ExportStmt         ::= EXPORT ID TO STRING FORMAT (BED | GFF3 | TSV) SEMICOLON
 DefinePromotersStmt ::= DEFINE PROMOTERS OF (GENE | TSS | ID) FROM TSS
                         UPSTREAM (NUM | FLOAT) RequiredUnit
@@ -576,7 +600,7 @@ The regulatory progression and its expected outputs are described in
 | `10_accessible_bound_myb_candidates.cql` | Combine filtered accessibility, binding, motif, and proximity | track-evidence `WHERE`, multi-track `overlapEvidence`, `COUNT`, `NEAR` |
 | `11_replicate_supported_candidates.cql` | Require substantial coordinate and summit support from two binding replicates | `CONSENSUS`, reciprocal overlap, summit distance, structured experimental provenance |
 | `12_regex_denovo.cql` | Find in-frame start-to-stop sequence candidates near TATA-like anchors | regex search, strand, `LENGTH MOD 3` |
-| `13_gff3_hierarchy.cql` | Select a real gene, navigate its hierarchy in both directions, and retain its CDS evidence | `FEATURE`, `CHILDREN`, `DESCENDANTS`, `PARENTS`, `ANCESTORS`, `ATTRIBUTE` |
+| `13_gff3_hierarchy.cql` | Validate a real annotation, select a gene, navigate its hierarchy in both directions, and retain its CDS evidence | `VALIDATE ANNOTATION`, `FEATURE`, `CHILDREN`, `DESCENDANTS`, `PARENTS`, `ANCESTORS`, `ATTRIBUTE` |
 
 ---
 
@@ -586,6 +610,7 @@ Cis-QL Studio provides a desktop graphical environment for query development, ex
 
 - **Integrated Code Editor & Console:** Write, load, and execute `.cql` queries with real-time terminal output.
 - **Multi-Track Visualizer Canvas:** Displays ruler coordinates, GC content profiles, feature annotation tracks, and sequence details.
+- **Annotation Validation:** Summarizes GFF3 identity and parent graphs and exposes unresolved parents, conflicts, and cycles.
 - **Data Synchronization:** Automatically synchronizes execution results via `.cisql_results.json` for live inspection.
 
 ---

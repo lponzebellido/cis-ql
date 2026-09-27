@@ -145,6 +145,12 @@ void SetOpStmtNode::print(std::string prefix, bool isLast) const {
     }
 }
 
+void ValidateStmtNode::print(std::string prefix, bool isLast) const {
+    std::cout << prefix << (isLast ? "└── " : "├── ")
+              << "ValidateStmt(Annotation: " << annotationAlias
+              << ", AS: " << alias << ")" << std::endl;
+}
+
 void CountStmtNode::print(std::string prefix, bool isLast) const {
     std::cout << prefix << (isLast ? "└── " : "├── ")
               << "CountStmt(" << countedEntity << " IN " << containerEntity
@@ -241,6 +247,7 @@ void SetOpStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void CountStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ScanStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void AnalyzeStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
+void ValidateStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void IfStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ForeachStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ProgramNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
