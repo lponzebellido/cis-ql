@@ -1642,261 +1642,167 @@ def main() -> int:
         require("finite, non-negative" in semantic_error,
                 "NEAR rejects non-finite or overflowing distances")
 
-        showcase_source = (
-            ROOT / "cql_examples" / "08_integrated_anthocyanin_query.cql"
+        filter_source = (
+            ROOT / "cql_examples" / "08_filters.cql"
         ).read_text(encoding="utf-8")
-        data, _ = run_query(
-            workspace, "anthocyanin_regulatory_showcase", showcase_source
-        )
-        require(len(data["resultSets"]["supported_myb_sites"]) == 4 and
-                [(site["start"], site["strand"])
-                 for site in data["resultSets"]["promoter_myb_evidence"]]
-                == [(150, "-"), (630, "+")] and
-                [(site["start"], site["strand"])
-                 for site in data["resultSets"]["enhancer_myb_evidence"]]
-                == [(400, "+"), (420, "+")] and
-                all(site["motifEvidence"]["statistics"]["qValue"] <= 0.01
-                    for site in
-                    data["resultSets"]["promoter_myb_evidence"]) and
-                len(data["resultSets"]["enhancer_myb_modules"]) == 1 and
-                data["resultSets"]["enhancer_myb_modules"][0]
-                    ["moduleEvidence"]["spacing"]["observed"] == 11 and
-                data["resultSets"]["enhancer_myb_modules"][0]
-                    ["moduleEvidence"]["orientation"]
-                == {"policy": "ANY", "observed": "SAME"} and
-                [member["motifEvidence"]["matrixId"] for member in
-                 data["resultSets"]["enhancer_myb_modules"][0]
-                    ["moduleEvidence"]["members"]]
-                == ["MA0054.1", "MA0054.1"] and
-                len(data["resultSets"]
-                    ["module_nearest_gene_hypotheses"]) == 1 and
-                data["resultSets"]["module_nearest_gene_hypotheses"][0]
-                    ["spatialRelation"]["reference"]["name"]
-                    == "transporter_candidate" and
-                data["resultSets"]["module_nearest_gene_hypotheses"][0]
-                    ["spatialRelation"]["distance"] == 71 and
-                data["resultSets"]["module_nearest_gene_hypotheses"][0]
-                    ["spatialRelation"]["maximumDistance"] == 100 and
-                data["resultSets"]["module_nearest_gene_hypotheses"][0]
-                    ["spatialRelation"]["overlaps"] is False and
-                [region["countEvidence"]["count"] for region in
-                 data["resultSets"]["promoter_myb_counts"]] == [1, 1, 0] and
-                [region["name"] for region in
-                 data["resultSets"]["supported_promoter_candidates"]]
-                == ["anthocyanin_enzyme_promoter",
-                    "transporter_candidate_promoter"],
-                "integrated example separates regulatory evidence, defines an auditable module, and records a provisional nearest-gene link")
-
-        accessibility_example = (
-            ROOT / "cql_examples" / "09_accessible_myb_evidence.cql"
-        ).read_text(encoding="utf-8")
-        data, _ = run_query(
-            workspace, "anthocyanin_accessibility_evidence",
-            accessibility_example
-        )
-        peak_counts = data["resultSets"]["accessible_peak_myb_counts"]
-        candidate_links = data["resultSets"][
-            "accessible_myb_candidate_links"
-        ]
-        require([peak["countEvidence"]["count"] for peak in peak_counts]
-                == [1, 2, 1, 0] and
-                all(peak.get("trackEvidence", {}).get("evidenceClass")
-                    == "ACCESSIBILITY" and
-                    peak["trackEvidence"].get("assay")
-                    == "synthetic ATAC-seq-like fixture" and
-                    peak["trackEvidence"].get("sample")
-                    == "synthetic anthocyanin locus" and
-                    peak["trackEvidence"].get("condition")
-                    == "pigmented petal" and
-                    peak["trackEvidence"].get("replicate") == "A1" and
-                    peak["trackEvidence"].get("control") == "input"
-                    for peak in peak_counts) and
-                [peak["name"] for peak in candidate_links] == [
-                    "anthocyanin_promoter_accessible",
-                    "distal_enhancer_accessible",
-                    "transporter_promoter_accessible",
-                ] and
-                all(link.get("trackEvidence", {}).get("evidenceClass")
-                    == "ACCESSIBILITY" for link in candidate_links) and
-                [peak["spatialRelation"]["distance"]
-                 for peak in candidate_links] == [25, 60, 20],
-                "accessibility example combines track, motif-count, and proximity evidence")
-
-        multi_evidence_example = (
-            ROOT / "cql_examples" /
-            "10_accessible_bound_myb_candidates.cql"
-        ).read_text(encoding="utf-8")
-        data, _ = run_query(
-            workspace, "anthocyanin_multi_track_evidence",
-            multi_evidence_example
-        )
-        combined_peaks = data["resultSets"]["accessible_bound_peaks"]
-        combined_counts = data["resultSets"][
-            "accessible_bound_peak_myb_counts"
-        ]
-        combined_links = data["resultSets"][
-            "multi_evidence_gene_hypotheses"
-        ]
+        data, _ = run_query(workspace, "annotation_filters", filter_source)
         require(
-            len(combined_peaks) == 2 and
-            [peak["countEvidence"]["count"] for peak in combined_counts]
-            == [1, 2] and
-            all(peak["trackEvidence"]["evidenceClass"] == "ACCESSIBILITY"
-                and peak["trackEvidence"]["replicate"] == "A1"
-                for peak in combined_counts) and
-            all(len(peak["overlapEvidence"]) == 1 and
-                peak["overlapEvidence"][0]["trackEvidence"]
-                    ["evidenceClass"] == "BINDING" and
-                peak["overlapEvidence"][0]["trackEvidence"]
-                    ["replicate"] == "R1" and
-                peak["overlapEvidence"][0]["trackEvidence"]
-                    ["control"] == "mock"
-                for peak in combined_counts) and
-            combined_counts[0]["overlapEvidence"][0]["trackEvidence"]
-                ["peakPosition"] == 160 and
-            all(link["overlapEvidence"][0]["trackEvidence"]
-                    ["evidenceClass"] == "BINDING"
-                for link in combined_links) and
-            [link["spatialRelation"]["distance"] for link in combined_links]
-            == [25, 60],
-            "multi-track example retains accessibility, binding, motif, and proximity evidence",
+            len(data["resultSets"]["coding_records"]) == 2112 and
+            len(data["resultSets"]["thra_cds"]) == 1 and
+            data["resultSets"]["thra_cds"][0]["annotationEvidence"]
+            ["attributes"]["protein_id"]
+            == "AAC73113.1",
+            "filter example selects a CDS by typed fields and attribute",
         )
 
-        replicate_example = (
-            ROOT / "cql_examples" /
-            "11_replicate_supported_candidates.cql"
+        module_source = (
+            ROOT / "cql_examples" / "07_modules.cql"
         ).read_text(encoding="utf-8")
-        data, _ = run_query(
-            workspace, "anthocyanin_replicate_supported_candidates",
-            replicate_example
-        )
-        replicate_peaks = data["resultSets"][
-            "replicate_supported_accessible_peaks"
-        ]
-        binding_consensus = data["resultSets"][
-            "replicate_supported_binding_peaks"
-        ]
-        replicate_counts = data["resultSets"][
-            "replicate_supported_peak_myb_counts"
-        ]
-        replicate_links = data["resultSets"][
-            "replicate_supported_gene_hypotheses"
-        ]
-        direct_support = replicate_peaks[0]["overlapEvidence"][0]
-        nested_support = direct_support["supportingEvidence"][0]
+        data, _ = run_query(workspace, "sequence_modules", module_source)
+        modules = data["resultSets"]["modules"]
         require(
-            len(replicate_peaks) == 2 and
-            len(binding_consensus) == 2 and
-            all(peak["consensusEvidence"] == {
-                    "anchorSet": "strong_myb_binding_rep1",
-                    "minimumSupport": 2,
-                    "observedSupport": 2,
-                    "minimumReciprocalOverlapPercent": 50,
-                    "maximumSummitDistanceBp": 5,
-                    "inputSets": ["strong_myb_binding_rep1",
-                                  "strong_myb_binding_rep2"],
-                } for peak in binding_consensus) and
-            [peak["countEvidence"]["count"] for peak in replicate_counts]
-            == [1, 2] and
-            all(peak["trackEvidence"]["replicate"] == "A1"
-                for peak in replicate_counts) and
-            direct_support["referenceSet"]
-            == "replicate_supported_binding_peaks" and
-            direct_support["trackEvidence"]["replicate"] == "R1" and
-            direct_support["consensusEvidence"]["minimumSupport"] == 2 and
-            direct_support["consensusEvidence"]["observedSupport"] == 2 and
-            len(direct_support["supportingEvidence"]) == 1 and
-            nested_support["referenceSet"] == "strong_myb_binding_rep2" and
-            nested_support["trackEvidence"]["replicate"] == "R2" and
-            nested_support["trackEvidence"]["condition"]
-            == "pigmented petal" and
-            nested_support["trackEvidence"]["control"] == "mock" and
-            [link["spatialRelation"]["distance"]
-             for link in replicate_links] == [25, 60],
-            "replicate example preserves direct and nested experimental support",
+            len(modules) == 1 and
+            5 <= modules[0]["moduleEvidence"]["spacing"]["observed"] <= 30 and
+            len(modules[0]["moduleEvidence"]["members"]) == 2,
+            "module example returns a pair within the declared spacing",
         )
-        replicate_tsv = (
-            workspace / "replicate_supported_peak_myb_counts.tsv"
-        ).read_text(encoding="utf-8").splitlines()[1].split("\t")
-        exported_support = json.loads(replicate_tsv[96])[0]
+
+        track_source = (
+            ROOT / "cql_examples" / "09_tracks.cql"
+        ).read_text(encoding="utf-8")
+        data, _ = run_query(workspace, "track_filters", track_source)
+        filtered_peaks = data["resultSets"]["filtered_peaks"]
         require(
-            exported_support["trackEvidence"]["replicate"] == "R1" and
-            exported_support["consensusEvidence"]["observedSupport"] == 2 and
-            exported_support["supportingEvidence"][0]["trackEvidence"]
-                ["replicate"] == "R2",
-            "TSV recursively exports replicate-support provenance",
+            [peak["name"] for peak in filtered_peaks]
+            == ["open_1", "open_2", "open_3"] and
+            all(
+                peak["trackEvidence"]["evidenceClass"] == "ACCESSIBILITY" and
+                peak["trackEvidence"]["assay"]
+                == "synthetic accessibility assay" and
+                peak["trackEvidence"]["condition"] == "condition_a" and
+                peak["trackEvidence"]["replicate"] == "A1"
+                for peak in filtered_peaks
+            ),
+            "track example filters values and preserves metadata",
+        )
+
+        overlap_source = (
+            ROOT / "cql_examples" / "10_track_overlap.cql"
+        ).read_text(encoding="utf-8")
+        data, _ = run_query(workspace, "track_overlap", overlap_source)
+        overlaps = data["resultSets"]["overlaps"]
+        require(
+            [peak["name"] for peak in overlaps] == ["open_1", "open_2"] and
+            all(
+                peak["trackEvidence"]["evidenceClass"] == "ACCESSIBILITY" and
+                len(peak["overlapEvidence"]) == 1 and
+                peak["overlapEvidence"][0]["referenceSet"]
+                == "bound_regions" and
+                peak["overlapEvidence"][0]["trackEvidence"]["evidenceClass"]
+                == "BINDING"
+                for peak in overlaps
+            ),
+            "track-overlap example preserves evidence from both inputs",
+        )
+
+        consensus_source = (
+            ROOT / "cql_examples" / "11_consensus.cql"
+        ).read_text(encoding="utf-8")
+        data, _ = run_query(workspace, "replicate_consensus", consensus_source)
+        consensus = data["resultSets"]["consensus"]
+        expected_consensus = {
+            "anchorSet": "filtered_1",
+            "minimumSupport": 2,
+            "observedSupport": 2,
+            "minimumReciprocalOverlapPercent": 50,
+            "maximumSummitDistanceBp": 5,
+            "inputSets": ["filtered_1", "filtered_2"],
+        }
+        require(
+            [peak["name"] for peak in consensus]
+            == ["binding_1", "binding_2"] and
+            all(
+                peak["trackEvidence"]["replicate"] == "R1" and
+                peak["consensusEvidence"] == expected_consensus and
+                len(peak["overlapEvidence"]) == 1 and
+                peak["overlapEvidence"][0]["referenceSet"]
+                == "filtered_2" and
+                peak["overlapEvidence"][0]["trackEvidence"]["replicate"]
+                == "R2"
+                for peak in consensus
+            ),
+            "consensus example preserves anchor and replicate evidence",
         )
         consensus_tsv = (
-            workspace / "replicate_supported_binding_peaks.tsv"
+            workspace / "consensus.tsv"
         ).read_text(encoding="utf-8").splitlines()[1].split("\t")
         require(
             len(consensus_tsv) == 110 and
-            consensus_tsv[97:100] == [
-                "strong_myb_binding_rep1", "2", "2",
-            ] and
+            consensus_tsv[97:100] == ["filtered_1", "2", "2"] and
             consensus_tsv[100] == "50" and
             consensus_tsv[101] == "5" and
-            json.loads(consensus_tsv[102]) == {
-                "anchorSet": "strong_myb_binding_rep1",
-                "minimumSupport": 2,
-                "observedSupport": 2,
-                "minimumReciprocalOverlapPercent": 50,
-                "maximumSummitDistanceBp": 5,
-                "inputSets": ["strong_myb_binding_rep1",
-                              "strong_myb_binding_rep2"],
-            },
-            "TSV exports typed coordinate-consensus evidence",
+            json.loads(consensus_tsv[102]) == expected_consensus,
+            "consensus example exports typed evidence to TSV",
         )
         consensus_gff = (
-            workspace / "replicate_supported_binding_peaks.gff3"
+            workspace / "consensus.gff3"
         ).read_text(encoding="utf-8").splitlines()[1]
         require(
-            "ConsensusAnchorSet=strong_myb_binding_rep1" in consensus_gff and
+            "ConsensusAnchorSet=filtered_1" in consensus_gff and
             "ConsensusMinimumSupport=2" in consensus_gff and
             "ConsensusObservedSupport=2" in consensus_gff and
             "ConsensusMinimumReciprocalOverlapPercent=50" in consensus_gff and
             "ConsensusMaximumSummitDistanceBp=5" in consensus_gff and
             "ConsensusEvidenceJSON=" in consensus_gff,
-            "GFF3 exports typed coordinate-consensus evidence",
+            "consensus example exports typed evidence to GFF3",
         )
 
-        nearest_example = (
-            ROOT / "cql_examples" / "06_nearest_gene_candidates.cql"
+        nearest_source = (
+            ROOT / "cql_examples" / "06_near.cql"
         ).read_text(encoding="utf-8")
-        data, _ = run_query(
-            workspace, "anthocyanin_nearest_gene_candidates", nearest_example
+        data, _ = run_query(workspace, "near_genes", nearest_source)
+        nearby_sites = data["resultSets"]["nearby_sites"]
+        require(
+            len(nearby_sites) == 675 and
+            all(
+                site["spatialRelation"]["distance"] <= 30 and
+                site["spatialRelation"]["maximumDistance"] == 30
+                for site in nearby_sites
+            ),
+            "near example records gene distances within its limit",
         )
-        proximal = data["resultSets"]["gene_proximal_myb_candidates"]
-        require([
-                    (
-                        site["start"],
-                        site["spatialRelation"]["reference"]["name"],
-                        site["spatialRelation"]["distance"],
-                    )
-                    for site in proximal
-                ] == [
-                    (150, "anthocyanin_enzyme", 41),
-                    (630, "transporter_candidate", 30),
-                ] and
-                all(site["motifEvidence"]["matrixId"] == "MA0054.1"
-                    for site in proximal),
-                "nearest-gene example exposes two auditable MYB candidates")
 
-        count_example = (
-            ROOT / "cql_examples" / "05_count_promoter_support.cql"
+        count_source = (
+            ROOT / "cql_examples" / "05_count.cql"
         ).read_text(encoding="utf-8")
-        data, _ = run_query(
-            workspace, "anthocyanin_promoter_support_counts", count_example
+        data, _ = run_query(workspace, "promoter_counts", count_source)
+        motif_counts = data["resultSets"]["motif_counts"]
+        nonzero_counts = data["resultSets"]["nonzero_counts"]
+        require(
+            len(motif_counts) == 4506 and
+            len(nonzero_counts) == 199 and
+            any(region["countEvidence"]["count"] == 0
+                for region in motif_counts) and
+            all(region["countEvidence"]["count"] >= 1
+                for region in nonzero_counts),
+            "count example retains zeroes before filtering",
         )
-        require([region["countEvidence"]["count"] for region in
-                 data["resultSets"]["promoter_myb_counts"]] == [1, 1, 0] and
-                [region["name"] for region in
-                 data["resultSets"]["promoters_with_myb_support"]]
-                == ["anthocyanin_enzyme_promoter",
-                    "transporter_candidate_promoter"] and
-                all(region["countEvidence"]["count"] == 1 for region in
-                    data["resultSets"]["promoters_with_myb_support"]),
-                "promoter-count example retains zeroes and supported promoters")
+
+        orf_source = (
+            ROOT / "cql_examples" / "12_orfs.cql"
+        ).read_text(encoding="utf-8")
+        data, _ = run_query(workspace, "orfs", orf_source)
+        orfs = data["resultSets"]["orfs"]
+        require(
+            len(orfs) == 1494 and
+            all(
+                region["sequence"].startswith("ATG") and
+                region["sequence"][-3:] in {"TAA", "TAG", "TGA"} and
+                len(region["sequence"]) % 3 == 0
+                for region in orfs
+            ),
+            "ORF example keeps start and stop codons in the same frame",
+        )
 
         data, _ = run_query(
             workspace,

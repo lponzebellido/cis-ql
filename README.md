@@ -1,82 +1,45 @@
-# Cis-QL: a query language for cis-regulatory analysis
+# Cis-QL
 
-Cis-QL is an experimental domain-specific language for describing
-cis-regulatory analyses as readable, executable queries. A `.cql` program
-names its sequence, annotation, motif models, and experimental tracks, then
-states how their evidence should be related: inside a promoter, overlapping an
-accessible region, supported across replicates, arranged as a motif module, or
-near a possible target gene.
+Cis-QL is a query language for sequence, annotation, motif, and genomic
+interval analysis. A `.cql` file loads FASTA, GFF3, JASPAR matrix, BED, or
+narrowPeak data and applies named operations to it. The C++11 interpreter runs
+from the command line; Cis-QL Studio provides an optional editor and result
+viewer.
 
-The project is motivated by a practical problem. These questions are usually
-spread across interval commands, motif-scanning tools, short scripts, and
-manually interpreted tables. Cis-QL makes the regulatory relationships part
-of the program and carries their provenance into the result. The goal is not
-to replace established upstream tools, but to provide a compact language for
-the evidence-integration step between their outputs and a testable regulatory
-hypothesis.
+## What it does
 
-The command-line interpreter is written in C++11. Cis-QL Studio adds a desktop
-editor and result viewer, but `.cql` files do not depend on the graphical
-interface.
+| Area | Operations |
+| :--- | :--- |
+| Sequence | literal, IUPAC, and regular-expression search; PWM scanning; GC analysis |
+| Annotation | GFF3 validation, filtering, hierarchy traversal, repeated-ID grouping, promoter derivation |
+| Intervals | set operations, overlap, counting, distance, two-pattern modules, replicate consensus |
+| Results | structured JSON and BED, GFF3, or TSV export |
 
-## What the language does today
-
-The current implementation reads FASTA sequences, hierarchy-preserving GFF3
-annotations, JASPAR frequency matrices, and BED or narrowPeak tracks. It can
-validate GFF3 identity and parent graphs, navigate annotation relationships,
-group discontinuous features without flattening their genomic gaps,
-derive strand-aware promoters, find literal or IUPAC sequence patterns, scan
-PWMs with explicit background and multiple-testing metadata, combine genomic
-intervals, describe two-site motif modules, count support, select nearby
-features, and build anchor-preserving consensus sets across experimental
-tracks. Results can be
-inspected as structured JSON and exported to BED, GFF3, or TSV.
-
-A typical query has this shape:
+A query can combine these operations without hiding their parameters:
 
 ```sql
-LOAD SEQUENCE "genome.fasta" AS genome;
-LOAD ANNOTATION "genes.gff3" AS annotation;
-VALIDATE ANNOTATION annotation AS annotation_report;
-LOAD MATRIX "tf_model.pwm" AS tf_model;
-LOAD TRACK "binding_rep1.narrowPeak" FORMAT NARROWPEAK
-    EVIDENCE BINDING REPLICATE "R1" AS binding_rep1;
-LOAD TRACK "binding_rep2.narrowPeak" FORMAT NARROWPEAK
-    EVIDENCE BINDING REPLICATE "R2" AS binding_rep2;
+LOAD SEQUENCE "data_examples/ecoli2.fna" AS genome;
+LOAD ANNOTATION "data_examples/genomic.gff" AS annotation;
 
-EXTRACT GENE AS candidate_genes WHERE ID = "candidate_1";
-DEFINE PROMOTERS OF candidate_genes FROM TSS
-    UPSTREAM 1000 BP DOWNSTREAM 100 BP AS candidate_promoters;
-SCAN tf_model IN candidate_promoters BACKGROUND FROM genome
-    QVALUE <= 0.01 AS promoter_sites;
-CONSENSUS FROM [binding_rep1, binding_rep2]
-    ANCHOR binding_rep1 MIN_SUPPORT 2
-    MIN_RECIPROCAL_OVERLAP 50 %
-    MAX_SUMMIT_DISTANCE 20 BP AS reproducible_binding;
-OVERLAPS reproducible_binding WITH promoter_sites AS supported_binding;
+EXTRACT GENE AS thra WHERE ID = "gene-b0002";
+DEFINE PROMOTERS OF thra FROM TSS
+    UPSTREAM 60 BP DOWNSTREAM 20 BP AS promoters;
+FIND MOTIF "TATAAT" AS sites;
+OVERLAPS sites WITH promoters AS promoter_sites;
+EXPORT promoter_sites TO "promoter_sites.tsv" FORMAT TSV;
 ```
 
-The filenames and biological choices in that fragment are intentionally
-generic. Cis-QL does not encode a particular pathway, transcription-factor
-family, organism, or assay. The repository contains both a compact eukaryotic
-evidence-integration fixture and a bacterial sequence-pattern example. They
-exercise different parts of the language and are not its biological boundary.
-
-## Project status and boundaries
-
-Cis-QL is a research prototype, not a complete genomics platform. It does not
-align reads, call peaks, infer enhancers, perform IDR, prove a target-gene
-relationship, or decide whether a PWM and threshold are biologically suitable.
-Those choices remain explicit inputs to the analysis. The value of the
-language is that they can be stated, reviewed, rerun, and exported together
-instead of disappearing inside an ad hoc pipeline.
+Cis-QL is a research prototype. It does not align reads, call peaks, perform
+IDR, infer enhancers, prove gene regulation, or choose a biologically suitable
+PWM or threshold. It queries inputs produced or selected elsewhere and records
+the operations used on them.
 
 The prioritized implementation gaps and their acceptance targets are tracked
 in [`docs/RFC_CISQL_V3.md`](docs/RFC_CISQL_V3.md#work-remaining-after-the-regulatory-foundation).
 
-## Compilation and Execution
+## Build and run
 
-### Building the C++ Binary
+### Build the interpreter
 
 Cis-QL requires a standard C++11 compiler and `make`:
 
@@ -85,18 +48,18 @@ make clean
 make
 ```
 
-### Running Queries via Command Line
+### Run a query
 
 Execute a `.cql` script using the `cisql` binary:
 
 ```bash
-./cisql cql_examples/01_define_promoters.cql
+./cisql cql_examples/01_promoters.cql
 ```
 
 Use the `--debug` flag to inspect compilation phases, including token stream, Abstract Syntax Tree (AST), Symbol Table, Intermediate Representation (IR), and execution steps:
 
 ```bash
-./cisql cql_examples/12_regex_denovo.cql --debug
+./cisql cql_examples/12_orfs.cql --debug
 ```
 
 ### Launching Cis-QL Studio
@@ -131,10 +94,11 @@ LOAD TRACK "accessibility.narrowPeak"
     AS accessibility_peaks;
 ```
 
-The example suite also includes the plant MYB profile `MA0054.1` from
-[JASPAR CORE](https://jaspar.elixir.no/matrix/MA0054.1/). The accompanying
-`anthocyanin_regulatory_demo` FASTA/GFF3 pair is synthetic and exists only to
-make expected regulatory-query results small, deterministic, and inspectable.
+Most examples use the assembly-matched *E. coli* `U00096.3` FASTA and GFF3
+files. PWM examples use the plant `MA0054.1` profile from
+[JASPAR CORE](https://jaspar.elixir.no/matrix/MA0054.1/) with a short synthetic
+FASTA. The matrix demonstrates scanning and p-value syntax; it is not presented
+as an *E. coli* model.
 
 GFF3 import preserves source, score, phase, `ID`, `Name`, every `Parent`, and
 the complete attribute map. Percent-encoded attribute values are decoded for
@@ -601,44 +565,35 @@ requirements needed before reporting external benchmark results.
 
 ---
 
-## Curated Examples Suite (`cql_examples/`)
+## Examples (`cql_examples/`)
 
-The repository includes runnable `.cql` programs grouped by the capability
-they demonstrate. Scripts 01-11 form one compact, synthetic eukaryotic
-evidence-integration workflow. Scripts 12-13 use an *E. coli* reference to show
-sequence-pattern constraints and hierarchy-preserving GFF3 queries. Neither
-fixture defines the intended organism, pathway, or regulatory model of Cis-QL.
-
-The regulatory progression and its expected outputs are described in
-[`cql_examples/README.md`](cql_examples/README.md).
+Each program focuses on one operation. Most use *E. coli* `U00096.3`; PWM and
+track examples use small synthetic fixtures. See
+[`cql_examples/README.md`](cql_examples/README.md) for inputs and limits.
 
 | Script | Description | Primary Features |
 | :--- | :--- | :--- |
-| `01_define_promoters.cql` | Build explicit candidate promoter windows | `DEFINE PROMOTERS`, TSS-relative bounds |
-| `02_score_myb_sites.cql` | Inspect high-scoring plant MYB matches | sourced PWM, relative score threshold |
-| `03_calibrated_myb_sites.cql` | Select statistically supported MYB sites | genomic background, `QVALUE` |
-| `04_promoter_supported_sites.cql` | Retain promoter-overlapping MYB evidence | directional `OVERLAPS` |
-| `05_count_promoter_support.cql` | Summarize site support per promoter | zero-preserving `COUNT`, `WHERE COUNT` |
-| `06_nearest_gene_candidates.cql` | Form proximity-based gene hypotheses | auditable `NEAR ... WITHIN` |
-| `07_enhancer_myb_module.cql` | Detect a constrained homotypic MYB module | spacing, order, orientation, two-member evidence |
-| `08_integrated_anthocyanin_query.cql` | Connect the complete evidence path | promoters, calibrated sites, modules, counts, candidate links |
-| `09_accessible_myb_evidence.cql` | Combine imported accessibility peaks with motif support | narrowPeak provenance, `COUNT`, `NEAR` |
-| `10_accessible_bound_myb_candidates.cql` | Combine filtered accessibility, binding, motif, and proximity | track-evidence `WHERE`, multi-track `overlapEvidence`, `COUNT`, `NEAR` |
-| `11_replicate_supported_candidates.cql` | Require substantial coordinate and summit support from two binding replicates | `CONSENSUS`, reciprocal overlap, summit distance, structured experimental provenance |
-| `12_regex_denovo.cql` | Find in-frame start-to-stop sequence candidates near TATA-like anchors | regex search, strand, `LENGTH MOD 3` |
-| `13_gff3_hierarchy.cql` | Validate a real annotation, navigate a gene hierarchy, and group a multipart CDS without flattening its segments | `VALIDATE ANNOTATION`, `GROUP ... BY ID`, `MEMBERS`, `CHILDREN`, `DESCENDANTS`, `PARENTS`, `ANCESTORS` |
+| `01_promoters.cql` | Derive a promoter for `thrA` | `DEFINE PROMOTERS` |
+| `02_pwm.cql` | Scan a PWM by relative score | `SCAN`, `THRESHOLD` |
+| `03_pvalues.cql` | Filter PWM hits by q-value | `BACKGROUND`, `QVALUE` |
+| `04_overlap.cql` | Select motif matches in promoters | `OVERLAPS` |
+| `05_count.cql` | Count motif matches per promoter | `COUNT`, `WHERE COUNT` |
+| `06_near.cql` | Select motif matches near genes | `NEAR ... WITHIN` |
+| `07_modules.cql` | Pair patterns by spacing | `DEFINE MODULE` |
+| `08_filters.cql` | Filter annotation fields and attributes | `EXTRACT`, `WHERE` |
+| `09_tracks.cql` | Filter narrowPeak fields and metadata | `LOAD TRACK`, `WHERE` |
+| `10_track_overlap.cql` | Intersect two tracks | `OVERLAPS` |
+| `11_consensus.cql` | Compare two replicate tracks | `CONSENSUS` |
+| `12_orfs.cql` | Match complete-codon start-to-stop patterns | regex, `LENGTH MOD 3` |
+| `13_gff3.cql` | Validate and traverse GFF3; group repeated IDs | `VALIDATE`, hierarchy queries, `GROUP` |
 
 ---
 
-## Cis-QL Studio Interface
+## Cis-QL Studio
 
-Cis-QL Studio provides a desktop graphical environment for query development, execution, and visual exploration:
-
-- **Integrated Code Editor & Console:** Write, load, and execute `.cql` queries with real-time terminal output.
-- **Multi-Track Visualizer Canvas:** Displays ruler coordinates, GC content profiles, feature annotation tracks, and sequence details.
-- **Annotation Validation:** Summarizes GFF3 identity and parent graphs and exposes unresolved parents, conflicts, and cycles.
-- **Feature Groups:** Separates logical GFF3 identities from their original discontinuous member records.
-- **Data Synchronization:** Automatically synchronizes execution results via `.cisql_results.json` for live inspection.
+Studio edits and runs `.cql` files. It displays sequences, annotations, GC
+profiles, validation reports, feature groups, and other result sets written to
+`.cisql_results.json`.
 
 ---
 
@@ -672,20 +627,3 @@ Cis-QL Studio provides a desktop graphical environment for query development, ex
                                             ▼
                               Cis-QL Studio GUI Visualizer
 ```
-
----
-
-## Current Project Status
-
-Cis-QL is an active academic research project and compiler design implementation.
-
-Current operational components:
-- LL(1) Lexical, syntactic, and semantic analyzers.
-- Virtual annotation engine for unannotated sequence data.
-- IUPAC degeneration engine and regex matching integration.
-- Parallel multithreaded PSSM matrix scanner.
-- Smith-Waterman pairwise alignment module.
-- Sweep-line interval algebra engine (`INTERSECT`, `UNION`, `EXCEPT`).
-- Evidence-preserving regulatory selection, counting, and motif modules.
-- Control flow execution engine (`IF/ELSE` and `FOREACH`).
-- Desktop GUI workspace (`Cis-QL Studio`).
