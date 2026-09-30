@@ -57,6 +57,7 @@ enum class IROpCode {
   ANALYZE_GC,
   ANALYZE_CPG,
   VALIDATE_ANNOTATION,
+  GROUP_ANNOTATION,
   DEFINE_PROMOTERS,
   DEFINE_MODULE,
   IF_BEGIN,
@@ -115,6 +116,7 @@ public:
   void visit(ScanStmtNode *node) override;
   void visit(AnalyzeStmtNode *node) override;
   void visit(ValidateStmtNode *node) override;
+  void visit(GroupStmtNode *node) override;
   void visit(IfStmtNode *node) override;
   void visit(ForeachStmtNode *node) override;
   void visit(ProgramNode *node) override;

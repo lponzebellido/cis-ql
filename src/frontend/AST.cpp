@@ -151,6 +151,12 @@ void ValidateStmtNode::print(std::string prefix, bool isLast) const {
               << ", AS: " << alias << ")" << std::endl;
 }
 
+void GroupStmtNode::print(std::string prefix, bool isLast) const {
+    std::cout << prefix << (isLast ? "└── " : "├── ")
+              << "GroupStmt(Source: " << sourceAlias
+              << ", By: ID, AS: " << alias << ")" << std::endl;
+}
+
 void CountStmtNode::print(std::string prefix, bool isLast) const {
     std::cout << prefix << (isLast ? "└── " : "├── ")
               << "CountStmt(" << countedEntity << " IN " << containerEntity
@@ -248,6 +254,7 @@ void CountStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ScanStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void AnalyzeStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ValidateStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
+void GroupStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void IfStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ForeachStmtNode::accept(ASTVisitor& visitor) { visitor.visit(this); }
 void ProgramNode::accept(ASTVisitor& visitor) { visitor.visit(this); }

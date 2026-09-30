@@ -1173,6 +1173,129 @@ body {
   font-size: 0.75rem;
 }
 
+.feature-group-viewer {
+  height: 100%;
+  overflow: auto;
+  padding: 18px;
+  background: var(--bg-primary);
+}
+
+.feature-group-empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.feature-group-empty code {
+  margin: 0 6px;
+  color: var(--accent);
+}
+
+.feature-group-collection {
+  margin-bottom: 20px;
+}
+
+.feature-group-collection-heading {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.feature-group-collection-name {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.feature-group-collection-count {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.feature-group {
+  margin-bottom: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 13px;
+  background: var(--bg-secondary);
+}
+
+.feature-group-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.feature-group-heading > span {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+
+.feature-group-id {
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.feature-group-location {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.feature-group-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.feature-group-metrics > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  padding: 7px;
+}
+
+.feature-group-metrics span {
+  color: var(--text-muted);
+  font-size: 0.65rem;
+}
+
+.feature-group-metrics strong {
+  color: var(--text-primary);
+  font-size: 0.82rem;
+}
+
+.feature-group table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.7rem;
+}
+
+.feature-group th,
+.feature-group td {
+  border: 1px solid var(--border-color);
+  padding: 5px 6px;
+  text-align: left;
+}
+
+.feature-group th {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.feature-group td {
+  color: var(--text-primary);
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

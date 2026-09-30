@@ -276,6 +276,42 @@ std::string Interpreter::serializeAnnotationValidationJSON(
   return out.str();
 }
 
+std::string Interpreter::serializeAnnotationFeatureGroupJSON(
+    const AnnotationFeatureGroup &group) const {
+  std::ostringstream out;
+  out << "{\"sourceAlias\":\"" << jsonEscape(group.sourceAlias)
+      << "\",\"id\":\"" << jsonEscape(group.id)
+      << "\",\"chr\":\"" << jsonEscape(group.chr)
+      << "\",\"type\":\"" << jsonEscape(group.type)
+      << "\",\"strand\":\"" << jsonEscape(group.strand)
+      << "\",\"span\":{\"start\":" << group.spanStart
+      << ",\"end\":" << group.spanEnd
+      << ",\"length\":" << (group.spanEnd - group.spanStart)
+      << "},\"totalMemberLength\":" << group.totalLength
+      << ",\"memberCount\":" << group.members.size()
+      << ",\"members\":[";
+  for (size_t index = 0; index < group.members.size(); ++index) {
+    if (index > 0)
+      out << ',';
+    const auto &member = group.members[index];
+    out << "{\"index\":" << (index + 1)
+        << ",\"chr\":\"" << jsonEscape(member.chr)
+        << "\",\"start\":" << member.start
+        << ",\"end\":" << member.end
+        << ",\"length\":" << member.length()
+        << ",\"strand\":\"" << jsonEscape(member.strand)
+        << "\",\"type\":\"" << jsonEscape(member.type)
+        << "\",\"name\":\"" << jsonEscape(member.name) << "\"";
+    if (member.annotationEvidence.present) {
+      out << ",\"annotationEvidence\":"
+          << serializeAnnotationEvidenceJSON(member.annotationEvidence);
+    }
+    out << '}';
+  }
+  out << "]}";
+  return out.str();
+}
+
 std::string
 Interpreter::serializeTrackEvidenceJSON(const TrackEvidence &track) const {
   std::ostringstream out;
@@ -831,6 +867,83 @@ void Interpreter::executeValidateAnnotation(const IRInstruction &instr) {
   }
 }
 
+void Interpreter::executeGroupAnnotation(const IRInstruction &instr) {
+  const std::string &sourceAlias = instr.arg1;
+  const std::string &groupAlias = instr.arg2;
+  const std::vector<GenomicRegion> *source = nullptr;
+  const auto annotation = annotationDatasets.find(sourceAlias);
+  if (annotation != annotationDatasets.end()) {
+    source = &annotation->second;
+  } else {
+    const auto result = resultSets.find(sourceAlias);
+    if (result != resultSets.end())
+      source = &result->second;
+  }
+  if (!source) {
+    reportRuntimeError("GROUP source alias '" + sourceAlias +
+                       "' is not available.");
+    return;
+  }
+
+  std::vector<AnnotationFeatureGroup> groups;
+  std::unordered_map<std::string, size_t> groupById;
+  for (size_t sourceIndex = 0; sourceIndex < source->size(); ++sourceIndex) {
+    const auto &region = (*source)[sourceIndex];
+    if (!region.annotationEvidence.present) {
+      reportRuntimeError("GROUP source alias '" + sourceAlias +
+                         "' contains a record without GFF3 annotation "
+                         "evidence.");
+      return;
+    }
+    const std::string &id = region.annotationEvidence.id;
+    if (id.empty()) {
+      reportRuntimeError("GROUP source alias '" + sourceAlias +
+                         "' contains a record without a GFF3 ID at source "
+                         "position " + std::to_string(sourceIndex + 1) + ".");
+      return;
+    }
+
+    auto found = groupById.find(id);
+    if (found == groupById.end()) {
+      AnnotationFeatureGroup group;
+      group.sourceAlias = sourceAlias;
+      group.id = id;
+      group.chr = region.chr;
+      group.type = region.type;
+      group.strand = region.strand;
+      group.spanStart = region.start;
+      group.spanEnd = region.end;
+      group.totalLength = region.length();
+      group.members.push_back(region);
+      groupById[id] = groups.size();
+      groups.push_back(group);
+      continue;
+    }
+
+    AnnotationFeatureGroup &group = groups[found->second];
+    if (region.chr != group.chr || region.type != group.type ||
+        region.strand != group.strand) {
+      reportRuntimeError("Cannot group GFF3 ID '" + id +
+                         "' because its records disagree on chromosome, "
+                         "feature type, or strand.");
+      return;
+    }
+    group.spanStart = std::min(group.spanStart, region.start);
+    group.spanEnd = std::max(group.spanEnd, region.end);
+    group.totalLength += region.length();
+    group.members.push_back(region);
+  }
+
+  annotationFeatureGroups[groupAlias] = std::move(groups);
+  if (debugMode) {
+    std::cout << "> GROUP " << sourceAlias << " BY ID AS " << groupAlias
+              << std::endl;
+    std::cout << "  Grouped " << source->size() << " annotation record(s) "
+              << "into " << annotationFeatureGroups[groupAlias].size()
+              << " feature identity group(s)." << std::endl;
+  }
+}
+
 void Interpreter::executeExport(const IRInstruction &instr) {
   const std::string &alias = instr.arg1;
   const std::string filename = stripQuotes(instr.arg2);
@@ -846,8 +959,10 @@ void Interpreter::executeExport(const IRInstruction &instr) {
   const auto regionsIt = resultSets.find(alias);
   const auto gcIt = gcResults.find(alias);
   const auto reportIt = annotationReports.find(alias);
+  const auto groupsIt = annotationFeatureGroups.find(alias);
   if (regionsIt == resultSets.end() && gcIt == gcResults.end() &&
-      reportIt == annotationReports.end()) {
+      reportIt == annotationReports.end() &&
+      groupsIt == annotationFeatureGroups.end()) {
     reportRuntimeError("Result alias '" + alias + "' is not available.");
     return;
   }
@@ -858,6 +973,11 @@ void Interpreter::executeExport(const IRInstruction &instr) {
   if (reportIt != annotationReports.end() && format != "TSV") {
     reportRuntimeError(
         "Annotation validation reports can currently be exported only as TSV.");
+    return;
+  }
+  if (groupsIt != annotationFeatureGroups.end() && format != "TSV") {
+    reportRuntimeError("Feature groups can currently be exported only as TSV. "
+                       "Extract their members before genomic export.");
     return;
   }
   if (regionsIt != resultSets.end() && format != "BED" && format != "GFF3" &&
@@ -873,7 +993,41 @@ void Interpreter::executeExport(const IRInstruction &instr) {
   }
   out << std::setprecision(17);
 
-  if (reportIt != annotationReports.end()) {
+  if (groupsIt != annotationFeatureGroups.end()) {
+    out << "group_id\tsource_alias\tchromosome\tfeature_type\tstrand"
+           "\tspan_start\tspan_end\tspan_length\ttotal_member_length"
+           "\tmember_count\tmember_index\tmember_start\tmember_end"
+           "\tmember_length\tmember_score\tmember_phase"
+           "\tmember_parents_json\tmember_attributes_json\n";
+    for (const auto &group : groupsIt->second) {
+      for (size_t index = 0; index < group.members.size(); ++index) {
+        const auto &member = group.members[index];
+        out << cleanTabularField(group.id) << '\t'
+            << cleanTabularField(group.sourceAlias) << '\t'
+            << cleanTabularField(group.chr) << '\t'
+            << cleanTabularField(group.type) << '\t'
+            << cleanTabularField(group.strand) << '\t' << group.spanStart
+            << '\t' << group.spanEnd << '\t'
+            << (group.spanEnd - group.spanStart) << '\t'
+            << group.totalLength << '\t' << group.members.size() << '\t'
+            << (index + 1) << '\t' << member.start << '\t' << member.end
+            << '\t' << member.length() << '\t'
+            << cleanTabularField(member.annotationEvidence.score) << '\t'
+            << cleanTabularField(member.annotationEvidence.phase) << "\t[";
+        for (size_t parentIndex = 0;
+             parentIndex < member.annotationEvidence.parents.size();
+             ++parentIndex) {
+          if (parentIndex > 0)
+            out << ',';
+          out << '"' << jsonEscape(
+              member.annotationEvidence.parents[parentIndex]) << '"';
+        }
+        out << "]\t" << cleanTabularField(
+            serializeAnnotationAttributesJSON(member.annotationEvidence))
+            << '\n';
+      }
+    }
+  } else if (reportIt != annotationReports.end()) {
     const auto joinNumbers = [](const std::vector<size_t> &values) {
       std::vector<std::string> rendered;
       rendered.reserve(values.size());
@@ -1705,6 +1859,36 @@ void Interpreter::executeExtractRelated(const IRInstruction &instr) {
   const std::string &relation = instr.arg1;
   const std::string &sourceAlias = instr.arg2;
   const std::string &resultId = instr.arg3;
+  if (relation == "MEMBERS") {
+    const auto groups = annotationFeatureGroups.find(sourceAlias);
+    if (groups == annotationFeatureGroups.end()) {
+      reportRuntimeError("Feature-group alias '" + sourceAlias +
+                         "' is not available.");
+      return;
+    }
+    std::vector<GenomicRegion> members;
+    for (const auto &group : groups->second) {
+      members.insert(members.end(), group.members.begin(), group.members.end());
+    }
+    const auto genome = sequenceChrMaps.find(activeSequenceAlias);
+    if (genome != sequenceChrMaps.end()) {
+      for (auto &member : members) {
+        if (!member.sequence.empty())
+          continue;
+        const auto chromosome = genome->second.find(member.chr);
+        if (chromosome != genome->second.end() &&
+            member.end <= chromosome->second.sequence.size()) {
+          member.sequence = chromosome->second.sequence.substr(
+              member.start, member.end - member.start);
+        }
+      }
+    }
+    resultSets[resultId] = std::move(members);
+    if (debugMode) {
+      std::cout << "> EXTRACT MEMBERS OF " << sourceAlias << std::endl;
+    }
+    return;
+  }
   const bool downward = relation == "CHILDREN" || relation == "DESCENDANTS";
   const bool transitive =
       relation == "DESCENDANTS" || relation == "ANCESTORS";
@@ -3184,6 +3368,25 @@ void Interpreter::dumpResultsJSON() const {
   }
   out << "\n  }";
 
+  if (!annotationFeatureGroups.empty()) {
+    out << ",\n  \"featureGroups\": {\n";
+    bool firstCollection = true;
+    for (const auto &collection : annotationFeatureGroups) {
+      if (!firstCollection)
+        out << ",\n";
+      firstCollection = false;
+      out << "    \"" << jsonEscape(collection.first) << "\": [\n";
+      for (size_t index = 0; index < collection.second.size(); ++index) {
+        if (index > 0)
+          out << ",\n";
+        out << "      "
+            << serializeAnnotationFeatureGroupJSON(collection.second[index]);
+      }
+      out << "\n    ]";
+    }
+    out << "\n  }";
+  }
+
   if (!gcResults.empty()) {
     out << ",\n  \"gcProfiles\": {\n";
     bool firstProfile = true;
@@ -3433,6 +3636,9 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
       break;
     case IROpCode::VALIDATE_ANNOTATION:
       executeValidateAnnotation(instr);
+      break;
+    case IROpCode::GROUP_ANNOTATION:
+      executeGroupAnnotation(instr);
       break;
     default:
       break;

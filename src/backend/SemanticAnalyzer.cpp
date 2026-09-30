@@ -108,9 +108,10 @@ void SemanticAnalyzer::visit(ExportStmtNode *node) {
   const std::string type = symbolTable.typeOf(node->alias);
   if (type != "RESULT_SET" && type != "MOTIF_HITS" &&
       type != "REGULATORY_TRACK" &&
-      type != "GC_PROFILE" && type != "ANNOTATION_REPORT") {
-    reportError("EXPORT expects a result-set, GC-profile, or annotation-report "
-                "alias, but '" +
+      type != "GC_PROFILE" && type != "ANNOTATION_REPORT" &&
+      type != "FEATURE_GROUPS") {
+    reportError("EXPORT expects a result-set, GC-profile, annotation-report, "
+                "or feature-group alias, but '" +
                 node->alias + "' has type " + type + ".");
   }
   if (type == "GC_PROFILE" && node->format != "TSV") {
@@ -118,6 +119,10 @@ void SemanticAnalyzer::visit(ExportStmtNode *node) {
   }
   if (type == "ANNOTATION_REPORT" && node->format != "TSV") {
     reportError("Annotation validation reports can be exported only as TSV.");
+  }
+  if (type == "FEATURE_GROUPS" && node->format != "TSV") {
+    reportError("Feature groups can be exported only as TSV. Extract their "
+                "members before genomic export.");
   }
 }
 
@@ -247,6 +252,27 @@ void SemanticAnalyzer::visit(FindOptNode *node) {
 
 void SemanticAnalyzer::visit(ExtractStmtNode *node) {
   if (!node->relation.empty()) {
+    if (node->relation == "MEMBERS") {
+      if (!symbolTable.lookup(node->source)) {
+        reportError("Feature-group alias '" + node->source +
+                    "' is not defined.");
+      } else if (symbolTable.typeOf(node->source) != "FEATURE_GROUPS") {
+        reportError("EXTRACT MEMBERS expects a feature-group alias, but '" +
+                    node->source + "' has type " +
+                    symbolTable.typeOf(node->source) + ".");
+      }
+      if (node->whereClause) {
+        node->whereClause->accept(*this);
+      }
+      if (!node->alias.empty()) {
+        if (symbolTable.lookup(node->alias)) {
+          reportError("Alias '" + node->alias + "' is already defined.");
+        } else {
+          symbolTable.insert(node->alias, "RESULT_SET");
+        }
+      }
+      return;
+    }
     if (!annotationLoaded) {
       reportError("EXTRACT " + node->relation +
                   " requires annotation data.");
@@ -705,6 +731,25 @@ void SemanticAnalyzer::visit(ValidateStmtNode *node) {
     reportError("Alias '" + node->alias + "' is already defined.");
   } else {
     symbolTable.insert(node->alias, "ANNOTATION_REPORT");
+  }
+}
+
+void SemanticAnalyzer::visit(GroupStmtNode *node) {
+  if (!symbolTable.lookup(node->sourceAlias)) {
+    reportError("GROUP source alias '" + node->sourceAlias +
+                "' is not defined.");
+  } else {
+    const std::string type = symbolTable.typeOf(node->sourceAlias);
+    if (type != "ANNOTATION_DATA" && type != "RESULT_SET") {
+      reportError("GROUP ... BY ID expects an annotation dataset or "
+                  "annotation-backed result set, but '" + node->sourceAlias +
+                  "' has type " + type + ".");
+    }
+  }
+  if (symbolTable.lookup(node->alias)) {
+    reportError("Alias '" + node->alias + "' is already defined.");
+  } else {
+    symbolTable.insert(node->alias, "FEATURE_GROUPS");
   }
 }
 

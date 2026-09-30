@@ -57,6 +57,7 @@ void Parser::synchronize() {
     case TokenType::EXPORT:
     case TokenType::DEFINE:
     case TokenType::VALIDATE:
+    case TokenType::GROUP:
     case TokenType::FIND:
     case TokenType::EXTRACT:
     case TokenType::INTERSECT:
@@ -98,6 +99,8 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
     return parseExport();
   if (match(TokenType::VALIDATE))
     return parseValidate();
+  if (match(TokenType::GROUP))
+    return parseGroup();
   if (match(TokenType::DEFINE)) {
     if (check(TokenType::PROMOTERS))
       return parseDefinePromoters();
@@ -133,7 +136,7 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
 
   reportError(peek(), "Expected start of a statement (LOAD, USE, EXPORT, FIND, "
                       "EXTRACT, INTERSECT, UNION, EXCEPT, OVERLAPS, NEAR, "
-                      "CONSENSUS, SCAN, COUNT, ANALYZE, VALIDATE, IF, FOREACH, "
+                      "CONSENSUS, SCAN, COUNT, ANALYZE, VALIDATE, GROUP, IF, FOREACH, "
                       "DEFINE)");
   throw std::runtime_error("Parse error");
 }
@@ -152,6 +155,22 @@ std::unique_ptr<ValidateStmtNode> Parser::parseValidate() {
           "Expected ';' at the end of VALIDATE ANNOTATION.");
   return std::unique_ptr<ValidateStmtNode>(
       new ValidateStmtNode(annotationAlias, alias));
+}
+
+std::unique_ptr<GroupStmtNode> Parser::parseGroup() {
+  consume(TokenType::ID, "Expected a source alias after GROUP.");
+  const std::string sourceAlias = previous().lexeme;
+  consume(TokenType::BY, "Expected 'BY' after the GROUP source alias.");
+  consume(TokenType::ID, "Expected 'ID' after GROUP ... BY.");
+  if (previous().lexeme != "ID") {
+    reportError(previous(), "GROUP currently supports only BY ID.");
+    throw std::runtime_error("Parse error");
+  }
+  consume(TokenType::AS, "Expected 'AS' after GROUP ... BY ID.");
+  consume(TokenType::ID, "Expected a feature-group alias after AS.");
+  const std::string alias = previous().lexeme;
+  consume(TokenType::SEMICOLON, "Expected ';' at the end of GROUP.");
+  return std::unique_ptr<GroupStmtNode>(new GroupStmtNode(sourceAlias, alias));
 }
 
 std::unique_ptr<DefinePromotersStmtNode> Parser::parseDefinePromoters() {
@@ -490,7 +509,8 @@ std::unique_ptr<FindStmtNode> Parser::parseFind() {
 
 std::unique_ptr<ExtractStmtNode> Parser::parseExtract() {
   if (match(TokenType::CHILDREN) || match(TokenType::DESCENDANTS) ||
-      match(TokenType::PARENTS) || match(TokenType::ANCESTORS)) {
+      match(TokenType::PARENTS) || match(TokenType::ANCESTORS) ||
+      match(TokenType::MEMBERS)) {
     const std::string relation = previous().lexeme;
     consume(TokenType::OF, "Expected 'OF' after " + relation + ".");
     consume(TokenType::ID,

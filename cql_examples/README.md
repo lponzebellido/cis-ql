@@ -102,6 +102,8 @@ the responsibility of the program.
     distinguishes `ID` from `Name`, obtains direct children, traverses
     descendants and ancestors, tests phase, and queries `locus_tag` and
     `protein_id` without adding organism-specific keywords to the language.
+    It also groups a real multipart CDS by identity, reports span and member
+    length separately, and recovers its original GFF3 records.
 
 `EXTRACT FEATURE` deliberately returns the annotation vocabulary as supplied.
 The programmer chooses `TYPE = "mRNA"`, `TYPE = "CDS"`, a Sequence Ontology
@@ -111,6 +113,9 @@ ANNOTATION` reports unresolved parents, incompatible repeated identities, and
 cycles while treating compatible multi-record identities as informational.
 `CHILDREN`, `DESCENDANTS`, `PARENTS`, and `ANCESTORS` navigate the structure
 that the file declares; they do not reinterpret it.
+`GROUP ... BY ID` represents a repeated GFF3 identity as a typed collection of
+records rather than a synthetic continuous interval. `EXTRACT MEMBERS OF`
+returns those records when an interval-oriented operation or export is needed.
 
 The shared `anthocyanin_regulatory_demo` FASTA and GFF3 files contain three
 annotated genes, one candidate enhancer, two promoter-local MYB instances, and

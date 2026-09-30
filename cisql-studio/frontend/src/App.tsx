@@ -6,6 +6,7 @@ import { TrackViewer } from './TrackViewer';
 import { FileExplorer } from './FileExplorer';
 import { SequenceViewer } from './SequenceViewer';
 import { AnnotationReportViewer } from './AnnotationReportViewer';
+import { FeatureGroupViewer } from './FeatureGroupViewer';
 import './App.css';
 
 const EXT_COLORS: Record<string, string> = {
@@ -34,9 +35,10 @@ function App() {
   const [results, setResults] = useState<Record<string, any[]>>({});
   const [gcProfiles, setGcProfiles] = useState<Record<string, any>>({});
   const [annotationReports, setAnnotationReports] = useState<Record<string, any>>({});
+  const [featureGroups, setFeatureGroups] = useState<Record<string, any[]>>({});
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeVisTab, setActiveVisTab] = useState<'track' | 'sequence' | 'validation'>('track');
+  const [activeVisTab, setActiveVisTab] = useState<'track' | 'sequence' | 'validation' | 'groups'>('track');
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [highlightedRegion, setHighlightedRegion] = useState<any>(null);
@@ -137,6 +139,7 @@ function App() {
     setResults({});
     setGcProfiles({});
     setAnnotationReports({});
+    setFeatureGroups({});
     try {
       const response = await fetch('http://localhost:3001/api/execute', {
         method: 'POST',
@@ -160,6 +163,9 @@ function App() {
       }
       if (data.results && data.results.annotationReports) {
         setAnnotationReports(data.results.annotationReports);
+      }
+      if (data.results && data.results.featureGroups) {
+        setFeatureGroups(data.results.featureGroups);
       }
     } catch (err) {
       setStdout('Error connecting to the backend server.');
@@ -339,6 +345,12 @@ function App() {
                   >
                     Validation
                   </div>
+                  <div
+                    className={`visualizer-tab ${activeVisTab === 'groups' ? 'active' : ''}`}
+                    onClick={() => setActiveVisTab('groups')}
+                  >
+                    Groups
+                  </div>
                 </div>
               </div>
               <div className="pane-content">
@@ -353,8 +365,10 @@ function App() {
                   }} />
                 ) : activeVisTab === 'sequence' ? (
                   <SequenceViewer results={results} highlightedRegion={highlightedRegion} />
-                ) : (
+                ) : activeVisTab === 'validation' ? (
                   <AnnotationReportViewer reports={annotationReports} />
+                ) : (
+                  <FeatureGroupViewer collections={featureGroups} />
                 )}
               </div>
             </div>

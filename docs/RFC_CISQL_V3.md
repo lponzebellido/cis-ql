@@ -29,7 +29,7 @@ how many new statements it adds.
 
 | Priority | Missing capability | Why it matters | Smallest useful acceptance target |
 | :--- | :--- | :--- | :--- |
-| 1 | Transcript-aware GFF3 selection | Parent graphs can now be validated and navigated, but feature grouping and transcript-selection policy are not yet first-class | Group discontinuous features; expose explicit `ALL`, canonical, or named-transcript selection |
+| 1 | Transcript-aware GFF3 selection | Parent graphs and discontinuous identities can now be represented explicitly, but transcript-selection policy is not yet first-class | Expose explicit `ALL`, canonical, or named-transcript selection |
 | 2 | General scalar and oriented-sequence expressions | Regex can describe complex patterns, but programmers need auditable arithmetic, captures, strand-oriented sequence, translation, and genetic-code policy outside the regex itself | Extend the current `MOD`, `START`, `END`, and `STRAND` foundation with reusable expressions and oriented extraction |
 | 3 | Enrichment with matched backgrounds | Counts alone cannot distinguish motif enrichment from length or composition effects | Declare foreground/background regions, matching policy, effect size, test, and multiple-testing correction |
 | 4 | CRE-to-gene evidence tables | `NEAR` is useful but genomic proximity is only one candidate-linking rule | Import relationship/contact tables and retain typed promoter, distance, contact, expression, and binding evidence per link |
@@ -78,6 +78,9 @@ EXTRACT ANCESTORS OF coding_descendants AS enclosing_genes
 
 VALIDATE ANNOTATION annotation AS hierarchy_report;
 EXPORT hierarchy_report TO "hierarchy_report.tsv" FORMAT TSV;
+
+GROUP coding_parts BY ID AS coding_features;
+EXTRACT MEMBERS OF coding_features AS coding_segments;
 ```
 
 GFF3 import retains source, score, phase, `ID`, `Name`, every `Parent`, the
@@ -106,10 +109,22 @@ with multiple lines. Validation is explicit rather than a load-time failure so
 partial annotations remain usable. JSON retains structured diagnostics, TSV
 provides summary and diagnostic rows, and Studio displays the same report.
 
+`GROUP source BY ID` materializes one typed logical feature for each distinct
+identity in an annotation dataset or annotation-backed result set. The group
+stores the genomic span and summed member length as different quantities and
+retains every original record, including member-specific score and phase.
+Groups are not intervals and therefore cannot enter interval operators until
+`EXTRACT MEMBERS OF` makes the member records explicit. Grouping fails on
+missing IDs or incompatible chromosome, type, or strand instead of discarding
+records or inventing a continuous feature.
+This follows the [Sequence Ontology GFF3 specification](https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md),
+which defines repeated IDs as the records that collectively represent one
+discontinuous feature.
+
 `FEATURE` means every imported feature type. Cis-QL does not currently decide
 that `mRNA`, `transcript`, `lnc_RNA`, or another source vocabulary should be
-treated as the canonical transcript concept. Multi-record feature grouping and
-explicit transcript-selection policies remain planned.
+treated as the canonical transcript concept. Explicit transcript-selection
+policies remain planned.
 
 ## Part 1: explicit TSS-relative promoters
 

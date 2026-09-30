@@ -20,6 +20,7 @@ void Lexer::initKeywords() {
     keywords["EXPORT"] = TokenType::EXPORT;
     keywords["DEFINE"] = TokenType::DEFINE;
     keywords["VALIDATE"] = TokenType::VALIDATE;
+    keywords["GROUP"] = TokenType::GROUP;
     keywords["MOTIF"] = TokenType::MOTIF;
     keywords["MODULE"] = TokenType::MODULE;
     keywords["GENE"] = TokenType::GENE;
@@ -31,6 +32,8 @@ void Lexer::initKeywords() {
     keywords["PROMOTERS"] = TokenType::PROMOTERS;
     keywords["ENHANCER"] = TokenType::ENHANCER;
     keywords["OF"] = TokenType::OF;
+    keywords["BY"] = TokenType::BY;
+    keywords["MEMBERS"] = TokenType::MEMBERS;
     keywords["UPSTREAM"] = TokenType::UPSTREAM;
     keywords["DOWNSTREAM"] = TokenType::DOWNSTREAM;
     keywords["WITHIN"] = TokenType::WITHIN;
@@ -399,6 +402,7 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::EXPORT: return "EXPORT";
         case TokenType::DEFINE: return "DEFINE";
         case TokenType::VALIDATE: return "VALIDATE";
+        case TokenType::GROUP: return "GROUP";
         case TokenType::MOTIF: return "MOTIF";
         case TokenType::MODULE: return "MODULE";
         case TokenType::GENE: return "GENE";
@@ -410,6 +414,8 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::PROMOTERS: return "PROMOTERS";
         case TokenType::ENHANCER: return "ENHANCER";
         case TokenType::OF: return "OF";
+        case TokenType::BY: return "BY";
+        case TokenType::MEMBERS: return "MEMBERS";
         case TokenType::UPSTREAM: return "UPSTREAM";
         case TokenType::DOWNSTREAM: return "DOWNSTREAM";
         case TokenType::WITHIN: return "WITHIN";

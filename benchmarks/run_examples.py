@@ -22,7 +22,7 @@ DEFAULT_EXAMPLES = (
 
 def benchmark(binary: Path, example: Path, repetitions: int) -> dict:
     samples: list[float] = []
-    expected_summary: dict[str, dict[str, int]] | None = None
+    expected_summary: dict[str, object] | None = None
     with tempfile.TemporaryDirectory(prefix="cisql-benchmark-") as temp:
         workspace = Path(temp)
         (workspace / "data_examples").symlink_to(ROOT / "data_examples",
@@ -56,6 +56,16 @@ def benchmark(binary: Path, example: Path, repetitions: int) -> dict:
                 for section in ("resultSets", "gcProfiles")
                 if parsed.get(section)
             }
+            feature_groups = parsed.get("featureGroups", {})
+            if feature_groups:
+                summary["featureGroups"] = {
+                    name: {
+                        "groups": len(groups),
+                        "members": sum(group["memberCount"]
+                                       for group in groups),
+                    }
+                    for name, groups in feature_groups.items()
+                }
             if expected_summary is None:
                 expected_summary = summary
             elif summary != expected_summary:

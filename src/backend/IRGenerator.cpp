@@ -39,6 +39,7 @@ std::string irOpcodeToString(IROpCode op) {
     case IROpCode::ANALYZE_GC:       return "ANALYZE_GC";
     case IROpCode::ANALYZE_CPG:      return "ANALYZE_CPG";
     case IROpCode::VALIDATE_ANNOTATION:return "VALIDATE_ANNOTATION";
+    case IROpCode::GROUP_ANNOTATION:   return "GROUP_ANNOTATION";
     case IROpCode::DEFINE_PROMOTERS: return "DEFINE_PROMOTERS";
     case IROpCode::DEFINE_MODULE:    return "DEFINE_MODULE";
     case IROpCode::IF_BEGIN:         return "IF_BEGIN";
@@ -465,6 +466,14 @@ void IRGenerator::visit(ValidateStmtNode *node) {
   validate.arg1 = node->annotationAlias;
   validate.arg2 = node->alias;
   instructions.push_back(validate);
+}
+
+void IRGenerator::visit(GroupStmtNode *node) {
+  IRInstruction group;
+  group.opcode = IROpCode::GROUP_ANNOTATION;
+  group.arg1 = node->sourceAlias;
+  group.arg2 = node->alias;
+  instructions.push_back(group);
 }
 
 void IRGenerator::visit(IfStmtNode *node) {

@@ -24,6 +24,7 @@ interface.
 The current implementation reads FASTA sequences, hierarchy-preserving GFF3
 annotations, JASPAR frequency matrices, and BED or narrowPeak tracks. It can
 validate GFF3 identity and parent graphs, navigate annotation relationships,
+group discontinuous features without flattening their genomic gaps,
 derive strand-aware promoters, find literal or IUPAC sequence patterns, scan
 PWMs with explicit background and multiple-testing metadata, combine genomic
 intervals, describe two-site motif modules, count support, select nearby
@@ -159,6 +160,23 @@ chromosome, feature type, or strand. Repeated IDs with compatible fields are
 reported separately as information because GFF3 permits one discontinuous
 feature to occupy multiple records. Reports appear in structured JSON, TSV,
 and the Validation panel in Cis-QL Studio.
+
+Repeated IDs can be materialized as logical features without treating the
+space between their records as part of the feature:
+
+```sql
+EXTRACT FEATURE AS coding_parts WHERE TYPE = "CDS";
+GROUP coding_parts BY ID AS coding_features;
+EXPORT coding_features TO "coding_features.tsv" FORMAT TSV;
+
+EXTRACT MEMBERS OF coding_features AS coding_segments;
+EXPORT coding_segments TO "coding_segments.gff3" FORMAT GFF3;
+```
+
+Each group retains its original records, their order, phases, scores, parents,
+and attributes. Its genomic span and the sum of member lengths are separate
+values. Feature groups are not accepted by interval operators; extracting
+their members makes the intended interval semantics explicit.
 
 `LOAD TRACK` currently accepts BED and narrowPeak. Track coordinates are
 already zero-based and half-open. When a sequence dataset is active, Cis-QL
@@ -389,6 +407,12 @@ derived result set. It reports unresolved parents, incompatible reuse of an
 identity, and cycles without silently repairing them. A compatible identity
 spread across multiple records is informational, not an error.
 
+`GROUP source BY ID` creates one logical feature per distinct GFF3 identity.
+The result is a feature-group collection rather than an interval set, so a
+discontinuous CDS, alignment, or transcript cannot accidentally be scanned or
+overlapped as one continuous span. `EXTRACT MEMBERS OF` recovers the original
+records in group and source order and may be followed by `WHERE`.
+
 `IF` currently evaluates the GC content of the active sequence dataset.
 Regions emitted by `CONSENSUS` additionally support the non-negative integer
 property `SUPPORT_COUNT`.
@@ -415,6 +439,7 @@ EXPORT homologous_genes TO "homologous_genes.gff3" FORMAT GFF3;
 EXPORT homologous_genes TO "homologous_genes.tsv" FORMAT TSV;
 EXPORT gc_profile TO "gc_profile.tsv" FORMAT TSV;
 EXPORT annotation_report TO "annotation_report.tsv" FORMAT TSV;
+EXPORT coding_features TO "coding_features.tsv" FORMAT TSV;
 ```
 
 Internal and BED coordinates are zero-based and half-open. GFF3 exports convert
@@ -448,7 +473,7 @@ the authoritative grammar:
 Program            ::= StatementList
 StatementList      ::= Statement StatementList | λ
 
-Statement          ::= LoadStmt | UseStmt | ValidateStmt | ExportStmt | FindStmt | ExtractStmt
+Statement          ::= LoadStmt | UseStmt | ValidateStmt | GroupStmt | ExportStmt | FindStmt | ExtractStmt
                      | DefinePromotersStmt | DefineModuleStmt
                      | SetOperationStmt | ConsensusStmt | CountStmt
                      | ScanStmt | AnalyzeStmt
@@ -462,6 +487,7 @@ TrackMetadata      ::= ASSAY STRING | SAMPLE STRING | CONDITION STRING
                      | REPLICATE STRING | CONTROL STRING
 UseStmt            ::= USE (SEQUENCE | ANNOTATION) ID SEMICOLON
 ValidateStmt       ::= VALIDATE ANNOTATION ID AS ID SEMICOLON
+GroupStmt          ::= GROUP ID BY ID AS ID SEMICOLON
 ExportStmt         ::= EXPORT ID TO STRING FORMAT (BED | GFF3 | TSV) SEMICOLON
 DefinePromotersStmt ::= DEFINE PROMOTERS OF (GENE | TSS | ID) FROM TSS
                         UPSTREAM (NUM | FLOAT) RequiredUnit
@@ -503,7 +529,7 @@ ConsensusCriterion ::= MIN_RECIPROCAL_OVERLAP (NUM | FLOAT) PERCENT
 CountStmt          ::= COUNT EntityRef IN EntityRef AS ID WhereClause SEMICOLON
 
 ExtractStmt        ::= EXTRACT ExtractSource AliasOpt WhereClause SEMICOLON
-ExtractSource      ::= EntityRef | HierarchyRelation OF ID
+ExtractSource      ::= EntityRef | HierarchyRelation OF ID | MEMBERS OF ID
 HierarchyRelation  ::= CHILDREN | DESCENDANTS | PARENTS | ANCESTORS
 
 IfStmt             ::= IF Condition THEN StatementList (ELSE StatementList)? ENDIF (SEMICOLON)?
@@ -600,7 +626,7 @@ The regulatory progression and its expected outputs are described in
 | `10_accessible_bound_myb_candidates.cql` | Combine filtered accessibility, binding, motif, and proximity | track-evidence `WHERE`, multi-track `overlapEvidence`, `COUNT`, `NEAR` |
 | `11_replicate_supported_candidates.cql` | Require substantial coordinate and summit support from two binding replicates | `CONSENSUS`, reciprocal overlap, summit distance, structured experimental provenance |
 | `12_regex_denovo.cql` | Find in-frame start-to-stop sequence candidates near TATA-like anchors | regex search, strand, `LENGTH MOD 3` |
-| `13_gff3_hierarchy.cql` | Validate a real annotation, select a gene, navigate its hierarchy in both directions, and retain its CDS evidence | `VALIDATE ANNOTATION`, `FEATURE`, `CHILDREN`, `DESCENDANTS`, `PARENTS`, `ANCESTORS`, `ATTRIBUTE` |
+| `13_gff3_hierarchy.cql` | Validate a real annotation, navigate a gene hierarchy, and group a multipart CDS without flattening its segments | `VALIDATE ANNOTATION`, `GROUP ... BY ID`, `MEMBERS`, `CHILDREN`, `DESCENDANTS`, `PARENTS`, `ANCESTORS` |
 
 ---
 
@@ -611,6 +637,7 @@ Cis-QL Studio provides a desktop graphical environment for query development, ex
 - **Integrated Code Editor & Console:** Write, load, and execute `.cql` queries with real-time terminal output.
 - **Multi-Track Visualizer Canvas:** Displays ruler coordinates, GC content profiles, feature annotation tracks, and sequence details.
 - **Annotation Validation:** Summarizes GFF3 identity and parent graphs and exposes unresolved parents, conflicts, and cycles.
+- **Feature Groups:** Separates logical GFF3 identities from their original discontinuous member records.
 - **Data Synchronization:** Automatically synchronizes execution results via `.cisql_results.json` for live inspection.
 
 ---

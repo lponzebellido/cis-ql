@@ -716,6 +716,87 @@ def main() -> int:
 
         data, _ = run_query(
             workspace,
+            "annotation_feature_groups",
+            'LOAD ANNOTATION "discontinuous.gff3" AS annotation;\n'
+            'GROUP annotation BY ID AS feature_groups;\n'
+            'EXTRACT MEMBERS OF feature_groups AS exon_members '
+            'WHERE TYPE = "exon";\n'
+            'EXPORT feature_groups TO "feature_groups.tsv" FORMAT TSV;\n',
+        )
+        groups = data["featureGroups"]["feature_groups"]
+        multi_group = groups[1]
+        require(
+            [group["id"] for group in groups]
+            == ["rootD", "multi", "leafD"] and
+            multi_group["span"] == {
+                "start": 0, "end": 300, "length": 300
+            } and
+            multi_group["totalMemberLength"] == 200 and
+            multi_group["memberCount"] == 2 and
+            [(member["index"], member["start"], member["end"])
+             for member in multi_group["members"]]
+            == [(1, 0, 100), (2, 200, 300)] and
+            [(member["annotationEvidence"]["id"], member["start"],
+              member["end"])
+             for member in data["resultSets"]["exon_members"]]
+            == [("multi", 0, 100), ("multi", 200, 300)],
+            "feature groups preserve discontinuous members and true length",
+        )
+        group_tsv = (workspace / "feature_groups.tsv").read_text(
+            encoding="utf-8"
+        ).splitlines()
+        require(
+            all(len(line.split("\t")) == 18 for line in group_tsv) and
+            [line.split("\t")[0] for line in group_tsv[1:]]
+            == ["rootD", "multi", "multi", "leafD"] and
+            group_tsv[2].split("\t")[7:11] == ["300", "200", "2", "1"] and
+            group_tsv[3].split("\t")[7:11] == ["300", "200", "2", "2"],
+            "feature-group TSV preserves group and member metrics",
+        )
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "group_requires_annotation_source",
+            'LOAD SEQUENCE "fixture.fasta" AS genome;\n'
+            'GROUP genome BY ID AS invalid;\n',
+            3,
+        )
+        require("expects an annotation dataset" in semantic_error,
+                "GROUP rejects non-annotation dataset types")
+
+        runtime_error = run_invalid_query(
+            workspace,
+            "group_requires_feature_identity",
+            'LOAD ANNOTATION "nameless_child.gff3" AS annotation;\n'
+            'GROUP annotation BY ID AS invalid;\n',
+            4,
+        )
+        require("without a GFF3 ID" in runtime_error,
+                "GROUP rejects unidentified annotation records")
+
+        runtime_error = run_invalid_query(
+            workspace,
+            "group_rejects_identity_conflicts",
+            'LOAD ANNOTATION "validation.gff3" AS annotation;\n'
+            'GROUP annotation BY ID AS invalid;\n',
+            4,
+        )
+        require("records disagree" in runtime_error,
+                "GROUP rejects incompatible repeated identities")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "group_requires_tabular_export",
+            'LOAD ANNOTATION "discontinuous.gff3" AS annotation;\n'
+            'GROUP annotation BY ID AS feature_groups;\n'
+            'EXPORT feature_groups TO "groups.gff3" FORMAT GFF3;\n',
+            3,
+        )
+        require("can be exported only as TSV" in semantic_error,
+                "feature groups require member extraction for genomic export")
+
+        data, _ = run_query(
+            workspace,
             "annotation_validation_report",
             'LOAD ANNOTATION "fixture.gff3" AS valid_annotation;\n'
             'LOAD ANNOTATION "validation.gff3" AS invalid_annotation;\n'
