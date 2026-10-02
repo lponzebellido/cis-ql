@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "examples": [
+    {
+      "id": "01",
+      "file": "01_promoters.cql",
+      "exports": ["promoters.bed"],
+      "resultCounts": {
+        "resultSets": {"promoters": 1, "thra": 1}
+      }
+    },
+    {
+      "id": "02",
+      "file": "02_pwm.cql",
+      "exports": ["pwm_hits.tsv"],
+      "resultCounts": {
+        "resultSets": {"hits": 8}
+      }
+    },
+    {
+      "id": "03",
+      "file": "03_pvalues.cql",
+      "exports": ["pvalue_hits.tsv"],
+      "resultCounts": {
+        "resultSets": {"hits": 4}
+      }
+    },
+    {
+      "id": "04",
+      "file": "04_overlap.cql",
+      "exports": ["overlap.tsv"],
+      "resultCounts": {
+        "resultSets": {
+          "sites": 1036,
+          "promoter_sites": 209,
+          "promoters": 4506
+        }
+      }
+    },
+    {
+      "id": "05",
+      "file": "05_count.cql",
+      "exports": ["counts.tsv", "nonzero_counts.gff3"],
+      "resultCounts": {
+        "resultSets": {
+          "nonzero_counts": 199,
+          "motif_counts": 4506,
+          "sites": 1036,
+          "promoters": 4506
+        }
+      }
+    },
+    {
+      "id": "06",
+      "file": "06_near.cql",
+      "exports": ["near.tsv"],
+      "resultCounts": {
+        "resultSets": {"nearby_sites": 675, "sites": 1036}
+      }
+    },
+    {
+      "id": "07",
+      "file": "07_modules.cql",
+      "exports": ["modules.tsv", "modules.gff3"],
+      "resultCounts": {
+        "resultSets": {
+          "modules": 1,
+          "second_sites": 302,
+          "first_sites": 504
+        }
+      }
+    },
+    {
+      "id": "08",
+      "file": "08_filters.cql",
+      "exports": ["filters.tsv"],
+      "resultCounts": {
+        "resultSets": {"thra_cds": 1, "coding_records": 2112}
+      }
+    },
+    {
+      "id": "09",
+      "file": "09_tracks.cql",
+      "exports": ["tracks.tsv"],
+      "resultCounts": {
+        "resultSets": {"filtered_peaks": 3, "peaks": 4}
+      }
+    },
+    {
+      "id": "10",
+      "file": "10_track_overlap.cql",
+      "exports": ["track_overlap.tsv"],
+      "resultCounts": {
+        "resultSets": {
+          "overlaps": 2,
+          "bound_regions": 2,
+          "open_regions": 3,
+          "binding": 3,
+          "accessibility": 4
+        }
+      }
+    },
+    {
+      "id": "11",
+      "file": "11_consensus.cql",
+      "exports": ["consensus.tsv", "consensus.gff3"],
+      "resultCounts": {
+        "resultSets": {
+          "consensus": 2,
+          "filtered_1": 2,
+          "replicate_2": 3,
+          "filtered_2": 2,
+          "replicate_1": 3
+        }
+      }
+    },
+    {
+      "id": "12",
+      "file": "12_orfs.cql",
+      "exports": ["orfs.tsv"],
+      "resultCounts": {
+        "resultSets": {"orfs": 1494, "anchors": 980}
+      }
+    },
+    {
+      "id": "13",
+      "file": "13_gff3.cql",
+      "exports": [
+        "thra.tsv",
+        "children.tsv",
+        "cds.gff3",
+        "genes.tsv",
+        "gff3_report.tsv",
+        "cds_groups.tsv",
+        "cds_parts.gff3"
+      ],
+      "resultCounts": {
+        "resultSets": {
+          "restored_parts": 3,
+          "cds_parts": 3,
+          "parents": 1,
+          "cds": 1,
+          "genes": 1,
+          "children": 1,
+          "thra": 1
+        },
+        "featureGroups": {
+          "cds_groups": {"groups": 1, "members": 3}
+        }
+      }
+    }
+  ]
+}

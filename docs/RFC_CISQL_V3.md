@@ -155,10 +155,10 @@ the preserved parent graph explicitly.
 Implemented syntax:
 
 ```cql
-SCAN myb_matrix IN proximal_promoters
+SCAN tf_matrix IN proximal_promoters
   STRAND POSITIVE
   THRESHOLD 85 %
-  AS myb_sites;
+  AS motif_sites;
 ```
 
 `IN` accepts an annotated biological entity or a named region/motif-hit set.
@@ -178,12 +178,12 @@ operations discard hit evidence whenever they change the hit geometry.
 Implemented syntax:
 
 ```cql
-SCAN myb_matrix IN proximal_promoters
+SCAN tf_matrix IN proximal_promoters
   BACKGROUND FROM genome
   THRESHOLD 85 %
-  AS myb_sites;
+  AS motif_sites;
 
-SCAN myb_matrix IN proximal_promoters
+SCAN tf_matrix IN proximal_promoters
   BACKGROUND UNIFORM
   THRESHOLD 85 %
   AS uniform_sites;
@@ -260,15 +260,15 @@ programs do not silently change semantics.
 Implemented syntax:
 
 ```cql
-SCAN myb_matrix IN proximal_promoters
+SCAN tf_matrix IN proximal_promoters
   BACKGROUND FROM genome
   PVALUE <= 1e-4
-  AS candidate_myb_sites;
+  AS pvalue_sites;
 
-SCAN myb_matrix IN proximal_promoters
+SCAN tf_matrix IN proximal_promoters
   BACKGROUND FROM genome
   QVALUE <= 0.05
-  AS significant_myb_sites;
+  AS qvalue_sites;
 ```
 
 Both `<` and `<=` are supported and probability thresholds must lie in `[0, 1]`.
@@ -319,8 +319,8 @@ scalar expressions remain planned.
 Implemented syntax:
 
 ```cql
-OVERLAPS significant_myb_sites WITH proximal_promoters
-  AS promoter_supported_myb_sites;
+OVERLAPS qvalue_sites WITH proximal_promoters
+  AS promoter_sites;
 ```
 
 This is an interval semi-join rather than a geometric intersection. It emits
@@ -345,8 +345,8 @@ supporting records.
 Implemented syntax:
 
 ```cql
-NEAR significant_myb_sites TO GENE WITHIN 2 KB
-  AS proximal_gene_candidates;
+NEAR qvalue_sites TO GENE WITHIN 2 KB
+  AS nearby_gene_links;
 ```
 
 `NEAR query TO reference WITHIN distance` is a directional, bounded nearest
@@ -379,11 +379,11 @@ chromatin-contact support.
 Implemented syntax:
 
 ```cql
-COUNT significant_myb_sites IN proximal_promoters
-  AS promoter_myb_counts;
+COUNT qvalue_sites IN proximal_promoters
+  AS promoter_site_counts;
 
-COUNT significant_myb_sites IN proximal_promoters
-  AS supported_promoters
+COUNT qvalue_sites IN proximal_promoters
+  AS nonempty_promoters
   WHERE COUNT >= 1;
 ```
 
@@ -413,11 +413,11 @@ Implemented syntax:
 
 ```cql
 DEFINE MODULE
-  FROM myb_sites WITH bhlh_sites
+  FROM factor_a_sites WITH factor_b_sites
   SPACING 5 BP TO 30 BP
   ORDER AS_WRITTEN
   ORIENTATION OPPOSITE
-  AS myb_bhlh_modules;
+  AS paired_sites;
 ```
 
 Both inputs are named region or motif-hit sets. Members must lie on the same

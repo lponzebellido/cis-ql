@@ -536,20 +536,19 @@ AliasOpt           ::= AS ID | λ
 StrandType         ::= POSITIVE | NEGATIVE
 ```
 
-## Correctness Tests and Engineering Benchmarks
+## Tests and benchmarks
 
 Run the automated language and algorithm tests with:
 
 ```bash
 make test
 make validate
+make check-examples
 ```
 
-`make validate` compares motif coordinates, PSSM thresholds and tail
-probabilities, interval subtraction, overlap/nearest selection, overlap counts,
-constrained homotypic modules, and normalized local-alignment filtering with independent reference
-implementations. If BEDTools, Biopython, or FIMO are installed, compatible
-external checks run as additional optional comparisons.
+`make validate` uses independent Python implementations and optional external
+tools. `make check-examples` runs the example manifest and verifies accepted
+result counts and exports.
 
 Deterministic scaling measurements and complete-query timings are available
 with:
@@ -559,9 +558,9 @@ make benchmark-core
 make benchmark
 ```
 
-These are engineering measurements of the current implementation, not evidence
-of superiority over other tools. See `benchmarks/README.md` for the comparison
-requirements needed before reporting external benchmark results.
+The complete-query benchmark also verifies hashes for its inputs, binary,
+results, and exports. See [`benchmarks/README.md`](benchmarks/README.md) for the
+report format and comparison requirements.
 
 ---
 

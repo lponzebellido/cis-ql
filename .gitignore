@@ -37,6 +37,28 @@ Thumbs.db
 
 .cisql_results.json
 temp_script.cql
+/promoters.bed
+/pwm_hits.tsv
+/pvalue_hits.tsv
+/overlap.tsv
+/counts.tsv
+/nonzero_counts.gff3
+/near.tsv
+/modules.tsv
+/modules.gff3
+/filters.tsv
+/tracks.tsv
+/track_overlap.tsv
+/consensus.tsv
+/consensus.gff3
+/orfs.tsv
+/thra.tsv
+/children.tsv
+/cds.gff3
+/genes.tsv
+/gff3_report.tsv
+/cds_groups.tsv
+/cds_parts.gff3
 
 *.tex
 

@@ -1,60 +1,63 @@
-# Cis-QL engineering benchmarks
+# Benchmarks and reference checks
 
-These benchmarks are intended to measure the current implementation
-reproducibly. They do not claim superiority over another language or tool.
+Cis-QL has two benchmark levels and one independent correctness suite. None is
+a comparison with another language or tool.
 
-## Commands
+## Complete queries
 
 ```sh
-make benchmark-core
+make check-examples
 make benchmark
 ```
 
-`benchmark-core` measures algorithm scaling with deterministic synthetic data.
-It performs one warm-up followed by five timed executions and reports the
-median:
+`check-examples` runs every file listed in `examples.json` once. It fails when
+an example is missing, its result counts change, or an expected export is not
+created. CI runs this target.
 
-- exact KMP motif search;
-- CpG-island scanning;
-- PWM/PSSM scanning;
-- Smith-Waterman alignment;
-- interval intersection; and
-- overlap counting per container.
+`benchmark` performs one warm-up and three measured executions per example.
+The JSON report contains wall-clock samples, median, range, input hashes,
+binary and manifest hashes, result counts, result hashes, export hashes, system
+metadata, and the Git revision when available. Repeated executions must produce
+identical JSON and exports.
 
-`benchmark` executes representative complete `.cql` programs three times and
-reports machine metadata, median, minimum, maximum, individual wall-clock
-measurements, and result counts as JSON. It aborts if repeated executions
-produce different result counts. All generated result files are kept in
-temporary directories.
+Run a subset or save the report with:
 
-For publication-quality comparisons, reference tools must receive identical
-input records, coordinate conventions, strand rules, thresholds, and expected
-outputs. Correctness must be checked before timing.
+```sh
+python3 benchmarks/run_examples.py \
+  --examples 01 07 13 \
+  --warmups 1 \
+  --repetitions 5 \
+  --output benchmark.json
+```
 
-## Correctness before comparison
+Update `examples.json` only when a deliberate language, fixture, or example
+change modifies the accepted results.
 
-Run the independent reference suite before recording benchmark results:
+## Core algorithms
+
+```sh
+make benchmark-core
+```
+
+This target measures deterministic synthetic workloads for exact motif search,
+CpG scanning, PWM scanning, Smith-Waterman alignment, interval intersection,
+overlap selection and counting, bounded proximity, promoter construction,
+two-pattern modules, and track consensus. Each workload performs one warm-up
+and reports the median of five executions as CSV.
+
+## Correctness
 
 ```sh
 make validate
 ```
 
-The suite uses separate Python implementations for exact overlapping motif
-coordinates, log-odds PSSM thresholds and tail probabilities, interval
-subtraction, overlap selection, nearest-reference selection, overlap counting,
-anchor-preserving distinct-set consensus, constrained homotypic modules, and
-the normalized Smith-Waterman recurrence. If
-BEDTools, Biopython, or FIMO
-is installed, compatible external checks are also executed; otherwise they are
-reported as skipped.
+The Python reference suite independently checks motif coordinates, PSSM
+thresholds and tail probabilities, interval subtraction, overlap, nearest
+selection, counting, consensus, motif modules, reading frame, and normalized
+Smith-Waterman scoring. BEDTools, Biopython, and FIMO comparisons run when those
+programs are installed.
 
-## Publication checklist
-
-Before describing a result as a comparison with another tool:
-
-1. Pin tool and dataset versions.
-2. Record the exact command lines and environment.
-3. Convert all outputs to the same coordinate convention.
-4. Compare coordinates and strand assignments before timing.
-5. Run warm-ups and repeated measurements on the same machine.
-6. Report runtime and peak memory with uncertainty, not only a speed ratio.
+Before publishing a comparison, use identical records, coordinate conventions,
+strand rules, thresholds, and output definitions. Verify coordinates before
+timing, pin tool and dataset versions, measure peak memory, and report repeated
+runs rather than a single speed ratio.

@@ -22,6 +22,9 @@ jobs:
       - name: Run unit and language tests
         run: make test
 
+      - name: Check runnable examples
+        run: make check-examples
+
       - name: Run independent reference validations
         run: make validate
 

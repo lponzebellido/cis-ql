@@ -1,6 +1,7 @@
 #include "../src/bioinfo/GCAnalyzer.h"
 #include "../src/bioinfo/MotifFinder.h"
 #include "../src/bioinfo/PWMScanner.h"
+#include "../src/bioinfo/RegulatoryRegions.h"
 #include "../src/bioinfo/SetOperations.h"
 #include "../src/bioinfo/SmithWaterman.h"
 
@@ -11,6 +12,7 @@
 #include <iostream>
 #include <random>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -115,7 +117,7 @@ int main() {
     printResult("smith_waterman", size, seconds, score, "normalized_percent");
   }
 
-  for (size_t size : {10000U, 100000U, 500000U}) {
+  for (size_t size : {10000U, 100000U, 250000U}) {
     std::vector<GenomicRegion> first;
     std::vector<GenomicRegion> second;
     first.reserve(size);
@@ -139,6 +141,75 @@ int main() {
     });
     printResult("interval_count_overlaps", size, countSeconds,
                 totalOverlaps, "overlaps");
+
+    const double overlapSeconds = medianElapsed(
+        [&] { count = SetOperations::selectOverlapping(
+                         first, second, "reference").size(); });
+    printResult("interval_overlaps", size, overlapSeconds, count, "regions");
+
+    const double nearSeconds = medianElapsed(
+        [&] { count = SetOperations::selectNear(
+                         first, second, 25, "reference").size(); });
+    printResult("interval_near", size, nearSeconds, count, "regions");
+  }
+
+  for (size_t size : {10000U, 100000U, 250000U}) {
+    std::vector<GenomicRegion> genes;
+    genes.reserve(size);
+    for (size_t i = 0; i < size; ++i) {
+      GenomicRegion gene = makeRegion(i * 40 + 100, i * 40 + 130);
+      gene.name = "gene_" + std::to_string(i);
+      if (i % 2 == 1)
+        gene.strand = "-";
+      genes.push_back(std::move(gene));
+    }
+    std::vector<GenomicRegion> promoters;
+    std::string error;
+    bool success = false;
+    const std::unordered_map<std::string, size_t> chromosomeLengths = {
+        {"chr1", size * 40 + 500}};
+    const double seconds = medianElapsed([&] {
+      success = RegulatoryRegions::buildPromoters(
+          genes, chromosomeLengths, 60, 20, promoters, error);
+    });
+    printResult("promoter_windows", size, seconds,
+                success ? promoters.size() : 0, "regions");
+  }
+
+  for (size_t size : {10000U, 50000U, 100000U}) {
+    std::vector<GenomicRegion> first;
+    std::vector<GenomicRegion> second;
+    first.reserve(size);
+    second.reserve(size);
+    for (size_t i = 0; i < size; ++i) {
+      first.push_back(makeRegion(i * 100, i * 100 + 6));
+      second.push_back(makeRegion(i * 100 + 16, i * 100 + 22));
+    }
+    size_t count = 0;
+    const double seconds = medianElapsed([&] {
+      count = SetOperations::defineModules(
+                  first, second, 10, 10, "AS_WRITTEN", "ANY",
+                  "first", "second").size();
+    });
+    printResult("motif_modules", size, seconds, count, "modules");
+  }
+
+  for (size_t size : {10000U, 50000U, 100000U}) {
+    std::vector<GenomicRegion> anchor;
+    std::vector<GenomicRegion> support;
+    anchor.reserve(size);
+    support.reserve(size);
+    for (size_t i = 0; i < size; ++i) {
+      anchor.push_back(makeRegion(i * 50, i * 50 + 20));
+      support.push_back(makeRegion(i * 50 + 2, i * 50 + 22));
+    }
+    size_t count = 0;
+    const double seconds = medianElapsed([&] {
+      count = SetOperations::consensus(
+                  anchor, "replicate_1", {{"replicate_2", support}},
+                  {"replicate_1", "replicate_2"}, 2, 50.0).size();
+    });
+    printResult("track_consensus", size, seconds, count, "regions");
   }
   return 0;
 }

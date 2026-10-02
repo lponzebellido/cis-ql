@@ -44,6 +44,9 @@ test: $(TARGET) $(CORE_TEST_TARGET)
 	./$(CORE_TEST_TARGET)
 	python3 tests/test_language.py
 
+check-examples: $(TARGET)
+	python3 benchmarks/run_examples.py --warmups 0 --repetitions 1 > /dev/null
+
 validate: $(TARGET)
 	python3 tests/reference_validation.py
 
@@ -62,12 +65,12 @@ benchmark: $(TARGET)
 $(CORE_BENCHMARK_TARGET): benchmarks/benchmark_core.cpp \
        src/bioinfo/MotifFinder.cpp src/bioinfo/SmithWaterman.cpp \
        src/bioinfo/SetOperations.cpp src/bioinfo/PWMScanner.cpp \
-       src/bioinfo/GCAnalyzer.cpp
+       src/bioinfo/GCAnalyzer.cpp src/bioinfo/RegulatoryRegions.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 benchmark-core: $(CORE_BENCHMARK_TARGET)
 	./$(CORE_BENCHMARK_TARGET)
 
-.PHONY: all run clean test validate test-sanitize benchmark benchmark-core
+.PHONY: all run clean test check-examples validate test-sanitize benchmark benchmark-core
 
 -include $(DEPS)
