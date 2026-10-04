@@ -178,6 +178,14 @@ def main() -> int:
         (workspace / "reading_frame.fasta").write_text(
             ">chrFrame\nATGAAATAACCCATGAAAATAA\n", encoding="utf-8"
         )
+        (workspace / "oriented.fasta").write_text(
+            ">chrOrient\nATGCAT\n", encoding="utf-8"
+        )
+        (workspace / "oriented.gff3").write_text(
+            "##gff-version 3\n"
+            "chrOrient\ttest\tregion\t1\t3\t.\t.\t.\tID=unstranded\n",
+            encoding="utf-8",
+        )
         (workspace / "alternate.gff3").write_text(
             "##gff-version 3\n"
             "chr1\ttest\tgene\t101\t200\t.\t-\t.\tID=alternate\n",
@@ -1203,6 +1211,92 @@ def main() -> int:
         require([(item["start"], item["end"], item["strand"])
                  for item in aligned_starts] == [(0, 3, "+"), (12, 15, "+")],
                 "START, END, MOD, and STRAND motif filters")
+
+        data, _ = run_query(
+            workspace,
+            "oriented_sequence_filter",
+            'LOAD SEQUENCE "oriented.fasta" AS genome;\n'
+            'FIND MOTIF "ATG" AS starts '
+            'WHERE ORIENTED_SEQUENCE = "atg";\n'
+            'EXTRACT starts AS negative_starts '
+            'WHERE STRAND = "-" AND ORIENTED_SEQUENCE ENDS_WITH "TG";\n',
+        )
+        starts = data["resultSets"]["starts"]
+        require(
+            [(item["start"], item["strand"], item["sequence"])
+             for item in starts] == [(0, "+", "ATG"), (3, "-", "CAT")],
+            "ORIENTED_SEQUENCE compares both strands in biological order",
+        )
+        require(
+            [(item["start"], item["strand"])
+             for item in data["resultSets"]["negative_starts"]]
+            == [(3, "-")],
+            "ORIENTED_SEQUENCE filters named region sets",
+        )
+
+        data, _ = run_query(
+            workspace,
+            "reference_sequence_filter",
+            'LOAD SEQUENCE "oriented.fasta" AS genome;\n'
+            'FIND MOTIF "ATG" AS reference_starts '
+            'WHERE SEQUENCE = "ATG";\n'
+            'FIND MOTIF "[ACGT]{3}" STRAND POSITIVE AS triplets '
+            'WHERE SEQUENCE STARTS_WITH "AT" '
+            'AND SEQUENCE ENDS_WITH "TG" '
+            'AND SEQUENCE CONTAINS "T";\n',
+        )
+        require(
+            [(item["start"], item["strand"])
+             for item in data["resultSets"]["reference_starts"]]
+            == [(0, "+")],
+            "SEQUENCE retains reference orientation",
+        )
+        require(
+            [(item["start"], item["end"])
+             for item in data["resultSets"]["triplets"]] == [(0, 3)],
+            "sequence text comparators compose with boolean conditions",
+        )
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "sequence_filter_requires_fasta",
+            'LOAD ANNOTATION "fixture.gff3" AS annotation;\n'
+            'EXTRACT GENE AS invalid WHERE SEQUENCE = "AAA";\n',
+            3,
+        )
+        require("SEQUENCE requires sequence data" in semantic_error,
+                "sequence properties require an active FASTA")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "sequence_comparator_scope",
+            'LOAD SEQUENCE "oriented.fasta" AS genome;\n'
+            'FIND MOTIF "ATG" AS invalid WHERE LENGTH STARTS_WITH "3";\n',
+            3,
+        )
+        require("STARTS_WITH requires SEQUENCE" in semantic_error,
+                "sequence comparators reject numeric properties")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "sequence_relational_operator",
+            'LOAD SEQUENCE "oriented.fasta" AS genome;\n'
+            'FIND MOTIF "ATG" AS invalid WHERE SEQUENCE > "A";\n',
+            3,
+        )
+        require("supports =, STARTS_WITH" in semantic_error,
+                "sequence properties reject numeric comparison operators")
+
+        data, _ = run_query(
+            workspace,
+            "unstranded_oriented_sequence",
+            'LOAD SEQUENCE "oriented.fasta" AS genome;\n'
+            'LOAD ANNOTATION "oriented.gff3" AS annotation;\n'
+            'EXTRACT REGION AS unstranded '
+            'WHERE ORIENTED_SEQUENCE = "ATG";\n',
+        )
+        require(data["resultSets"]["unstranded"] == [],
+                "unstranded regions have no oriented sequence")
 
         data, _ = run_query(
             workspace,

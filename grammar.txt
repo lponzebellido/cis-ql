@@ -5,7 +5,7 @@ Terminals (Tokens):
 LOAD, USE, VALIDATE, GROUP, EXPORT, DEFINE, PROMOTERS, MODULE, OF, BY, MEMBERS, SEQUENCE, ANNOTATION, TRACK, MATRIX, STRING, AS, ID, SEMICOLON, FIND, MOTIF, COUNT, WITHIN, NUM,
 FROM, WITH, GENE, PROMOTER, ENHANCER, EXON, INTRON, UTR, TSS, CDS, REGION, FEATURE, CHILDREN, DESCENDANTS, PARENTS, ANCESTORS, TRANSCRIPTS, TYPES, SELECT, ALL, STRAND, POSITIVE, NEGATIVE,
 CHR, EXTRACT, WHERE, INTERSECT, UNION, EXCEPT, OVERLAPS, NEAR, CONSENSUS, ANCHOR, MIN_SUPPORT, MIN_RECIPROCAL_OVERLAP, MAX_SUMMIT_DISTANCE, AND, OR, NOT, LPAREN, RPAREN, LBRACKET, RBRACKET,
-LENGTH, START, END, MOD, TYPE, PARENT, SOURCE, PHASE, ATTRIBUTE, SIMILARITY, GREATER, LESS, GREATER_EQ, LESS_EQ, ASSIGN, FLOAT, PERCENT, BP, KB, MB,
+LENGTH, START, END, MOD, TYPE, PARENT, SOURCE, PHASE, ATTRIBUTE, SIMILARITY, ORIENTED_SEQUENCE, STARTS_WITH, ENDS_WITH, CONTAINS, GREATER, LESS, GREATER_EQ, LESS_EQ, ASSIGN, FLOAT, PERCENT, BP, KB, MB,
 UPSTREAM, DOWNSTREAM, SCAN, THRESHOLD, PVALUE, QVALUE, BACKGROUND, UNIFORM, ANALYZE, GC_CONTENT, CPG_ISLANDS, WINDOW,
 IF, THEN, ELSE, ENDIF, FOREACH, IN, DO, ENDFOR, COMMA, TO, FORMAT, BED, GFF3, TSV,
 SPACING, ORDER, ORIENTATION, ANY, SAME, OPPOSITE, AS_WRITTEN, NARROWPEAK,
@@ -96,6 +96,7 @@ Factor             -> NOT Factor | SimpleCondition | LPAREN Condition RPAREN
 
 SimpleCondition    -> NumericProperty NumericModifierOpt RelOp Value
                     | SIMILARITY SimilarityRefOpt NumericModifierOpt RelOp Value
+                    | SequenceProperty SequenceRelOp STRING
                     | StringProperty RelOp STRING
                     | ATTRIBUTE STRING RelOp STRING
 NumericModifierOpt -> MOD (NUM | FLOAT) | λ
@@ -105,6 +106,8 @@ NumericProperty    -> LENGTH | START | END | GC_CONTENT | COUNT
 StringProperty     -> ID | NAME | STRAND | TYPE | PARENT | SOURCE | PHASE
                     | EVIDENCE_CLASS | ASSAY | SAMPLE | CONDITION
                     | REPLICATE | CONTROL
+SequenceProperty   -> SEQUENCE | ORIENTED_SEQUENCE
+SequenceRelOp      -> ASSIGN | STARTS_WITH | ENDS_WITH | CONTAINS
 SimilarityRefOpt   -> TO ID | λ
 RelOp              -> GREATER | LESS | GREATER_EQ | LESS_EQ | ASSIGN
 Value              -> (NUM | FLOAT) Unit | (NUM | FLOAT) PERCENT | NUM | FLOAT | STRING
@@ -144,3 +147,4 @@ Note on Execution Engine & Studio Integration:
 22. `VALIDATE ANNOTATION dataset AS report` inspects the declared GFF3 identity and parent graph without preventing partial annotations from loading. The report distinguishes informational multi-record identities from unresolved parents, identity conflicts across chromosome, type, or strand, and cycles. Only the latter three make the report invalid. Reports are emitted as structured JSON and can be exported to TSV.
 23. `GROUP source BY ID AS groups` constructs typed logical features from annotation records without replacing their disjoint coordinates with a continuous interval. Every source record must carry GFF3 annotation evidence and an `ID`; records sharing an ID must agree on chromosome, type, and strand. JSON and TSV expose group span, summed member length, and original members. `EXTRACT MEMBERS OF groups` restores those member intervals for filtering and genomic operations.
 24. `EXTRACT TRANSCRIPTS OF source TYPES ["type", ...] SELECT policy` follows the complete descendant graph and retains records with an exact declared type. `SELECT ALL` retains every match, `SELECT ID "value"` matches a GFF3 identity, and `SELECT ATTRIBUTE "key" = "value"` matches a decoded source attribute. Intermediate hierarchy nodes need not have a declared transcript type. The language does not infer a transcript vocabulary or a canonical isoform.
+25. `SEQUENCE` exposes the reference-oriented bases of a region or motif match. `ORIENTED_SEQUENCE` exposes positive-strand bases unchanged and reverse-complements negative-strand bases; unstranded records do not satisfy it. Both support case-insensitive literal `=`, `STARTS_WITH`, `ENDS_WITH`, and `CONTAINS` comparisons. These predicates filter intervals and do not alter regex match selection.

@@ -84,6 +84,10 @@ void Lexer::initKeywords() {
     keywords["END"] = TokenType::END;
     keywords["MOD"] = TokenType::MOD;
     keywords["AS"] = TokenType::AS;
+    keywords["ORIENTED_SEQUENCE"] = TokenType::ORIENTED_SEQUENCE;
+    keywords["STARTS_WITH"] = TokenType::STARTS_WITH;
+    keywords["ENDS_WITH"] = TokenType::ENDS_WITH;
+    keywords["CONTAINS"] = TokenType::CONTAINS;
 
     keywords["EXON"] = TokenType::EXON;
     keywords["INTRON"] = TokenType::INTRON;
@@ -470,6 +474,10 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::END: return "END";
         case TokenType::MOD: return "MOD";
         case TokenType::AS: return "AS";
+        case TokenType::ORIENTED_SEQUENCE: return "ORIENTED_SEQUENCE";
+        case TokenType::STARTS_WITH: return "STARTS_WITH";
+        case TokenType::ENDS_WITH: return "ENDS_WITH";
+        case TokenType::CONTAINS: return "CONTAINS";
         case TokenType::EXON: return "EXON";
         case TokenType::INTRON: return "INTRON";
         case TokenType::UTR: return "UTR";

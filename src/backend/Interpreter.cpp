@@ -48,6 +48,32 @@ std::string cleanTabularField(const std::string &value) {
   return cleaned;
 }
 
+std::string uppercaseSequence(std::string value) {
+  std::transform(value.begin(), value.end(), value.begin(), [](char base) {
+    return static_cast<char>(
+        std::toupper(static_cast<unsigned char>(base)));
+  });
+  return value;
+}
+
+bool compareSequenceText(const std::string &observed,
+                         const std::string &operation,
+                         const std::string &expected) {
+  const std::string left = uppercaseSequence(observed);
+  const std::string right = uppercaseSequence(expected);
+  if (operation == "=" || operation == "==")
+    return left == right;
+  if (operation == "STARTS_WITH")
+    return left.size() >= right.size() &&
+           left.compare(0, right.size(), right) == 0;
+  if (operation == "ENDS_WITH")
+    return left.size() >= right.size() &&
+           left.compare(left.size() - right.size(), right.size(), right) == 0;
+  if (operation == "CONTAINS")
+    return left.find(right) != std::string::npos;
+  return false;
+}
+
 std::vector<std::string>
 canonicalCycle(const std::vector<std::string> &cycle) {
   if (cycle.empty())
@@ -2279,6 +2305,31 @@ bool Interpreter::evaluateRegionCondition(
     return (condition->op == "=" || condition->op == "==") &&
            region.strand == expected;
   }
+  if (condition->property == "SEQUENCE" ||
+      condition->property == "ORIENTED_SEQUENCE") {
+    std::string observed = region.sequence;
+    if (observed.empty()) {
+      const auto dataset = sequenceChrMaps.find(activeSequenceAlias);
+      if (dataset != sequenceChrMaps.end()) {
+        const auto chromosome = dataset->second.find(region.chr);
+        if (chromosome != dataset->second.end() &&
+            region.end <= chromosome->second.sequence.size()) {
+          observed = chromosome->second.sequence.substr(
+              region.start, region.end - region.start);
+        }
+      }
+    }
+    if (observed.empty())
+      return false;
+    if (condition->property == "ORIENTED_SEQUENCE") {
+      if (region.strand == "-")
+        observed = MotifFinder::reverseComplement(observed);
+      else if (region.strand != "+")
+        return false;
+    }
+    return compareSequenceText(observed, condition->op,
+                               stripQuotes(condition->value));
+  }
   if (condition->property == "EVIDENCE_CLASS" ||
       condition->property == "ASSAY" || condition->property == "SAMPLE" ||
       condition->property == "CONDITION" ||
@@ -2408,6 +2459,28 @@ bool Interpreter::evaluateMotifCondition(
     return (condition->op == "=" || condition->op == "==") &&
            match.strand == expected;
   }
+  if (condition->property == "SEQUENCE" ||
+      condition->property == "ORIENTED_SEQUENCE") {
+    const auto dataset = sequenceChrMaps.find(activeSequenceAlias);
+    if (dataset == sequenceChrMaps.end())
+      return false;
+    const auto sequence = dataset->second.find(match.chr);
+    if (sequence == dataset->second.end() || match.matchLength == 0 ||
+        match.position + match.matchLength >
+            sequence->second.sequence.size()) {
+      return false;
+    }
+    std::string observed = sequence->second.sequence.substr(
+        match.position, match.matchLength);
+    if (condition->property == "ORIENTED_SEQUENCE") {
+      if (match.strand == "-")
+        observed = MotifFinder::reverseComplement(observed);
+      else if (match.strand != "+")
+        return false;
+    }
+    return compareSequenceText(observed, condition->op,
+                               stripQuotes(condition->value));
+  }
   if (condition->property == "GC_CONTENT") {
     const auto dataset = sequenceChrMaps.find(activeSequenceAlias);
     if (dataset == sequenceChrMaps.end())
@@ -2466,7 +2539,8 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
     if (!conditionUsesOnly(
             instr.condition,
             {"LENGTH", "START", "END", "STRAND", "SIMILARITY",
-             "GC_CONTENT", "COUNT", "ID", "NAME", "TYPE", "PARENT",
+             "GC_CONTENT", "SEQUENCE", "ORIENTED_SEQUENCE", "COUNT",
+             "ID", "NAME", "TYPE", "PARENT",
              "SOURCE", "PHASE", "ATTRIBUTE",
              "TRACK_SCORE", "SIGNAL_VALUE", "MINUS_LOG10_PVALUE",
              "MINUS_LOG10_QVALUE", "EVIDENCE_CLASS", "ASSAY", "SAMPLE",
@@ -2582,10 +2656,11 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
   } else if (motifResults.count(resultId)) {
     if (!conditionUsesOnly(
             instr.condition,
-            {"LENGTH", "START", "END", "STRAND", "GC_CONTENT"})) {
+            {"LENGTH", "START", "END", "STRAND", "GC_CONTENT",
+             "SEQUENCE", "ORIENTED_SEQUENCE"})) {
       reportRuntimeError(
-          "Motif matches support LENGTH, START, END, STRAND, and GC_CONTENT "
-          "filters.");
+          "Motif matches support LENGTH, START, END, STRAND, GC_CONTENT, "
+          "SEQUENCE, and ORIENTED_SEQUENCE filters.");
       return;
     }
     auto &matches = motifResults[resultId];

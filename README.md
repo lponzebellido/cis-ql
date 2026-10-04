@@ -10,7 +10,7 @@ viewer.
 
 | Area | Operations |
 | :--- | :--- |
-| Sequence | literal, IUPAC, and regular-expression search; PWM scanning; GC analysis |
+| Sequence | literal, IUPAC, and regular-expression search; strand-aware sequence predicates; PWM scanning; GC analysis |
 | Annotation | GFF3 validation, filtering, hierarchy traversal, transcript selection, repeated-ID grouping, promoter derivation |
 | Intervals | set operations, overlap, counting, distance, two-pattern modules, replicate consensus |
 | Results | structured JSON and BED, GFF3, or TSV export |
@@ -176,6 +176,10 @@ FIND MOTIF "CANNTG"
 FIND MOTIF "ATG(?:(?!TAA|TAG|TGA)[ACGT]{3})*(?:TAA|TAG|TGA)"
     STRAND POSITIVE AS start_stop_candidates
     WHERE LENGTH >= 15 BP AND LENGTH MOD 3 = 0;
+
+FIND MOTIF "ATGNNNTAA" AS bounded_patterns
+    WHERE ORIENTED_SEQUENCE STARTS_WITH "ATG"
+      AND ORIENTED_SEQUENCE ENDS_WITH "TAA";
 ```
 
 `FIND MOTIF` is appropriate for exact strings, regular expressions, or
@@ -189,6 +193,13 @@ invariant visible to the reader instead of leaving it implicit in the regex.
 It reports sequence candidates, not predicted genes; genetic code, alternative
 starts, minimum coding length, annotation evidence, and the biological question
 remain separate policies.
+
+`SEQUENCE` reads the exact reference-oriented interval from the active FASTA.
+`ORIENTED_SEQUENCE` reads the same interval from 5' to 3' on its declared
+strand, reverse-complementing negative-strand records. It does not match an
+unstranded record. Sequence literals are compared case-insensitively with `=`,
+`STARTS_WITH`, `ENDS_WITH`, or `CONTAINS`; they are literal strings rather than
+regular expressions or implicit IUPAC patterns.
 
 ### 3. Position Weight Matrix Scanning (`SCAN`)
 
@@ -355,8 +366,9 @@ FIND MOTIF "ATG" AS phase_zero_starts
 ```
 
 Condition properties are result-specific. Region sets support `LENGTH`,
-`START`, `END`, `STRAND`, `SIMILARITY`, `GC_CONTENT`, and `ID`, plus `COUNT`
-when count evidence is attached. Annotation-backed regions also support
+`START`, `END`, `STRAND`, `SEQUENCE`, `ORIENTED_SEQUENCE`, `SIMILARITY`,
+`GC_CONTENT`, and `ID`, plus `COUNT` when count evidence is attached.
+Annotation-backed regions also support
 `NAME`, `TYPE`, `PARENT`, `SOURCE`, `PHASE`, and arbitrary
 `ATTRIBUTE "key" = "value"` filters. `PARENT` matches any member of a
 multi-parent GFF3 record. Track-backed regions additionally support
@@ -366,8 +378,8 @@ multi-parent GFF3 record. Track-backed regions additionally support
 Missing optional narrowPeak values do not satisfy a numeric condition.
 Metadata uses exact string equality. These properties filter the primary
 track; filter a reference track before combining it with `OVERLAPS`. Motif
-results support `LENGTH`, `START`, `END`, `STRAND`, and `GC_CONTENT`; GC
-profiles support `GC_CONTENT`.
+results support `LENGTH`, `START`, `END`, `STRAND`, `SEQUENCE`,
+`ORIENTED_SEQUENCE`, and `GC_CONTENT`; GC profiles support `GC_CONTENT`.
 
 Hierarchy traversal uses the active annotation dataset and preserved GFF3
 relationships. Per-dataset parent and identity indices are built at load time.
@@ -409,6 +421,12 @@ property `SUPPORT_COUNT`.
 `LENGTH MOD 3 = 0` or `START MOD 3 = 0`. Coordinates are zero-based and
 half-open. Modular filtering is a general arithmetic constraint; its biological
 meaning comes from the surrounding program.
+
+Sequence predicates compose with the same `AND`, `OR`, and `NOT` expressions
+as numeric and annotation predicates. They filter existing intervals; they do
+not change how a regular expression chooses its match boundaries. A lazy regex
+that stops at an out-of-frame codon therefore cannot be repaired afterward by
+a `WHERE` clause.
 
 These filters do not calibrate experimental evidence. BED/narrowPeak scores
 and `signalValue` remain upstream-tool-specific, so thresholds require an
@@ -540,6 +558,7 @@ Factor             ::= NOT Factor | SimpleCondition | "(" Condition ")"
 
 SimpleCondition    ::= NumericProperty NumericModifierOpt RelOp Value
                      | SIMILARITY SimilarityRefOpt NumericModifierOpt RelOp Value
+                     | SequenceProperty SequenceRelOp STRING
                      | StringProperty RelOp STRING
                      | ATTRIBUTE STRING RelOp STRING
 NumericModifierOpt ::= MOD (NUM | FLOAT) | λ
@@ -549,6 +568,8 @@ NumericProperty    ::= LENGTH | START | END | GC_CONTENT | COUNT
 StringProperty     ::= ID | NAME | STRAND | TYPE | PARENT | SOURCE | PHASE
                      | EVIDENCE_CLASS | ASSAY | SAMPLE | CONDITION
                      | REPLICATE | CONTROL
+SequenceProperty   ::= SEQUENCE | ORIENTED_SEQUENCE
+SequenceRelOp      ::= "=" | STARTS_WITH | ENDS_WITH | CONTAINS
 SimilarityRefOpt   ::= TO ID | λ
 RelOp              ::= ">" | "<" | ">=" | "<=" | "="
 Value              ::= (NUM | FLOAT) Unit | (NUM | FLOAT) PERCENT | NUM | FLOAT | STRING
@@ -595,7 +616,7 @@ report format and comparison requirements.
 ## Examples (`cql_examples/`)
 
 Each program focuses on one operation. Most use *E. coli* `U00096.3`; PWM,
-track, and transcript examples use small synthetic fixtures. See
+track, transcript, and strand examples use small synthetic fixtures. See
 [`cql_examples/README.md`](cql_examples/README.md) for inputs and limits.
 
 | Script | Description | Primary Features |
@@ -614,6 +635,7 @@ track, and transcript examples use small synthetic fixtures. See
 | `12_orfs.cql` | Match complete-codon start-to-stop patterns | regex, `LENGTH MOD 3` |
 | `13_gff3.cql` | Validate and traverse GFF3; group repeated IDs | `VALIDATE`, hierarchy queries, `GROUP` |
 | `14_transcripts.cql` | Select declared transcript types and derive promoters | `EXTRACT TRANSCRIPTS`, `SELECT` |
+| `15_strands.cql` | Compare reference and strand-oriented sequence | `SEQUENCE`, `ORIENTED_SEQUENCE` |
 
 ---
 

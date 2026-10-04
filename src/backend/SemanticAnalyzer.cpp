@@ -520,7 +520,7 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
   static const std::set<std::string> supportedProperties = {
       "LENGTH", "START", "END", "STRAND", "SIMILARITY", "GC_CONTENT",
       "COUNT", "ID", "NAME", "TYPE", "PARENT", "SOURCE", "PHASE",
-      "ATTRIBUTE",
+      "ATTRIBUTE", "SEQUENCE", "ORIENTED_SEQUENCE",
       "TRACK_SCORE", "SIGNAL_VALUE", "MINUS_LOG10_PVALUE",
       "MINUS_LOG10_QVALUE", "EVIDENCE_CLASS", "ASSAY", "SAMPLE",
       "CONDITION", "REPLICATE", "CONTROL", "SUPPORT_COUNT"};
@@ -528,12 +528,19 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
       "LENGTH", "START", "END", "SIMILARITY", "GC_CONTENT", "COUNT",
       "TRACK_SCORE", "SIGNAL_VALUE", "MINUS_LOG10_PVALUE",
       "MINUS_LOG10_QVALUE", "SUPPORT_COUNT"};
+  if ((node->op == "STARTS_WITH" || node->op == "ENDS_WITH" ||
+       node->op == "CONTAINS") &&
+      node->property != "SEQUENCE" &&
+      node->property != "ORIENTED_SEQUENCE") {
+    reportError(node->op + " requires SEQUENCE or ORIENTED_SEQUENCE.");
+  }
   if (!supportedProperties.count(node->property)) {
     reportError("Unsupported condition property '" + node->property + "'.");
     return;
   }
   if ((node->property == "SIMILARITY" ||
-       node->property == "GC_CONTENT") &&
+       node->property == "GC_CONTENT" || node->property == "SEQUENCE" ||
+       node->property == "ORIENTED_SEQUENCE") &&
       !sequenceLoaded) {
     reportError(node->property + " requires sequence data.");
   }
@@ -614,6 +621,20 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
     }
     if (node->op != "=" && node->op != "==") {
       reportError("STRAND supports only equality comparison.");
+    }
+  } else if (node->property == "SEQUENCE" ||
+             node->property == "ORIENTED_SEQUENCE") {
+    if (node->value.size() < 2 || node->value.front() != '"' ||
+        node->value.back() != '"') {
+      reportError(node->property + " must be compared with a string value.");
+    } else if (node->value == "\"\"") {
+      reportError(node->property + " cannot be compared with an empty string.");
+    }
+    if (node->op != "=" && node->op != "==" &&
+        node->op != "STARTS_WITH" && node->op != "ENDS_WITH" &&
+        node->op != "CONTAINS") {
+      reportError(node->property +
+                  " supports =, STARTS_WITH, ENDS_WITH, or CONTAINS.");
     }
   } else if (node->property == "TYPE" || node->property == "PARENT" ||
              node->property == "SOURCE" || node->property == "PHASE" ||

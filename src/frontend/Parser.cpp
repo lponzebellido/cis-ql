@@ -988,6 +988,7 @@ std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
     reference = previous().lexeme;
   } else if (match(TokenType::LENGTH) || match(TokenType::START) ||
       match(TokenType::END) || match(TokenType::STRAND) ||
+      match(TokenType::SEQUENCE) || match(TokenType::ORIENTED_SEQUENCE) ||
       match(TokenType::SIMILARITY) ||
       match(TokenType::GC_CONTENT) || match(TokenType::COUNT) ||
       match(TokenType::TRACK_SCORE) || match(TokenType::SIGNAL_VALUE) ||
@@ -1026,10 +1027,12 @@ std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
   std::string op;
   if (match(TokenType::GREATER) || match(TokenType::LESS) ||
       match(TokenType::GREATER_EQ) || match(TokenType::LESS_EQ) ||
-      match(TokenType::ASSIGN)) {
+      match(TokenType::ASSIGN) || match(TokenType::STARTS_WITH) ||
+      match(TokenType::ENDS_WITH) || match(TokenType::CONTAINS)) {
     op = previous().lexeme;
   } else {
-    reportError(peek(), "Expected a relational operator (> < >= <= =).");
+    reportError(peek(),
+                "Expected a relational or string comparison operator.");
     throw std::runtime_error("Parse error");
   }
 

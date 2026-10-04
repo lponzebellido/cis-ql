@@ -1,10 +1,10 @@
 # Cis-QL v3: regulatory genomics direction
 
 Status: incremental implementation. Explicit promoters, transcript selection,
-calibrated PWM scans, evidence-preserving interval operations, two-member
-modules, imported regulatory tracks, replicate consensus, and modular
-coordinate filters are implemented. Later sections are a design contract, not
-yet accepted syntax.
+strand-aware sequence predicates, calibrated PWM scans, evidence-preserving
+interval operations, two-member modules, imported regulatory tracks, replicate
+consensus, and modular coordinate filters are implemented. Later sections are
+a design contract, not yet accepted syntax.
 
 ## Product definition
 
@@ -30,7 +30,7 @@ how many new statements it adds.
 
 | Priority | Missing capability | Why it matters | Smallest useful acceptance target |
 | :--- | :--- | :--- | :--- |
-| 1 | General scalar and oriented-sequence expressions | Regex can describe complex patterns, but programmers need auditable arithmetic, captures, strand-oriented sequence, translation, and genetic-code policy outside the regex itself | Extend the current `MOD`, `START`, `END`, and `STRAND` foundation with reusable expressions and oriented extraction |
+| 1 | Richer scalar expressions, captures, and translation | Reference and strand-oriented sequences can now be queried, but programmers still need slicing, captures, translation, and genetic-code policy outside the regex itself | Add reusable string/numeric expressions and translation with an explicit genetic code |
 | 2 | Enrichment with matched backgrounds | Counts alone cannot distinguish motif enrichment from length or composition effects | Declare foreground/background regions, matching policy, effect size, test, and multiple-testing correction |
 | 3 | CRE-to-gene evidence tables | `NEAR` is useful but genomic proximity is only one candidate-linking rule | Import relationship/contact tables and retain typed promoter, distance, contact, expression, and binding evidence per link |
 | 4 | General regulatory grammars | Two-site modules cannot express larger heterotypic architectures | Named members, more than two sites, transcript-relative orientation, and grouped aggregation |
@@ -318,6 +318,10 @@ Implemented syntax:
 FIND MOTIF "ATG(?:(?!TAA|TAG|TGA)[ACGT]{3})*(?:TAA|TAG|TGA)"
   STRAND POSITIVE AS start_stop_candidates
   WHERE LENGTH MOD 3 = 0 AND START MOD 3 = 0;
+
+FIND MOTIF "ATGNNNTAA" AS bounded_patterns
+  WHERE ORIENTED_SEQUENCE STARTS_WITH "ATG"
+    AND ORIENTED_SEQUENCE ENDS_WITH "TAA";
 ```
 
 Numeric conditions may apply `MOD` before their relational comparison.
@@ -328,9 +332,13 @@ still necessary when the search engine must skip an out-of-frame stop and keep
 looking for the next in-frame stop; filtering a lazy arbitrary-length regex
 after it has already chosen a match cannot change that choice.
 
-The current result sequence is stored in reference orientation. Strand-oriented
-extraction, capture groups, translation, genetic-code selection, and general
-scalar expressions remain planned.
+Result sequences remain stored in reference orientation. `SEQUENCE` queries
+that representation, while `ORIENTED_SEQUENCE` reverse-complements a
+negative-strand interval for comparison without changing its coordinates or
+stored evidence. Both accept literal `=`, `STARTS_WITH`, `ENDS_WITH`, and
+`CONTAINS` predicates. Unstranded records do not satisfy
+`ORIENTED_SEQUENCE`. Materialized sequence expressions, slicing, capture
+groups, translation, and explicit genetic-code selection remain planned.
 
 ### Part 3: regulatory interval algebra
 

@@ -23,6 +23,7 @@ from the repository root:
 | `12_orfs.cql` | Find start-to-stop patterns in complete codons | *E. coli* FASTA |
 | `13_gff3.cql` | Validate and traverse GFF3; group repeated IDs | *E. coli* FASTA and GFF3 |
 | `14_transcripts.cql` | Select transcript types and derive their promoters | synthetic FASTA and GFF3 |
+| `15_strands.cql` | Compare reference and strand-oriented sequence | synthetic FASTA |
 
 `ecoli2.fna` and `genomic.gff` use accession `U00096.3`, so sequence and
 annotation coordinates refer to the same assembly. The track and regulatory
@@ -33,6 +34,10 @@ input for testing PWM syntax, not a recommended model for *E. coli*.
 Example 14 declares both `mRNA` and `transcript` as accepted input types. Its
 `canonical` tag is fixture metadata queried with `SELECT ATTRIBUTE`, not a
 portable GFF3 convention or an inference made by Cis-QL.
+
+Example 15 finds the same bounded pattern on both strands. `SEQUENCE` retains
+the bases as stored in the FASTA; `ORIENTED_SEQUENCE` reverse-complements the
+negative-strand match before applying the text predicates.
 
 The regular expression in `12_orfs.cql` advances three nucleotides at a time
 after `ATG` and rejects an in-frame stop in each repeated codon. It therefore

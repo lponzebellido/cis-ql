@@ -166,6 +166,18 @@
           "gene": 1
         }
       }
+    },
+    {
+      "id": "15",
+      "file": "15_strands.cql",
+      "exports": ["strands.tsv"],
+      "resultCounts": {
+        "resultSets": {
+          "reverse_reference": 1,
+          "forward_reference": 1,
+          "spans": 2
+        }
+      }
     }
   ]
 }
