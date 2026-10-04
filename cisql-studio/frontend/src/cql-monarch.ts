@@ -1,7 +1,8 @@
 export const cqlLanguageDef = {
   keywords: [
     'LOAD', 'USE', 'EXPORT', 'DEFINE', 'VALIDATE', 'GROUP', 'SEQUENCE', 'ANNOTATION', 'TRACK', 'MATRIX',
-    'AS', 'OF', 'BY', 'MEMBERS', 'PROMOTERS', 'FIND', 'MOTIF', 'MODULE',
+    'AS', 'OF', 'BY', 'MEMBERS', 'TRANSCRIPTS', 'TYPES', 'SELECT', 'ALL',
+    'PROMOTERS', 'FIND', 'MOTIF', 'MODULE',
     'WITHIN', 'WITH', 'FROM', 'TO', 'GENE', 'PROMOTER', 'ENHANCER', 'EXON', 'INTRON',
     'UTR', 'TSS', 'CDS', 'REGION', 'FEATURE',
     'CHILDREN', 'DESCENDANTS', 'PARENTS', 'ANCESTORS',

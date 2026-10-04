@@ -1,9 +1,10 @@
 # Cis-QL v3: regulatory genomics direction
 
-Status: incremental implementation. Explicit promoters, calibrated PWM scans,
-evidence-preserving interval operations, two-member modules, imported regulatory
-tracks, replicate consensus, and modular coordinate filters are implemented.
-Later sections are a design contract, not yet accepted syntax.
+Status: incremental implementation. Explicit promoters, transcript selection,
+calibrated PWM scans, evidence-preserving interval operations, two-member
+modules, imported regulatory tracks, replicate consensus, and modular
+coordinate filters are implemented. Later sections are a design contract, not
+yet accepted syntax.
 
 ## Product definition
 
@@ -29,13 +30,12 @@ how many new statements it adds.
 
 | Priority | Missing capability | Why it matters | Smallest useful acceptance target |
 | :--- | :--- | :--- | :--- |
-| 1 | Transcript-aware GFF3 selection | Parent graphs and discontinuous identities can now be represented explicitly, but transcript-selection policy is not yet first-class | Expose explicit `ALL`, canonical, or named-transcript selection |
-| 2 | General scalar and oriented-sequence expressions | Regex can describe complex patterns, but programmers need auditable arithmetic, captures, strand-oriented sequence, translation, and genetic-code policy outside the regex itself | Extend the current `MOD`, `START`, `END`, and `STRAND` foundation with reusable expressions and oriented extraction |
-| 3 | Enrichment with matched backgrounds | Counts alone cannot distinguish motif enrichment from length or composition effects | Declare foreground/background regions, matching policy, effect size, test, and multiple-testing correction |
-| 4 | CRE-to-gene evidence tables | `NEAR` is useful but genomic proximity is only one candidate-linking rule | Import relationship/contact tables and retain typed promoter, distance, contact, expression, and binding evidence per link |
-| 5 | General regulatory grammars | Two-site modules cannot express larger heterotypic architectures | Named members, more than two sites, transcript-relative orientation, and grouped aggregation |
-| 6 | Dataset identity and catalogs | File provenance alone cannot prevent assembly, annotation-release, or matrix-version mismatches | Assembly identifiers, annotation releases, sequence dictionaries, and catalog-resolved matrix metadata |
-| 7 | Comparative regulation | Conservation and motif turnover require orthology and assembly-aware mappings | Import ortholog groups and compare position-aware modules without pretending motif presence proves conserved regulation |
+| 1 | General scalar and oriented-sequence expressions | Regex can describe complex patterns, but programmers need auditable arithmetic, captures, strand-oriented sequence, translation, and genetic-code policy outside the regex itself | Extend the current `MOD`, `START`, `END`, and `STRAND` foundation with reusable expressions and oriented extraction |
+| 2 | Enrichment with matched backgrounds | Counts alone cannot distinguish motif enrichment from length or composition effects | Declare foreground/background regions, matching policy, effect size, test, and multiple-testing correction |
+| 3 | CRE-to-gene evidence tables | `NEAR` is useful but genomic proximity is only one candidate-linking rule | Import relationship/contact tables and retain typed promoter, distance, contact, expression, and binding evidence per link |
+| 4 | General regulatory grammars | Two-site modules cannot express larger heterotypic architectures | Named members, more than two sites, transcript-relative orientation, and grouped aggregation |
+| 5 | Dataset identity and catalogs | File provenance alone cannot prevent assembly, annotation-release, or matrix-version mismatches | Assembly identifiers, annotation releases, sequence dictionaries, and catalog-resolved matrix metadata |
+| 6 | Comparative regulation | Conservation and motif turnover require orthology and assembly-aware mappings | Import ortholog groups and compare position-aware modules without pretending motif presence proves conserved regulation |
 
 Validation should span several organisms and question types. A bacterial
 sequence-pattern fixture tests regex, strand, coordinates, and frame. Yeast can
@@ -75,6 +75,21 @@ EXTRACT DESCENDANTS OF selected_gene AS coding_descendants
 EXTRACT PARENTS OF coding_descendants AS direct_parents;
 EXTRACT ANCESTORS OF coding_descendants AS enclosing_genes
   WHERE TYPE = "gene";
+
+EXTRACT TRANSCRIPTS OF selected_gene
+  TYPES ["mRNA", "transcript"]
+  SELECT ALL
+  AS transcripts;
+
+EXTRACT TRANSCRIPTS OF selected_gene
+  TYPES ["mRNA", "transcript"]
+  SELECT ID "transcript_1"
+  AS named_transcript;
+
+EXTRACT TRANSCRIPTS OF selected_gene
+  TYPES ["mRNA", "transcript"]
+  SELECT ATTRIBUTE "tag" = "canonical"
+  AS source_labeled_transcript;
 
 VALIDATE ANNOTATION annotation AS hierarchy_report;
 EXPORT hierarchy_report TO "hierarchy_report.tsv" FORMAT TSV;
@@ -121,10 +136,13 @@ This follows the [Sequence Ontology GFF3 specification](https://github.com/The-S
 which defines repeated IDs as the records that collectively represent one
 discontinuous feature.
 
-`FEATURE` means every imported feature type. Cis-QL does not currently decide
-that `mRNA`, `transcript`, `lnc_RNA`, or another source vocabulary should be
-treated as the canonical transcript concept. Explicit transcript-selection
-policies remain planned.
+`FEATURE` means every imported feature type. `EXTRACT TRANSCRIPTS` makes the
+source-specific transcript vocabulary and selection rule part of the query.
+It follows the full descendant graph, even through intermediate records whose
+types are not listed, then applies exact `TYPES` and `SELECT` matches. `ALL`
+keeps every matching record, `ID` names a GFF3 identity, and `ATTRIBUTE` names
+a source key and value. Cis-QL does not treat `mRNA`, `transcript`, `lnc_RNA`,
+or an attribute named `canonical` as a universal convention.
 
 ## Part 1: explicit TSS-relative promoters
 
@@ -144,9 +162,11 @@ zero-based start; on the negative strand it is the half-open end. Intervals are
 clamped to the active FASTA chromosome. Both distances are mandatory so a query
 cannot silently depend on a biological default.
 
-Transcript-selection policies such as `CANONICAL`, `ALL`, or an explicit
-transcript list remain deferred until the language can validate and traverse
-the preserved parent graph explicitly.
+An `EXTRACT TRANSCRIPTS` result can be used as the promoter source. The query
+therefore records whether promoters came from every declared transcript, one
+named transcript, or records carrying an exact source attribute. Cis-QL does
+not provide a `CANONICAL` keyword because that designation is annotation-source
+specific.
 
 ## Planned language layers
 

@@ -148,6 +148,24 @@
           "cds_groups": {"groups": 1, "members": 3}
         }
       }
+    },
+    {
+      "id": "14",
+      "file": "14_transcripts.cql",
+      "exports": [
+        "transcripts.tsv",
+        "canonical_transcript.gff3",
+        "transcript_promoters.bed"
+      ],
+      "resultCounts": {
+        "resultSets": {
+          "transcript_promoters": 2,
+          "canonical_transcript": 1,
+          "tx2": 1,
+          "transcripts": 2,
+          "gene": 1
+        }
+      }
     }
   ]
 }

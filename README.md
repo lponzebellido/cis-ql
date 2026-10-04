@@ -11,7 +11,7 @@ viewer.
 | Area | Operations |
 | :--- | :--- |
 | Sequence | literal, IUPAC, and regular-expression search; PWM scanning; GC analysis |
-| Annotation | GFF3 validation, filtering, hierarchy traversal, repeated-ID grouping, promoter derivation |
+| Annotation | GFF3 validation, filtering, hierarchy traversal, transcript selection, repeated-ID grouping, promoter derivation |
 | Intervals | set operations, overlap, counting, distance, two-pattern modules, replicate consensus |
 | Results | structured JSON and BED, GFF3, or TSV export |
 
@@ -103,8 +103,8 @@ as an *E. coli* model.
 GFF3 import preserves source, score, phase, `ID`, `Name`, every `Parent`, and
 the complete attribute map. Percent-encoded attribute values are decoded for
 queries, while GFF3 export retains the original attribute field. Cis-QL does
-not guess which Sequence Ontology types constitute a transcript; use
-`EXTRACT FEATURE` with explicit type and attribute filters instead.
+not guess which feature types constitute a transcript or which transcript is
+canonical. `EXTRACT TRANSCRIPTS` requires the query to state both choices.
 Named annotation result sets can be traversed with `EXTRACT CHILDREN OF` for
 one downward `Parent` edge or `EXTRACT DESCENDANTS OF` for transitive
 relationships. `EXTRACT PARENTS OF` and `EXTRACT ANCESTORS OF` navigate in
@@ -326,6 +326,21 @@ EXTRACT PARENTS OF coding_descendants AS direct_parents;
 EXTRACT ANCESTORS OF coding_descendants AS enclosing_genes
     WHERE TYPE = "gene";
 
+EXTRACT TRANSCRIPTS OF selected_gene
+    TYPES ["mRNA", "transcript"]
+    SELECT ALL
+    AS transcripts;
+
+EXTRACT TRANSCRIPTS OF selected_gene
+    TYPES ["mRNA", "transcript"]
+    SELECT ID "transcript_1"
+    AS named_transcript;
+
+EXTRACT TRANSCRIPTS OF selected_gene
+    TYPES ["mRNA", "transcript"]
+    SELECT ATTRIBUTE "tag" = "canonical"
+    AS source_labeled_transcript;
+
 EXTRACT accessibility_peaks AS strong_accessibility
     WHERE TRACK_SCORE >= 600
       AND SIGNAL_VALUE >= 10
@@ -363,8 +378,17 @@ cycle. A source region without `ID` is rejected because it cannot identify a
 parent graph node. `PARENTS` and `ANCESTORS` resolve relationships in the
 opposite direction; they can start from an annotation record without `ID` if
 it declares `Parent`. Unresolved parent identifiers are not inferred from
-coordinates. Traversal does not choose a transcript vocabulary or canonical
-isoform.
+coordinates.
+
+`EXTRACT TRANSCRIPTS` traverses every descendant of the source set and retains
+records whose type exactly matches one of the required `TYPES`. `SELECT ALL`
+keeps all matching records, `SELECT ID` keeps one declared GFF3 identity, and
+`SELECT ATTRIBUTE` applies exact equality to a source attribute. Intermediate
+nodes do not need to be transcript records, so a gene-to-locus-to-transcript
+hierarchy remains queryable. The result is a regular annotation-backed region
+set and can feed `DEFINE PROMOTERS`, interval operations, filters, and export.
+There is no `CANONICAL` policy because GFF3 does not define a universal field
+or value for that concept; a query must name the convention used by its input.
 
 `VALIDATE ANNOTATION` audits the complete named annotation rather than a
 derived result set. It reports unresolved parents, incompatible reuse of an
@@ -494,7 +518,11 @@ CountStmt          ::= COUNT EntityRef IN EntityRef AS ID WhereClause SEMICOLON
 
 ExtractStmt        ::= EXTRACT ExtractSource AliasOpt WhereClause SEMICOLON
 ExtractSource      ::= EntityRef | HierarchyRelation OF ID | MEMBERS OF ID
+                     | TranscriptSelection
 HierarchyRelation  ::= CHILDREN | DESCENDANTS | PARENTS | ANCESTORS
+TranscriptSelection ::= TRANSCRIPTS OF ID TYPES "[" STRING ("," STRING)* "]"
+                        SELECT TranscriptPolicy
+TranscriptPolicy  ::= ALL | ID STRING | ATTRIBUTE STRING "=" STRING
 
 IfStmt             ::= IF Condition THEN StatementList (ELSE StatementList)? ENDIF (SEMICOLON)?
 
@@ -566,8 +594,8 @@ report format and comparison requirements.
 
 ## Examples (`cql_examples/`)
 
-Each program focuses on one operation. Most use *E. coli* `U00096.3`; PWM and
-track examples use small synthetic fixtures. See
+Each program focuses on one operation. Most use *E. coli* `U00096.3`; PWM,
+track, and transcript examples use small synthetic fixtures. See
 [`cql_examples/README.md`](cql_examples/README.md) for inputs and limits.
 
 | Script | Description | Primary Features |
@@ -585,6 +613,7 @@ track examples use small synthetic fixtures. See
 | `11_consensus.cql` | Compare two replicate tracks | `CONSENSUS` |
 | `12_orfs.cql` | Match complete-codon start-to-stop patterns | regex, `LENGTH MOD 3` |
 | `13_gff3.cql` | Validate and traverse GFF3; group repeated IDs | `VALIDATE`, hierarchy queries, `GROUP` |
+| `14_transcripts.cql` | Select declared transcript types and derive promoters | `EXTRACT TRANSCRIPTS`, `SELECT` |
 
 ---
 

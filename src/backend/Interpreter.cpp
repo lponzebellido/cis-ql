@@ -1889,9 +1889,33 @@ void Interpreter::executeExtractRelated(const IRInstruction &instr) {
     }
     return;
   }
-  const bool downward = relation == "CHILDREN" || relation == "DESCENDANTS";
+  const bool transcriptSelection = relation == "TRANSCRIPTS";
+  std::set<std::string> transcriptTypes;
+  for (const auto &type : instr.listArgs)
+    transcriptTypes.insert(stripQuotes(type));
+  const std::string transcriptPolicy = instr.arg4;
+  const std::string transcriptPolicyKey = stripQuotes(instr.arg5);
+  const std::string transcriptPolicyValue = stripQuotes(instr.arg6);
+  const auto matchesTranscriptPolicy = [&](const GenomicRegion &region) {
+    if (!transcriptTypes.count(region.type))
+      return false;
+    if (transcriptPolicy == "ALL")
+      return true;
+    if (transcriptPolicy == "ID")
+      return region.annotationEvidence.id == transcriptPolicyValue;
+    if (transcriptPolicy == "ATTRIBUTE") {
+      const auto attribute =
+          region.annotationEvidence.attributes.find(transcriptPolicyKey);
+      return attribute != region.annotationEvidence.attributes.end() &&
+             attribute->second == transcriptPolicyValue;
+    }
+    return false;
+  };
+  const bool downward = transcriptSelection || relation == "CHILDREN" ||
+                        relation == "DESCENDANTS";
   const bool transitive =
-      relation == "DESCENDANTS" || relation == "ANCESTORS";
+      transcriptSelection || relation == "DESCENDANTS" ||
+      relation == "ANCESTORS";
   if (debugMode) {
     std::cout << "> EXTRACT " << relation << " OF " << sourceAlias
               << std::endl;
@@ -1972,7 +1996,9 @@ void Interpreter::executeExtractRelated(const IRInstruction &instr) {
         if (!childId.empty() && rootIds.count(childId)) {
           continue;
         }
-        if (!selected[index]) {
+        if ((!transcriptSelection ||
+             matchesTranscriptPolicy(annotations[index])) &&
+            !selected[index]) {
           selected[index] = true;
           selectedIndices.push_back(index);
         }

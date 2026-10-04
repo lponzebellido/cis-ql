@@ -59,6 +59,9 @@ temp_script.cql
 /gff3_report.tsv
 /cds_groups.tsv
 /cds_parts.gff3
+/transcripts.tsv
+/canonical_transcript.gff3
+/transcript_promoters.bed
 
 *.tex
 

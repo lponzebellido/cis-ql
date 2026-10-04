@@ -103,6 +103,23 @@ def main() -> int:
             "ID=cycleB;Parent=cycleA\n",
             encoding="utf-8",
         )
+        (workspace / "transcript_policy.fasta").write_text(
+            ">chrT\n" + "A" * 1000 + "\n", encoding="utf-8"
+        )
+        (workspace / "transcript_policy.gff3").write_text(
+            "##gff-version 3\n"
+            "chrT\ttest\tgene\t101\t900\t.\t+\t.\t"
+            "ID=geneT;Name=GENE_T\n"
+            "chrT\ttest\tregion\t101\t900\t.\t+\t.\t"
+            "ID=locusT;Parent=geneT\n"
+            "chrT\ttest\tmRNA\t201\t700\t.\t+\t.\t"
+            "ID=tx1;Parent=locusT;tag=canonical\n"
+            "chrT\ttest\ttranscript\t301\t800\t.\t-\t.\t"
+            "ID=tx2;Parent=locusT;tag=alternative\n"
+            "chrT\ttest\texon\t201\t250\t.\t+\t.\t"
+            "ID=exonT;Parent=tx1\n",
+            encoding="utf-8",
+        )
         (workspace / "nameless_child.gff3").write_text(
             "##gff-version 3\n"
             "chrN\ttest\tgene\t1\t100\t.\t+\t.\tID=root\n"
@@ -623,6 +640,81 @@ def main() -> int:
             json.loads(coding_tsv[109])["protein_id"] == "P1",
             "TSV export preserves annotation identity and attributes",
         )
+
+        data, _ = run_query(
+            workspace,
+            "transcript_selection",
+            'LOAD SEQUENCE "transcript_policy.fasta" AS genome;\n'
+            'LOAD ANNOTATION "transcript_policy.gff3" AS annotation;\n'
+            'EXTRACT GENE AS gene WHERE ID = "geneT";\n'
+            'EXTRACT TRANSCRIPTS OF gene TYPES ["mRNA", "transcript"] '
+            'SELECT ALL AS transcripts;\n'
+            'EXTRACT TRANSCRIPTS OF gene TYPES ["mRNA", "transcript"] '
+            'SELECT ID "tx2" AS named_transcript;\n'
+            'EXTRACT TRANSCRIPTS OF gene TYPES ["mRNA", "transcript"] '
+            'SELECT ATTRIBUTE "tag" = "canonical" AS canonical_transcript;\n'
+            'DEFINE PROMOTERS OF transcripts FROM TSS '
+            'UPSTREAM 50 BP DOWNSTREAM 10 BP AS transcript_promoters;\n',
+        )
+        transcript_ids = [
+            item["annotationEvidence"]["id"]
+            for item in data["resultSets"]["transcripts"]
+        ]
+        require(
+            transcript_ids == ["tx1", "tx2"],
+            f"ALL transcript selection observed {transcript_ids}",
+        )
+        require(
+            [item["annotationEvidence"]["id"] for item in
+             data["resultSets"]["named_transcript"]] == ["tx2"],
+            "ID transcript selection resolves one declared descendant",
+        )
+        require(
+            [item["annotationEvidence"]["id"] for item in
+             data["resultSets"]["canonical_transcript"]] == ["tx1"],
+            "ATTRIBUTE transcript selection uses an explicit source tag",
+        )
+        require(
+            [(item["start"], item["end"], item["strand"])
+             for item in data["resultSets"]["transcript_promoters"]]
+            == [(150, 210, "+"), (790, 850, "-")],
+            "selected transcripts feed strand-aware promoter construction",
+        )
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "transcript_types_are_unique",
+            'LOAD ANNOTATION "transcript_policy.gff3" AS annotation;\n'
+            'EXTRACT GENE AS gene WHERE ID = "geneT";\n'
+            'EXTRACT TRANSCRIPTS OF gene TYPES ["mRNA", "mRNA"] '
+            'SELECT ALL AS invalid;\n',
+            3,
+        )
+        require("TYPES cannot contain duplicates" in semantic_error,
+                "transcript selection rejects duplicate type declarations")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "transcript_types_are_nonempty",
+            'LOAD ANNOTATION "transcript_policy.gff3" AS annotation;\n'
+            'EXTRACT GENE AS gene WHERE ID = "geneT";\n'
+            'EXTRACT TRANSCRIPTS OF gene TYPES [""] '
+            'SELECT ALL AS invalid;\n',
+            3,
+        )
+        require("cannot contain an empty feature type" in semantic_error,
+                "transcript selection rejects empty type declarations")
+
+        parser_error = run_invalid_query(
+            workspace,
+            "transcript_policy_is_required",
+            'LOAD ANNOTATION "transcript_policy.gff3" AS annotation;\n'
+            'EXTRACT GENE AS gene WHERE ID = "geneT";\n'
+            'EXTRACT TRANSCRIPTS OF gene TYPES ["mRNA"] AS invalid;\n',
+            2,
+        )
+        require("Expected 'SELECT'" in parser_error,
+                "transcript selection requires an explicit policy")
 
         semantic_error = run_invalid_query(
             workspace,

@@ -273,6 +273,38 @@ void SemanticAnalyzer::visit(ExtractStmtNode *node) {
       }
       return;
     }
+    if (node->relation == "TRANSCRIPTS") {
+      const std::set<std::string> uniqueTypes(node->transcriptTypes.begin(),
+                                               node->transcriptTypes.end());
+      if (node->transcriptTypes.empty()) {
+        reportError("EXTRACT TRANSCRIPTS requires at least one GFF3 feature "
+                    "type.");
+      } else if (uniqueTypes.size() != node->transcriptTypes.size()) {
+        reportError("EXTRACT TRANSCRIPTS TYPES cannot contain duplicates.");
+      }
+      for (const auto &type : node->transcriptTypes) {
+        if (type == "\"\"") {
+          reportError("EXTRACT TRANSCRIPTS TYPES cannot contain an empty "
+                      "feature type.");
+          break;
+        }
+      }
+      if (node->transcriptPolicy != "ALL" &&
+          node->transcriptPolicy != "ID" &&
+          node->transcriptPolicy != "ATTRIBUTE") {
+        reportError("EXTRACT TRANSCRIPTS requires an explicit ALL, ID, or "
+                    "ATTRIBUTE selection policy.");
+      }
+      if (node->transcriptPolicy == "ID" &&
+          node->transcriptPolicyValue == "\"\"") {
+        reportError("SELECT ID requires a non-empty transcript ID.");
+      }
+      if (node->transcriptPolicy == "ATTRIBUTE" &&
+          (node->transcriptPolicyKey == "\"\"" ||
+           node->transcriptPolicyValue == "\"\"")) {
+        reportError("SELECT ATTRIBUTE requires a non-empty key and value.");
+      }
+    }
     if (!annotationLoaded) {
       reportError("EXTRACT " + node->relation +
                   " requires annotation data.");

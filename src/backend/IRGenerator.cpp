@@ -254,6 +254,12 @@ void IRGenerator::visit(ExtractStmtNode* node) {
     extractInstr.arg1 = node->relation;
     extractInstr.arg2 = node->source;
     extractInstr.arg3 = currentTemp;
+    if (node->relation == "TRANSCRIPTS") {
+      extractInstr.arg4 = node->transcriptPolicy;
+      extractInstr.arg5 = node->transcriptPolicyKey;
+      extractInstr.arg6 = node->transcriptPolicyValue;
+      extractInstr.listArgs = node->transcriptTypes;
+    }
   }
   instructions.push_back(extractInstr);
 

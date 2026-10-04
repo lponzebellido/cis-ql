@@ -508,6 +508,68 @@ std::unique_ptr<FindStmtNode> Parser::parseFind() {
 }
 
 std::unique_ptr<ExtractStmtNode> Parser::parseExtract() {
+  if (match(TokenType::TRANSCRIPTS)) {
+    consume(TokenType::OF, "Expected 'OF' after TRANSCRIPTS.");
+    consume(TokenType::ID,
+            "Expected a result-set alias after TRANSCRIPTS OF.");
+    const std::string source = previous().lexeme;
+    consume(TokenType::TYPES,
+            "Expected 'TYPES' after the transcript source.");
+    consume(TokenType::LBRACKET,
+            "Expected '[' before transcript feature types.");
+    std::vector<std::string> types;
+    consume(TokenType::STRING,
+            "Expected at least one GFF3 feature type string.");
+    types.push_back(previous().lexeme);
+    while (match(TokenType::COMMA)) {
+      consume(TokenType::STRING,
+              "Expected a GFF3 feature type string after ','.");
+      types.push_back(previous().lexeme);
+    }
+    consume(TokenType::RBRACKET,
+            "Expected ']' after transcript feature types.");
+    consume(TokenType::SELECT,
+            "Expected 'SELECT' after transcript feature types.");
+    std::string policy;
+    std::string policyKey;
+    std::string policyValue;
+    if (match(TokenType::ALL)) {
+      policy = "ALL";
+    } else if (check(TokenType::ID) && peek().lexeme == "ID") {
+      advance();
+      policy = "ID";
+      consume(TokenType::STRING,
+              "Expected a GFF3 transcript ID string after SELECT ID.");
+      policyValue = previous().lexeme;
+    } else if (match(TokenType::ATTRIBUTE)) {
+      policy = "ATTRIBUTE";
+      consume(TokenType::STRING,
+              "Expected an attribute key after SELECT ATTRIBUTE.");
+      policyKey = previous().lexeme;
+      consume(TokenType::ASSIGN,
+              "Expected '=' after the transcript attribute key.");
+      consume(TokenType::STRING,
+              "Expected an attribute value after '='.");
+      policyValue = previous().lexeme;
+    } else {
+      reportError(peek(),
+                  "Expected ALL, ID, or ATTRIBUTE after SELECT.");
+      throw std::runtime_error("Parse error");
+    }
+    consume(TokenType::AS,
+            "Expected 'AS' after the transcript selection policy.");
+    consume(TokenType::ID, "Expected an alias identifier after AS.");
+    const std::string alias = previous().lexeme;
+    auto whereClause = parseWhereClause();
+    consume(TokenType::SEMICOLON, "Expected ';' at the end of EXTRACT.");
+    auto node = std::unique_ptr<ExtractStmtNode>(new ExtractStmtNode(
+        "", "TRANSCRIPTS", source, alias, std::move(whereClause)));
+    node->transcriptTypes = std::move(types);
+    node->transcriptPolicy = policy;
+    node->transcriptPolicyKey = policyKey;
+    node->transcriptPolicyValue = policyValue;
+    return node;
+  }
   if (match(TokenType::CHILDREN) || match(TokenType::DESCENDANTS) ||
       match(TokenType::PARENTS) || match(TokenType::ANCESTORS) ||
       match(TokenType::MEMBERS)) {

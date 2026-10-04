@@ -92,8 +92,21 @@ void ExtractStmtNode::print(std::string prefix, bool isLast) const {
     std::cout << prefix << (isLast ? "└── " : "├── ") << "ExtractStmt(";
     if (relation.empty())
         std::cout << "Entity: " << entity;
-    else
+    else {
         std::cout << "Relation: " << relation << ", Source: " << source;
+        if (relation == "TRANSCRIPTS") {
+            std::cout << ", Types: [";
+            for (size_t index = 0; index < transcriptTypes.size(); ++index) {
+                if (index > 0) std::cout << ", ";
+                std::cout << transcriptTypes[index];
+            }
+            std::cout << "], Policy: " << transcriptPolicy;
+            if (!transcriptPolicyKey.empty())
+                std::cout << " " << transcriptPolicyKey;
+            if (!transcriptPolicyValue.empty())
+                std::cout << " " << transcriptPolicyValue;
+        }
+    }
     if (!alias.empty()) std::cout << ", AS: " << alias;
     std::cout << ")" << std::endl;
     std::string childPrefix = prefix + (isLast ? "    " : "│   ");

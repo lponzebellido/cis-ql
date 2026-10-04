@@ -219,6 +219,10 @@ public:
   std::string entity;
   std::string relation;
   std::string source;
+  std::vector<std::string> transcriptTypes;
+  std::string transcriptPolicy;
+  std::string transcriptPolicyKey;
+  std::string transcriptPolicyValue;
   std::string alias;
   std::unique_ptr<ConditionNode> whereClause;
   ExtractStmtNode(std::string e, std::string r, std::string s,

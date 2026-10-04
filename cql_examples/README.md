@@ -22,12 +22,17 @@ from the repository root:
 | `11_consensus.cql` | Require coordinate support across two replicates | synthetic narrowPeak tracks |
 | `12_orfs.cql` | Find start-to-stop patterns in complete codons | *E. coli* FASTA |
 | `13_gff3.cql` | Validate and traverse GFF3; group repeated IDs | *E. coli* FASTA and GFF3 |
+| `14_transcripts.cql` | Select transcript types and derive their promoters | synthetic FASTA and GFF3 |
 
 `ecoli2.fna` and `genomic.gff` use accession `U00096.3`, so sequence and
 annotation coordinates refer to the same assembly. The track and regulatory
 FASTA fixtures are synthetic and exist only to keep expected results small.
 Examples 02 and 03 use the unmodified JASPAR CORE `MA0054.1` matrix; it is an
 input for testing PWM syntax, not a recommended model for *E. coli*.
+
+Example 14 declares both `mRNA` and `transcript` as accepted input types. Its
+`canonical` tag is fixture metadata queried with `SELECT ATTRIBUTE`, not a
+portable GFF3 convention or an inference made by Cis-QL.
 
 The regular expression in `12_orfs.cql` advances three nucleotides at a time
 after `ATG` and rejects an in-frame stop in each repeated codon. It therefore
