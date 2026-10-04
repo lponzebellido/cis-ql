@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BINARY = Path(os.environ.get("CISQL_BINARY", ROOT / "cisql"))
+BINARY = Path(os.environ.get("GRQL_BINARY", ROOT / "grql"))
 
 
 def require(condition: bool, message: str) -> None:
@@ -22,7 +22,7 @@ def require(condition: bool, message: str) -> None:
 
 
 def run_query(workspace: Path, name: str, source: str) -> dict:
-    query = workspace / f"{name}.cql"
+    query = workspace / f"{name}.grql"
     query.write_text(source, encoding="utf-8")
     completed = subprocess.run(
         [str(BINARY), str(query)],
@@ -37,7 +37,7 @@ def run_query(workspace: Path, name: str, source: str) -> dict:
         f"stdout:\n{completed.stdout}\nstderr:\n{completed.stderr}",
     )
     return json.loads(
-        (workspace / ".cisql_results.json").read_text(encoding="utf-8")
+        (workspace / ".grql_results.json").read_text(encoding="utf-8")
     )
 
 
@@ -374,15 +374,15 @@ def validate_optional_bedtools(workspace: Path) -> str:
         tuple(map(int, line.split("\t")[1:3]))
         for line in completed.stdout.splitlines()
     ]
-    cisql_coordinates = [
+    grql_coordinates = [
         tuple(map(int, line.split("\t")[1:3]))
         for line in (workspace / "difference.bed")
         .read_text(encoding="utf-8")
         .splitlines()
     ]
     require(
-        cisql_coordinates == bedtools_coordinates,
-        "Cis-QL interval subtraction differs from bedtools subtract",
+        grql_coordinates == bedtools_coordinates,
+        "GRQL interval subtraction differs from bedtools subtract",
     )
 
     (workspace / "overlap_a.bed").write_text(
@@ -407,14 +407,14 @@ def validate_optional_bedtools(workspace: Path) -> str:
         tuple(map(int, line.split("\t")[1:3]))
         for line in completed.stdout.splitlines()
     ]
-    cisql_supported = [
+    grql_supported = [
         tuple(map(int, line.split("\t")[1:3]))
         for line in (workspace / "supported.bed")
         .read_text(encoding="utf-8")
         .splitlines()
     ]
-    require(cisql_supported == bedtools_supported,
-            "Cis-QL OVERLAPS differs from bedtools intersect -u")
+    require(grql_supported == bedtools_supported,
+            "GRQL OVERLAPS differs from bedtools intersect -u")
     return "bedtools subtract and overlap-selection coordinates agree"
 
 
@@ -438,7 +438,7 @@ def validate_optional_biopython() -> str:
     return "Biopython local-alignment score agrees"
 
 
-def validate_optional_fimo(workspace: Path, cisql_pvalue: float) -> str:
+def validate_optional_fimo(workspace: Path, grql_pvalue: float) -> str:
     fimo = shutil.which("fimo")
     if not fimo:
         return "FIMO not installed (optional p-value comparison skipped)"
@@ -479,14 +479,14 @@ def validate_optional_fimo(workspace: Path, cisql_pvalue: float) -> str:
     best = [float(row[pvalue_column]) for row in rows[1:]
             if int(row[start_column]) in (7, 8)]
     require(best, "FIMO comparison did not return the expected AA sites")
-    require(all(abs(value - cisql_pvalue) < 1e-9 for value in best),
-            "Cis-QL PWM p-value differs from FIMO")
+    require(all(abs(value - grql_pvalue) < 1e-9 for value in best),
+            "GRQL PWM p-value differs from FIMO")
     return "FIMO AA p-values agree"
 
 
 def main() -> int:
-    require(BINARY.exists(), "Build cisql before running reference validation")
-    with tempfile.TemporaryDirectory(prefix="cisql-reference-") as temp:
+    require(BINARY.exists(), "Build grql before running reference validation")
+    with tempfile.TemporaryDirectory(prefix="grql-reference-") as temp:
         workspace = Path(temp)
         sequence = "ATATATAAACCGGTT"
         (workspace / "motifs.fasta").write_text(
@@ -625,11 +625,11 @@ def main() -> int:
         require(observed_pwm == expected_pwm,
                 "PWM coordinates differ from independent log-odds reference")
         print("[ok] PWM/PSSM threshold coordinates")
-        cisql_pvalue = pwm_data["resultSets"]["pwm_hits"][0][
+        grql_pvalue = pwm_data["resultSets"]["pwm_hits"][0][
             "motifEvidence"
         ]["statistics"]["pValue"]
         exact_pvalue = exact_pssm_tail_probability(counts, "AA")
-        require(abs(cisql_pvalue - exact_pvalue) < 1e-12,
+        require(abs(grql_pvalue - exact_pvalue) < 1e-12,
                 "PWM p-value differs from exhaustive null enumeration")
         print("[ok] PWM p-value against exhaustive null distribution")
 
@@ -857,7 +857,7 @@ def main() -> int:
 
         print(f"[optional] {validate_optional_bedtools(workspace)}")
         print(f"[optional] {validate_optional_biopython()}")
-        print(f"[optional] {validate_optional_fimo(workspace, cisql_pvalue)}")
+        print(f"[optional] {validate_optional_fimo(workspace, grql_pvalue)}")
 
     print("All independent reference validations passed.")
     return 0

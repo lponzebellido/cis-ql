@@ -1,4 +1,4 @@
-export const cqlLanguageDef = {
+export const grqlLanguageDef = {
   keywords: [
     'LOAD', 'USE', 'EXPORT', 'DEFINE', 'VALIDATE', 'GROUP', 'SEQUENCE', 'ANNOTATION', 'TRACK', 'MATRIX',
     'AS', 'OF', 'BY', 'MEMBERS', 'TRANSCRIPTS', 'TYPES', 'SELECT', 'ALL',

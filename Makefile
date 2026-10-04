@@ -1,10 +1,10 @@
 CXX = g++
 CXXFLAGS = -std=c++11 -Wall -O2 -MMD -MP -I src/frontend -I src/backend -I src/bioinfo
 
-TARGET = cisql
+TARGET = grql
 CORE_TEST_TARGET = tests/test_core
 CORE_BENCHMARK_TARGET = benchmarks/benchmark_core
-SANITIZER_TARGET = tests/cisql_sanitize
+SANITIZER_TARGET = tests/grql_sanitize
 
 SRCS = src/main.cpp \
        src/frontend/Lexer.cpp src/frontend/Parser.cpp src/frontend/AST.cpp \
@@ -56,8 +56,8 @@ $(SANITIZER_TARGET): $(SRCS)
 		-I src/frontend -I src/backend -I src/bioinfo -o $@ $^
 
 test-sanitize: $(SANITIZER_TARGET)
-	CISQL_BINARY=$(CURDIR)/$(SANITIZER_TARGET) python3 tests/test_language.py
-	CISQL_BINARY=$(CURDIR)/$(SANITIZER_TARGET) python3 tests/reference_validation.py
+	GRQL_BINARY=$(CURDIR)/$(SANITIZER_TARGET) python3 tests/test_language.py
+	GRQL_BINARY=$(CURDIR)/$(SANITIZER_TARGET) python3 tests/reference_validation.py
 
 benchmark: $(TARGET)
 	python3 benchmarks/run_examples.py

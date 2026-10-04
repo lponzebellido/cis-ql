@@ -72,12 +72,12 @@ def load_manifest(path: Path) -> list[dict]:
         )
         for exported in entry["exports"]:
             validate_relative_path(exported, "Export path")
-        example = ROOT / "cql_examples" / example_relative
+        example = ROOT / "grql_examples" / example_relative
         if not example.is_file():
             raise RuntimeError(f"Missing example declared in manifest: {example}")
     declared = set(files)
     discovered = {
-        example.name for example in (ROOT / "cql_examples").glob("*.cql")
+        example.name for example in (ROOT / "grql_examples").glob("*.grql")
     }
     if declared != discovered:
         missing = sorted(discovered - declared)
@@ -145,7 +145,7 @@ def resolve_repository_path(relative: str) -> Path:
 
 
 def prepare_workspace(entry: dict, workspace: Path) -> list[dict]:
-    example = ROOT / "cql_examples" / entry["file"]
+    example = ROOT / "grql_examples" / entry["file"]
     relative_inputs = list(dict.fromkeys(
         LOAD_PATTERN.findall(example.read_text(encoding="utf-8"))
     ))
@@ -164,12 +164,12 @@ def prepare_workspace(entry: dict, workspace: Path) -> list[dict]:
 def execute_once(
     binary: Path, entry: dict, workspace: Path
 ) -> tuple[float, dict, dict, list[dict]]:
-    result_path = workspace / ".cisql_results.json"
+    result_path = workspace / ".grql_results.json"
     paths = [result_path] + [workspace / path for path in entry["exports"]]
     for path in paths:
         if path.exists():
             path.unlink()
-    example = ROOT / "cql_examples" / entry["file"]
+    example = ROOT / "grql_examples" / entry["file"]
     started = time.perf_counter()
     completed = subprocess.run(
         [str(binary), str(example)],
@@ -214,7 +214,7 @@ def benchmark(
     samples = []
     expected_fingerprint = None
     final_exports = []
-    with tempfile.TemporaryDirectory(prefix="cisql-benchmark-") as temp:
+    with tempfile.TemporaryDirectory(prefix="grql-benchmark-") as temp:
         workspace = Path(temp)
         inputs = prepare_workspace(entry, workspace)
         for _ in range(warmups):
@@ -270,7 +270,7 @@ def repository_state() -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--binary", type=Path, default=ROOT / "cisql")
+    parser.add_argument("--binary", type=Path, default=ROOT / "grql")
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--warmups", type=int, default=1)
     parser.add_argument("--repetitions", type=int, default=3)
@@ -284,7 +284,7 @@ def main() -> int:
         raise RuntimeError("Repetition count must be positive")
     binary = args.binary.resolve()
     if not binary.is_file():
-        raise RuntimeError(f"Missing Cis-QL binary: {binary}")
+        raise RuntimeError(f"Missing GRQL binary: {binary}")
     manifest = args.manifest.resolve()
     entries = select_examples(load_manifest(manifest), args.examples)
     results = [

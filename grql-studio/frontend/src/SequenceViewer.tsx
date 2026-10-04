@@ -300,7 +300,7 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
     return (
       <div className="seq-empty">
         <div style={{ fontSize: '1.1rem', marginBottom: 8 }}>No sequence results available</div>
-        <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>Run a Cis-QL query to populate this view.</div>
+        <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>Run a GRQL query to populate this view.</div>
       </div>
     );
   }

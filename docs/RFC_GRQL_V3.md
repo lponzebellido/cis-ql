@@ -1,4 +1,4 @@
-# Cis-QL v3: regulatory genomics direction
+# GRQL v3: regulatory genomics direction
 
 Status: incremental implementation. Explicit promoters, transcript selection,
 strand-aware sequence predicates, calibrated PWM scans, evidence-preserving
@@ -8,7 +8,7 @@ implemented. Later sections are a design contract, not yet accepted syntax.
 
 ## Product definition
 
-Cis-QL is a declarative language for expressing and evaluating cis-regulatory
+GRQL is a declarative language for expressing and evaluating cis-regulatory
 hypotheses. Sequence search and genomic interval operations are its execution
 substrate, not its main identity.
 
@@ -60,7 +60,7 @@ large annotations, promoter/enhancer evidence, and assembly compatibility.
 
 Implemented syntax:
 
-```cql
+```grql
 EXTRACT FEATURE AS coding_features
   WHERE TYPE = "CDS"
     AND PARENT = "transcript_1"
@@ -141,14 +141,14 @@ source-specific transcript vocabulary and selection rule part of the query.
 It follows the full descendant graph, even through intermediate records whose
 types are not listed, then applies exact `TYPES` and `SELECT` matches. `ALL`
 keeps every matching record, `ID` names a GFF3 identity, and `ATTRIBUTE` names
-a source key and value. Cis-QL does not treat `mRNA`, `transcript`, `lnc_RNA`,
+a source key and value. GRQL does not treat `mRNA`, `transcript`, `lnc_RNA`,
 or an attribute named `canonical` as a universal convention.
 
 ## Part 1: explicit TSS-relative promoters
 
 Implemented syntax:
 
-```cql
+```grql
 DEFINE PROMOTERS OF GENE
   FROM TSS
   UPSTREAM 1000 BP
@@ -164,7 +164,7 @@ cannot silently depend on a biological default.
 
 An `EXTRACT TRANSCRIPTS` result can be used as the promoter source. The query
 therefore records whether promoters came from every declared transcript, one
-named transcript, or records carrying an exact source attribute. Cis-QL does
+named transcript, or records carrying an exact source attribute. GRQL does
 not provide a `CANONICAL` keyword because that designation is annotation-source
 specific.
 
@@ -174,7 +174,7 @@ specific.
 
 Implemented syntax:
 
-```cql
+```grql
 SCAN tf_matrix IN proximal_promoters
   STRAND POSITIVE
   THRESHOLD 85 %
@@ -190,14 +190,14 @@ complete active FASTA, preserving backward compatibility.
 
 Motif-hit aliases are a distinct semantic type and can be exported or reused in
 region operations. BED score carries the normalized score on its 0-1000 scale;
-GFF3, TSV, JSON, and Cis-QL Studio retain the richer evidence fields. Interval
+GFF3, TSV, JSON, and GRQL Studio retain the richer evidence fields. Interval
 operations discard hit evidence whenever they change the hit geometry.
 
 ### Part 2B1: explicit zero-order background models
 
 Implemented syntax:
 
-```cql
+```grql
 SCAN tf_matrix IN proximal_promoters
   BACKGROUND FROM genome
   THRESHOLD 85 %
@@ -210,7 +210,7 @@ SCAN tf_matrix IN proximal_promoters
 ```
 
 `BACKGROUND FROM` accepts a loaded sequence dataset, annotated entity, or named
-region set. Cis-QL estimates A/C/G/T frequencies after ignoring ambiguous bases
+region set. GRQL estimates A/C/G/T frequencies after ignoring ambiguous bases
 and adds a total pseudocount of 0.1 to prevent zero probabilities. Negative-only
 scans complement the frequencies; when both strands are searched, complementary
 frequencies are averaged (`A=T`, `C=G`) as in FIMO. The effective frequencies,
@@ -226,7 +226,7 @@ The matrix-to-PSSM conversion now applies the MEME/FIMO convention in which the
 total motif pseudocount is distributed according to background frequencies.
 Omitting `BACKGROUND` preserves the legacy uniform default, but records it as
 such. Because this corrects the former per-letter pseudocount calculation,
-percentage thresholds can produce different hit counts than earlier Cis-QL
+percentage thresholds can produce different hit counts than earlier GRQL
 versions. Future p/q-value syntax will require an explicit statistical policy.
 
 Compatibility basis:
@@ -251,7 +251,7 @@ Implemented for every retained PWM hit:
 - the tested-position count, integer score, scale, offset, score range, and
   names of both statistical methods.
 
-The p-value lookup follows FIMO's execution model. Cis-QL maps PSSM cells to
+The p-value lookup follows FIMO's execution model. GRQL maps PSSM cells to
 non-negative integer scores using FIMO's range of 1000, then computes
 `Pr(score >= x)` by dynamic programming under the same background used for
 the log-odds matrix. Windows containing ambiguous bases are neither scored nor
@@ -260,14 +260,14 @@ pair is a test. Separate chromosomes and scoped regions are accumulated before
 one multiple-testing correction is applied; overlapping input regions therefore
 count as separate tests because they represent separate requested searches.
 
-Unlike an implementation that retains every genomic p-value, Cis-QL keeps a
+Unlike an implementation that retains every genomic p-value, GRQL keeps a
 histogram of integer score levels. This permits exact tied-rank BH correction
 for the selected model with memory bounded by motif width and score range,
 rather than genome size. The unscaled log-odds score remains available alongside
 the discretized score used for calibration.
 
 JSON nests these values under `motifEvidence.statistics`; GFF3 and TSV retain
-equivalent fields, and Cis-QL Studio shows p, q, and the test-universe size.
+equivalent fields, and GRQL Studio shows p, q, and the test-universe size.
 Independent validation exhaustively enumerates the null distribution of a
 small motif. The validation suite also compares p-values with the `fimo`
 executable when it is locally available.
@@ -279,7 +279,7 @@ programs do not silently change semantics.
 
 Implemented syntax:
 
-```cql
+```grql
 SCAN tf_matrix IN proximal_promoters
   BACKGROUND FROM genome
   PVALUE <= 1e-4
@@ -299,7 +299,7 @@ legacy 75% default. If both forms are explicit, they are combined with logical
 AND.
 
 The statistical universe is accumulated before final selection. To avoid
-materializing every genomic window, Cis-QL retains only candidates with
+materializing every genomic window, GRQL retains only candidates with
 `p <= alpha` while building the complete observed score histogram. This is safe
 for q-value filtering because a Benjamini-Hochberg adjusted p-value cannot be
 smaller than its raw p-value. Strict-boundary filtering is applied after q-values
@@ -314,7 +314,7 @@ Still planned:
 
 Implemented syntax:
 
-```cql
+```grql
 FIND MOTIF "ATG(?:(?!TAA|TAG|TGA)[ACGT]{3})*(?:TAA|TAG|TGA)"
   STRAND POSITIVE AS start_stop_candidates
   WHERE LENGTH MOD 3 = 0 AND START MOD 3 = 0;
@@ -344,7 +344,7 @@ groups, and reusable scalar values remain planned.
 
 Implemented syntax:
 
-```cql
+```grql
 TRANSLATE candidates CODE 1 FRAME 0 AS standard;
 TRANSLATE candidates CODE 4 FRAME 0 AS table4;
 
@@ -385,7 +385,7 @@ the program instead of being inferred from feature names.
 
 Implemented syntax:
 
-```cql
+```grql
 OVERLAPS qvalue_sites WITH proximal_promoters
   AS promoter_sites;
 ```
@@ -411,13 +411,13 @@ supporting records.
 
 Implemented syntax:
 
-```cql
+```grql
 NEAR qvalue_sites TO GENE WITHIN 2 KB
   AS nearby_gene_links;
 ```
 
 `NEAR query TO reference WITHIN distance` is a directional, bounded nearest
-selection. For every valid query interval, Cis-QL finds one nearest reference
+selection. For every valid query interval, GRQL finds one nearest reference
 on the same chromosome and retains the complete query only when its interval
 gap is less than or equal to the explicit limit. Overlaps and directly adjacent
 half-open intervals both have gap zero; the stored `overlaps` Boolean keeps
@@ -445,7 +445,7 @@ chromatin-contact support.
 
 Implemented syntax:
 
-```cql
+```grql
 COUNT qvalue_sites IN proximal_promoters
   AS promoter_site_counts;
 
@@ -478,7 +478,7 @@ selected statistical background.
 
 Implemented syntax:
 
-```cql
+```grql
 DEFINE MODULE
   FROM factor_a_sites WITH factor_b_sites
   SPACING 5 BP TO 30 BP
@@ -503,7 +503,7 @@ Ordering is deliberately reference-relative, not gene- or transcript-relative.
 `ORIENTATION SAME` and `OPPOSITE` compare the members' reference strands and
 require both to be `+` or `-`. `ORIENTATION ANY` also accepts unstranded members
 and records `UNKNOWN` when their relationship cannot be determined. When the
-same alias appears on both sides, Cis-QL produces one canonical unordered pair,
+same alias appears on both sides, GRQL produces one canonical unordered pair,
 does not pair a record with itself, and does not treat opposite-strand records
 at identical coordinates as two independent sites.
 
@@ -539,7 +539,7 @@ Still planned:
 
 Implemented syntax:
 
-```cql
+```grql
 LOAD TRACK "sample_accessibility.narrowPeak"
   FORMAT NARROWPEAK
   EVIDENCE ACCESSIBILITY
@@ -573,7 +573,7 @@ misrepresenting transitive support as a direct overlap.
 
 Track evidence is executable in `WHERE` filters:
 
-```cql
+```grql
 EXTRACT accessibility_peaks AS strong_accessibility
   WHERE TRACK_SCORE >= 600
     AND SIGNAL_VALUE >= 10
@@ -606,7 +606,7 @@ quality or control design, and is not a formal reproducibility test.
 
 Anchor-preserving coordinate consensus is implemented explicitly:
 
-```cql
+```grql
 CONSENSUS FROM [binding_rep1, binding_rep2]
   ANCHOR binding_rep1
   MIN_SUPPORT 2

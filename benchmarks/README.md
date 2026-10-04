@@ -1,6 +1,6 @@
 # Benchmarks and reference checks
 
-Cis-QL has two benchmark levels and one independent correctness suite. None is
+GRQL has two benchmark levels and one independent correctness suite. None is
 a comparison with another language or tool.
 
 ## Complete queries

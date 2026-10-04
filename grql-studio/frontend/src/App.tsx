@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import Split from 'react-split';
-import { cqlLanguageDef } from './cql-monarch';
+import { grqlLanguageDef } from './grql-monarch';
 import { TrackViewer } from './TrackViewer';
 import { FileExplorer } from './FileExplorer';
 import { SequenceViewer } from './SequenceViewer';
@@ -10,7 +10,7 @@ import { FeatureGroupViewer } from './FeatureGroupViewer';
 import './App.css';
 
 const EXT_COLORS: Record<string, string> = {
-  cql: '#3fb950',
+  grql: '#3fb950',
   fasta: '#58a6ff',
   fa: '#58a6ff',
   gff3: '#d29922',
@@ -31,7 +31,7 @@ function App() {
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [activeFile, setActiveFile] = useState<string | null>(null);
-  const [stdout, setStdout] = useState('Welcome to Cis-QL Studio.');
+  const [stdout, setStdout] = useState('Welcome to GRQL Studio.');
   const [results, setResults] = useState<Record<string, any[]>>({});
   const [gcProfiles, setGcProfiles] = useState<Record<string, any>>({});
   const [annotationReports, setAnnotationReports] = useState<Record<string, any>>({});
@@ -64,10 +64,10 @@ function App() {
 
   useEffect(() => {
     if (monaco) {
-      monaco.languages.register({ id: 'cql' });
-      monaco.languages.setMonarchTokensProvider('cql', cqlLanguageDef as any);
+      monaco.languages.register({ id: 'grql' });
+      monaco.languages.setMonarchTokensProvider('grql', grqlLanguageDef as any);
 
-      monaco.editor.defineTheme('cql-dark', {
+      monaco.editor.defineTheme('grql-dark', {
         base: 'vs-dark',
         inherit: true,
         rules: [
@@ -85,7 +85,7 @@ function App() {
         }
       });
 
-      monaco.editor.defineTheme('cql-light', {
+      monaco.editor.defineTheme('grql-light', {
         base: 'vs',
         inherit: true,
         rules: [
@@ -213,7 +213,7 @@ function App() {
   return (
     <div className="app-container" onClick={() => setMenuOpen(null)}>
       <div className="titlebar-drag">
-        <div className="menu-brand">Cis-QL Studio</div>
+        <div className="menu-brand">GRQL Studio</div>
         <div className="menu-items">
           <div className="menu-item-wrapper">
             <div className="menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === 'file' ? null : 'file'); }}>File</div>
@@ -287,8 +287,8 @@ function App() {
                 {activeFile ? (
                   <Editor
                     height="100%"
-                    defaultLanguage="cql"
-                    theme={isDarkMode ? 'cql-dark' : 'cql-light'}
+                    defaultLanguage="grql"
+                    theme={isDarkMode ? 'grql-dark' : 'grql-light'}
                     value={code}
                     onChange={(val) => setCode(val || '')}
                     onMount={handleEditorDidMount}
@@ -307,7 +307,7 @@ function App() {
                   />
                 ) : (
                   <div className="welcome-screen">
-                    <h1>Cis-QL Studio</h1>
+                    <h1>GRQL Studio</h1>
                     <p>Cis-Regulatory Query Language</p>
                     <div className="welcome-shortcuts">
                       <div className="shortcut"><span>Open Folder</span><span>Cmd+O</span></div>
@@ -390,7 +390,7 @@ function App() {
         )}
         <div className="spacer" />
         <div className="status-item">UTF-8</div>
-        <div className="status-item">Cis-QL</div>
+        <div className="status-item">GRQL</div>
       </div>
     </div>
   );

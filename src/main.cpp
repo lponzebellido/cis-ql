@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (filename.empty()) {
-    std::cerr << "Usage: " << argv[0] << " <filename.cql> [--debug]"
+    std::cerr << "Usage: " << argv[0] << " <filename.grql> [--debug]"
               << std::endl;
     return 1;
   }
@@ -102,7 +102,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  std::remove(".cisql_results.json");
+  std::remove(".grql_results.json");
 
   
   SymbolTable symbolTable;

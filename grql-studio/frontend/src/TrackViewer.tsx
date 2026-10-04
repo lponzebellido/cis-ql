@@ -628,7 +628,7 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
         <div className="track-empty">
           <div>
             <div style={{ fontSize: '1.1rem', marginBottom: 8 }}>No regions to display</div>
-            <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>Run a Cis-QL query to visualize genomic results here.</div>
+            <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>Run a GRQL query to visualize genomic results here.</div>
           </div>
         </div>
       </div>

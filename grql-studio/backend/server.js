@@ -11,7 +11,7 @@ app.use(express.json());
 const PORT = 3001;
 
 
-const CISQL_BIN = path.resolve(__dirname, '../../cisql');
+const GRQL_BIN = path.resolve(__dirname, '../../grql');
 let WORKING_DIR = null;
 let executionInProgress = false;
 
@@ -68,9 +68,9 @@ app.post('/api/execute', (req, res) => {
 
   executionInProgress = true;
   const tempFile = path.join(
-    WORKING_DIR, `.cisql-studio-${process.pid}-${Date.now()}.cql`
+    WORKING_DIR, `.grql-studio-${process.pid}-${Date.now()}.grql`
   );
-  const resultsFile = path.join(WORKING_DIR, '.cisql_results.json');
+  const resultsFile = path.join(WORKING_DIR, '.grql_results.json');
   
   
   try {
@@ -84,7 +84,7 @@ app.post('/api/execute', (req, res) => {
   }
 
   
-  execFile(CISQL_BIN, [path.basename(tempFile)], { cwd: WORKING_DIR },
+  execFile(GRQL_BIN, [path.basename(tempFile)], { cwd: WORKING_DIR },
     (error, stdout, stderr) => {
     
     let parsedResults = null;
@@ -124,7 +124,7 @@ app.get('/api/fs/list', (req, res) => {
     const files = fs.readdirSync(dirPath, { withFileTypes: true });
     
     const items = files
-      .filter(f => !f.name.startsWith('.') && f.name !== 'node_modules' && f.name !== 'cisql-studio')
+      .filter(f => !f.name.startsWith('.') && f.name !== 'node_modules' && f.name !== 'grql-studio')
       .map(f => ({
         name: f.name,
         isDirectory: f.isDirectory(),
@@ -268,5 +268,5 @@ app.post('/api/fs/delete', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Cis-QL backend server running on http://localhost:${PORT}`);
+  console.log(`GRQL backend server running on http://localhost:${PORT}`);
 });

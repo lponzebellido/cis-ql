@@ -3,7 +3,7 @@
   "examples": [
     {
       "id": "01",
-      "file": "01_promoters.cql",
+      "file": "01_promoters.grql",
       "exports": ["promoters.bed"],
       "resultCounts": {
         "resultSets": {"promoters": 1, "thra": 1}
@@ -11,7 +11,7 @@
     },
     {
       "id": "02",
-      "file": "02_pwm.cql",
+      "file": "02_pwm.grql",
       "exports": ["pwm_hits.tsv"],
       "resultCounts": {
         "resultSets": {"hits": 8}
@@ -19,7 +19,7 @@
     },
     {
       "id": "03",
-      "file": "03_pvalues.cql",
+      "file": "03_pvalues.grql",
       "exports": ["pvalue_hits.tsv"],
       "resultCounts": {
         "resultSets": {"hits": 4}
@@ -27,7 +27,7 @@
     },
     {
       "id": "04",
-      "file": "04_overlap.cql",
+      "file": "04_overlap.grql",
       "exports": ["overlap.tsv"],
       "resultCounts": {
         "resultSets": {
@@ -39,7 +39,7 @@
     },
     {
       "id": "05",
-      "file": "05_count.cql",
+      "file": "05_count.grql",
       "exports": ["counts.tsv", "nonzero_counts.gff3"],
       "resultCounts": {
         "resultSets": {
@@ -52,7 +52,7 @@
     },
     {
       "id": "06",
-      "file": "06_near.cql",
+      "file": "06_near.grql",
       "exports": ["near.tsv"],
       "resultCounts": {
         "resultSets": {"nearby_sites": 675, "sites": 1036}
@@ -60,7 +60,7 @@
     },
     {
       "id": "07",
-      "file": "07_modules.cql",
+      "file": "07_modules.grql",
       "exports": ["modules.tsv", "modules.gff3"],
       "resultCounts": {
         "resultSets": {
@@ -72,7 +72,7 @@
     },
     {
       "id": "08",
-      "file": "08_filters.cql",
+      "file": "08_filters.grql",
       "exports": ["filters.tsv"],
       "resultCounts": {
         "resultSets": {"thra_cds": 1, "coding_records": 2112}
@@ -80,7 +80,7 @@
     },
     {
       "id": "09",
-      "file": "09_tracks.cql",
+      "file": "09_tracks.grql",
       "exports": ["tracks.tsv"],
       "resultCounts": {
         "resultSets": {"filtered_peaks": 3, "peaks": 4}
@@ -88,7 +88,7 @@
     },
     {
       "id": "10",
-      "file": "10_track_overlap.cql",
+      "file": "10_track_overlap.grql",
       "exports": ["track_overlap.tsv"],
       "resultCounts": {
         "resultSets": {
@@ -102,7 +102,7 @@
     },
     {
       "id": "11",
-      "file": "11_consensus.cql",
+      "file": "11_consensus.grql",
       "exports": ["consensus.tsv", "consensus.gff3"],
       "resultCounts": {
         "resultSets": {
@@ -116,7 +116,7 @@
     },
     {
       "id": "12",
-      "file": "12_orfs.cql",
+      "file": "12_orfs.grql",
       "exports": ["orfs.tsv"],
       "resultCounts": {
         "resultSets": {"orfs": 1494, "anchors": 980}
@@ -124,7 +124,7 @@
     },
     {
       "id": "13",
-      "file": "13_gff3.cql",
+      "file": "13_gff3.grql",
       "exports": [
         "thra.tsv",
         "children.tsv",
@@ -151,7 +151,7 @@
     },
     {
       "id": "14",
-      "file": "14_transcripts.cql",
+      "file": "14_transcripts.grql",
       "exports": [
         "transcripts.tsv",
         "canonical_transcript.gff3",
@@ -169,7 +169,7 @@
     },
     {
       "id": "15",
-      "file": "15_strands.cql",
+      "file": "15_strands.grql",
       "exports": ["strands.tsv"],
       "resultCounts": {
         "resultSets": {
@@ -181,7 +181,7 @@
     },
     {
       "id": "16",
-      "file": "16_translate.cql",
+      "file": "16_translate.grql",
       "exports": ["standard_translation.tsv", "table4_translation.gff3"],
       "resultCounts": {
         "resultSets": {

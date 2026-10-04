@@ -1,0 +1,12 @@
+LOAD SEQUENCE "data_examples/code_demo.fasta" AS genome;
+
+FIND MOTIF "ATGTGATAA" AS candidates;
+
+TRANSLATE candidates CODE 1 FRAME 0 AS standard;
+TRANSLATE candidates CODE 4 FRAME 0 AS table4;
+
+EXTRACT table4 AS tga_trp
+  WHERE PROTEIN_SEQUENCE = "MW*";
+
+EXPORT standard TO "standard_translation.tsv" FORMAT TSV;
+EXPORT table4 TO "table4_translation.gff3" FORMAT GFF3;

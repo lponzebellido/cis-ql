@@ -1,10 +1,9 @@
-# Cis-QL
+# Grequel (GRQL)
 
-Cis-QL is a query language for sequence, annotation, motif, and genomic
-interval analysis. A `.cql` file loads FASTA, GFF3, JASPAR matrix, BED, or
-narrowPeak data and applies named operations to it. The C++11 interpreter runs
-from the command line; Cis-QL Studio provides an optional editor and result
-viewer.
+GRQL, pronounced “Grequel”, is the Genomic Region Query Language. It queries
+sequence, annotations, motifs, and genomic intervals from FASTA, GFF3, JASPAR,
+BED, and narrowPeak inputs. The C++11 interpreter runs `.grql` files from the
+command line; GRQL Studio provides an optional editor and result viewer.
 
 ## What it does
 
@@ -29,19 +28,19 @@ OVERLAPS sites WITH promoters AS promoter_sites;
 EXPORT promoter_sites TO "promoter_sites.tsv" FORMAT TSV;
 ```
 
-Cis-QL is a research prototype. It does not align reads, call peaks, perform
+GRQL is a research prototype. It does not align reads, call peaks, perform
 IDR, infer enhancers, prove gene regulation, or choose a biologically suitable
 PWM or threshold. It queries inputs produced or selected elsewhere and records
 the operations used on them.
 
 The prioritized implementation gaps and their acceptance targets are tracked
-in [`docs/RFC_CISQL_V3.md`](docs/RFC_CISQL_V3.md#work-remaining-after-the-regulatory-foundation).
+in [`docs/RFC_GRQL_V3.md`](docs/RFC_GRQL_V3.md#work-remaining-after-the-regulatory-foundation).
 
 ## Build and run
 
 ### Build the interpreter
 
-Cis-QL requires a standard C++11 compiler and `make`:
+GRQL requires a standard C++11 compiler and `make`:
 
 ```bash
 make clean
@@ -50,24 +49,24 @@ make
 
 ### Run a query
 
-Execute a `.cql` script using the `cisql` binary:
+Execute a `.grql` script using the `grql` binary:
 
 ```bash
-./cisql cql_examples/01_promoters.cql
+./grql grql_examples/01_promoters.grql
 ```
 
 Use the `--debug` flag to inspect compilation phases, including token stream, Abstract Syntax Tree (AST), Symbol Table, Intermediate Representation (IR), and execution steps:
 
 ```bash
-./cisql cql_examples/12_orfs.cql --debug
+./grql grql_examples/12_orfs.grql --debug
 ```
 
-### Launching Cis-QL Studio
+### Launching GRQL Studio
 
 To run the interactive desktop graphical environment:
 
 ```bash
-cd cisql-studio
+cd grql-studio
 npm start
 ```
 
@@ -102,7 +101,7 @@ as an *E. coli* model.
 
 GFF3 import preserves source, score, phase, `ID`, `Name`, every `Parent`, and
 the complete attribute map. Percent-encoded attribute values are decoded for
-queries, while GFF3 export retains the original attribute field. Cis-QL does
+queries, while GFF3 export retains the original attribute field. GRQL does
 not guess which feature types constitute a transcript or which transcript is
 canonical. `EXTRACT TRANSCRIPTS` requires the query to state both choices.
 Named annotation result sets can be traversed with `EXTRACT CHILDREN OF` for
@@ -123,7 +122,7 @@ parents; detects cycles; and flags repeated identities that disagree on
 chromosome, feature type, or strand. Repeated IDs with compatible fields are
 reported separately as information because GFF3 permits one discontinuous
 feature to occupy multiple records. Reports appear in structured JSON, TSV,
-and the Validation panel in Cis-QL Studio.
+and the Validation panel in GRQL Studio.
 
 Repeated IDs can be materialized as logical features without treating the
 space between their records as part of the feature:
@@ -143,7 +142,7 @@ values. Feature groups are not accepted by interval operators; extracting
 their members makes the intended interval semantics explicit.
 
 `LOAD TRACK` currently accepts BED and narrowPeak. Track coordinates are
-already zero-based and half-open. When a sequence dataset is active, Cis-QL
+already zero-based and half-open. When a sequence dataset is active, GRQL
 validates chromosome names and interval bounds, attaches interval sequence,
 and rejects assembly-incompatible records. narrowPeak's `pValue` and `qValue`
 columns are preserved according to that format as `-log10(p)` and `-log10(q)`;
@@ -223,7 +222,7 @@ translated, an ambiguous codon becomes `X`, a stop becomes `*`, and incomplete
 trailing bases are ignored.
 
 `CODE` accepts the current NCBI translation-table identifiers: 1–6, 9–16, and
-21–33. Cis-QL uses the amino-acid assignment row from the selected table. It
+21–33. GRQL uses the amino-acid assignment row from the selected table. It
 does not apply the separate initiator row because an arbitrary interval is not
 assumed to be a complete CDS. Alternative-initiation policy remains a distinct
 future CDS mode. The table definitions follow the
@@ -337,7 +336,7 @@ overlapping and adjacent intervals have gap zero. `ORDER AS_WRITTEN` requires a
 member from the first set to have a lower reference start than one from the
 second set; tied starts do not satisfy it. `ORDER ANY` accepts either order and
 records what was observed. `SAME` and `OPPOSITE` require known `+`/`-` strands.
-When one alias is used twice, Cis-QL excludes self-pairs and mirror duplicates.
+When one alias is used twice, GRQL excludes self-pairs and mirror duplicates.
 The output span
 retains both member identities and PWM evidence in JSON, GFF3, TSV, and Studio.
 
@@ -506,7 +505,7 @@ hide a scientific decision inside a convenient branch.
 
 ## Formal Syntax & Grammar (CFG)
 
-Cis-QL is specified by the development CFG in [`grammar.txt`](grammar.txt).
+GRQL is specified by the development CFG in [`grammar.txt`](grammar.txt).
 The following compact EBNF lists the main statement forms; the linked file is
 the authoritative grammar:
 
@@ -649,45 +648,45 @@ report format and comparison requirements.
 
 ---
 
-## Examples (`cql_examples/`)
+## Examples (`grql_examples/`)
 
 Each program focuses on one operation. Most use *E. coli* `U00096.3`; PWM,
 track, transcript, and strand examples use small synthetic fixtures. See
-[`cql_examples/README.md`](cql_examples/README.md) for inputs and limits.
+[`grql_examples/README.md`](grql_examples/README.md) for inputs and limits.
 
 | Script | Description | Primary Features |
 | :--- | :--- | :--- |
-| `01_promoters.cql` | Derive a promoter for `thrA` | `DEFINE PROMOTERS` |
-| `02_pwm.cql` | Scan a PWM by relative score | `SCAN`, `THRESHOLD` |
-| `03_pvalues.cql` | Filter PWM hits by q-value | `BACKGROUND`, `QVALUE` |
-| `04_overlap.cql` | Select motif matches in promoters | `OVERLAPS` |
-| `05_count.cql` | Count motif matches per promoter | `COUNT`, `WHERE COUNT` |
-| `06_near.cql` | Select motif matches near genes | `NEAR ... WITHIN` |
-| `07_modules.cql` | Pair patterns by spacing | `DEFINE MODULE` |
-| `08_filters.cql` | Filter annotation fields and attributes | `EXTRACT`, `WHERE` |
-| `09_tracks.cql` | Filter narrowPeak fields and metadata | `LOAD TRACK`, `WHERE` |
-| `10_track_overlap.cql` | Intersect two tracks | `OVERLAPS` |
-| `11_consensus.cql` | Compare two replicate tracks | `CONSENSUS` |
-| `12_orfs.cql` | Match complete-codon start-to-stop patterns | regex, `LENGTH MOD 3` |
-| `13_gff3.cql` | Validate and traverse GFF3; group repeated IDs | `VALIDATE`, hierarchy queries, `GROUP` |
-| `14_transcripts.cql` | Select declared transcript types and derive promoters | `EXTRACT TRANSCRIPTS`, `SELECT` |
-| `15_strands.cql` | Compare reference and strand-oriented sequence | `SEQUENCE`, `ORIENTED_SEQUENCE` |
-| `16_translate.cql` | Translate intervals under two genetic codes | `TRANSLATE`, `PROTEIN_SEQUENCE` |
+| `01_promoters.grql` | Derive a promoter for `thrA` | `DEFINE PROMOTERS` |
+| `02_pwm.grql` | Scan a PWM by relative score | `SCAN`, `THRESHOLD` |
+| `03_pvalues.grql` | Filter PWM hits by q-value | `BACKGROUND`, `QVALUE` |
+| `04_overlap.grql` | Select motif matches in promoters | `OVERLAPS` |
+| `05_count.grql` | Count motif matches per promoter | `COUNT`, `WHERE COUNT` |
+| `06_near.grql` | Select motif matches near genes | `NEAR ... WITHIN` |
+| `07_modules.grql` | Pair patterns by spacing | `DEFINE MODULE` |
+| `08_filters.grql` | Filter annotation fields and attributes | `EXTRACT`, `WHERE` |
+| `09_tracks.grql` | Filter narrowPeak fields and metadata | `LOAD TRACK`, `WHERE` |
+| `10_track_overlap.grql` | Intersect two tracks | `OVERLAPS` |
+| `11_consensus.grql` | Compare two replicate tracks | `CONSENSUS` |
+| `12_orfs.grql` | Match complete-codon start-to-stop patterns | regex, `LENGTH MOD 3` |
+| `13_gff3.grql` | Validate and traverse GFF3; group repeated IDs | `VALIDATE`, hierarchy queries, `GROUP` |
+| `14_transcripts.grql` | Select declared transcript types and derive promoters | `EXTRACT TRANSCRIPTS`, `SELECT` |
+| `15_strands.grql` | Compare reference and strand-oriented sequence | `SEQUENCE`, `ORIENTED_SEQUENCE` |
+| `16_translate.grql` | Translate intervals under two genetic codes | `TRANSLATE`, `PROTEIN_SEQUENCE` |
 
 ---
 
-## Cis-QL Studio
+## GRQL Studio
 
-Studio edits and runs `.cql` files. It displays sequences, annotations, GC
+Studio edits and runs `.grql` files. It displays sequences, annotations, GC
 profiles, validation reports, feature groups, and other result sets written to
-`.cisql_results.json`.
+`.grql_results.json`.
 
 ---
 
 ## Compiler Architecture
 
 ```
-                                  [ .cql Source Query ]
+                                  [ .grql Source Query ]
                                             │
                                             ▼
                                    Lexical Analyzer (Lexer)
@@ -709,8 +708,8 @@ profiles, validation reports, feature groups, and other result sets written to
                  (FastaReader, GFFReader, Sweep-Line, PWMScanner)
                                             │
                                             ▼
-                                [ .cisql_results.json ]
+                                [ .grql_results.json ]
                                             │
                                             ▼
-                              Cis-QL Studio GUI Visualizer
+                              GRQL Studio GUI Visualizer
 ```

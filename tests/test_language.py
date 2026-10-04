@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BINARY = Path(os.environ.get("CISQL_BINARY", ROOT / "cisql"))
+BINARY = Path(os.environ.get("GRQL_BINARY", ROOT / "grql"))
 
 
 def require(condition: bool, message: str) -> None:
@@ -20,7 +20,7 @@ def require(condition: bool, message: str) -> None:
 
 
 def run_query(workspace: Path, name: str, source: str) -> tuple[dict, str]:
-    query = workspace / f"{name}.cql"
+    query = workspace / f"{name}.grql"
     query.write_text(source, encoding="utf-8")
     completed = subprocess.run(
         [str(BINARY), str(query)],
@@ -34,7 +34,7 @@ def run_query(workspace: Path, name: str, source: str) -> tuple[dict, str]:
         f"{name}: return code {completed.returncode}\n"
         f"stdout:\n{completed.stdout}\nstderr:\n{completed.stderr}",
     )
-    result_path = workspace / ".cisql_results.json"
+    result_path = workspace / ".grql_results.json"
     require(result_path.exists(), f"{name}: missing JSON output")
     return json.loads(result_path.read_text(encoding="utf-8")), completed.stderr
 
@@ -42,7 +42,7 @@ def run_query(workspace: Path, name: str, source: str) -> tuple[dict, str]:
 def run_invalid_query(
     workspace: Path, name: str, source: str, expected_code: int
 ) -> str:
-    query = workspace / f"{name}.cql"
+    query = workspace / f"{name}.grql"
     query.write_text(source, encoding="utf-8")
     completed = subprocess.run(
         [str(BINARY), str(query)],
@@ -58,15 +58,15 @@ def run_invalid_query(
         f"stderr:\n{completed.stderr}",
     )
     require(
-        not (workspace / ".cisql_results.json").exists(),
+        not (workspace / ".grql_results.json").exists(),
         f"{name}: failed execution left a stale results file",
     )
     return completed.stderr
 
 
 def main() -> int:
-    require(BINARY.exists(), "Build cisql before running language tests")
-    with tempfile.TemporaryDirectory(prefix="cisql-language-tests-") as temp:
+    require(BINARY.exists(), "Build grql before running language tests")
+    with tempfile.TemporaryDirectory(prefix="grql-language-tests-") as temp:
         workspace = Path(temp)
         (workspace / "data_examples").symlink_to(
             ROOT / "data_examples", target_is_directory=True
@@ -1939,7 +1939,7 @@ def main() -> int:
                 "NEAR rejects non-finite or overflowing distances")
 
         filter_source = (
-            ROOT / "cql_examples" / "08_filters.cql"
+            ROOT / "grql_examples" / "08_filters.grql"
         ).read_text(encoding="utf-8")
         data, _ = run_query(workspace, "annotation_filters", filter_source)
         require(
@@ -1952,7 +1952,7 @@ def main() -> int:
         )
 
         module_source = (
-            ROOT / "cql_examples" / "07_modules.cql"
+            ROOT / "grql_examples" / "07_modules.grql"
         ).read_text(encoding="utf-8")
         data, _ = run_query(workspace, "sequence_modules", module_source)
         modules = data["resultSets"]["modules"]
@@ -1964,7 +1964,7 @@ def main() -> int:
         )
 
         track_source = (
-            ROOT / "cql_examples" / "09_tracks.cql"
+            ROOT / "grql_examples" / "09_tracks.grql"
         ).read_text(encoding="utf-8")
         data, _ = run_query(workspace, "track_filters", track_source)
         filtered_peaks = data["resultSets"]["filtered_peaks"]
@@ -1983,7 +1983,7 @@ def main() -> int:
         )
 
         overlap_source = (
-            ROOT / "cql_examples" / "10_track_overlap.cql"
+            ROOT / "grql_examples" / "10_track_overlap.grql"
         ).read_text(encoding="utf-8")
         data, _ = run_query(workspace, "track_overlap", overlap_source)
         overlaps = data["resultSets"]["overlaps"]
@@ -2002,7 +2002,7 @@ def main() -> int:
         )
 
         consensus_source = (
-            ROOT / "cql_examples" / "11_consensus.cql"
+            ROOT / "grql_examples" / "11_consensus.grql"
         ).read_text(encoding="utf-8")
         data, _ = run_query(workspace, "replicate_consensus", consensus_source)
         consensus = data["resultSets"]["consensus"]
@@ -2054,7 +2054,7 @@ def main() -> int:
         )
 
         nearest_source = (
-            ROOT / "cql_examples" / "06_near.cql"
+            ROOT / "grql_examples" / "06_near.grql"
         ).read_text(encoding="utf-8")
         data, _ = run_query(workspace, "near_genes", nearest_source)
         nearby_sites = data["resultSets"]["nearby_sites"]
@@ -2069,7 +2069,7 @@ def main() -> int:
         )
 
         count_source = (
-            ROOT / "cql_examples" / "05_count.cql"
+            ROOT / "grql_examples" / "05_count.grql"
         ).read_text(encoding="utf-8")
         data, _ = run_query(workspace, "promoter_counts", count_source)
         motif_counts = data["resultSets"]["motif_counts"]
@@ -2085,7 +2085,7 @@ def main() -> int:
         )
 
         orf_source = (
-            ROOT / "cql_examples" / "12_orfs.cql"
+            ROOT / "grql_examples" / "12_orfs.grql"
         ).read_text(encoding="utf-8")
         data, _ = run_query(workspace, "orfs", orf_source)
         orfs = data["resultSets"]["orfs"]

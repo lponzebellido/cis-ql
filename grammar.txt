@@ -1,4 +1,4 @@
-Context-Free Grammar (CFG) for Cis-QL (v3.0-dev, regulatory foundation)
+Context-Free Grammar (CFG) for GRQL (v3.0-dev, regulatory foundation)
 
 Terminals (Tokens):
 
@@ -124,10 +124,10 @@ AliasOpt           -> AS ID | λ
 StrandType         -> POSITIVE | NEGATIVE
 
 Note on Execution Engine & Studio Integration:
-1. Cis-QL automatically compiles degenerate IUPAC nucleotide codes (e.g. TATAWAW) into regex patterns.
-2. If an `AliasOpt` (AS ID) is not provided, Cis-QL auto-generates descriptive track names (e.g., `Find_TATAAT_0`, `Scan_tbp_1`).
-3. Execution outputs are formatted into `.cisql_results.json` for live visualization in Cis-QL Studio.
-4. GFF features are loaded exactly as annotated. Cis-QL does not synthesize promoters or TSS records during import.
+1. GRQL automatically compiles degenerate IUPAC nucleotide codes (e.g. TATAWAW) into regex patterns.
+2. If an `AliasOpt` (AS ID) is not provided, GRQL auto-generates descriptive track names (e.g., `Find_TATAAT_0`, `Scan_tbp_1`).
+3. Execution outputs are formatted into `.grql_results.json` for live visualization in GRQL Studio.
+4. GFF features are loaded exactly as annotated. GRQL does not synthesize promoters or TSS records during import.
 5. `DEFINE PROMOTERS` requires an active sequence, explicit upstream/downstream distances, and stranded source features. Generated intervals are oriented from the TSS and clamped to chromosome bounds.
 6. `SCAN matrix IN regions` restricts a PWM scan to a biological entity or named region set. Each hit retains matrix identity, raw and relative scores, its source region, and the source-oriented relative start. Omitting `IN` preserves whole-genome scanning.
 7. `BACKGROUND UNIFORM` selects an explicit uniform zero-order background. `BACKGROUND FROM source` estimates nucleotide frequencies from a sequence dataset or region set and adds a total pseudocount of 0.1. The effective policy is forward, reverse-complemented for negative-only scans, or symmetrized for two-strand scans. Omitting the option retains the recorded uniform legacy default.

@@ -1219,7 +1219,7 @@ void Interpreter::executeExport(const IRInstruction &instr) {
                     : ".";
       const std::string source = region.annotationEvidence.present
                                      ? region.annotationEvidence.source
-                                     : "Cis-QL";
+                                     : "GRQL";
       const std::string phase = region.annotationEvidence.present
                                     ? region.annotationEvidence.phase
                                     : ".";
@@ -3333,7 +3333,7 @@ void Interpreter::executeAnalyzeCpG(const IRInstruction &instr) {
 }
 
 void Interpreter::dumpResultsJSON() const {
-  std::ofstream out(".cisql_results.json");
+  std::ofstream out(".grql_results.json");
   if (!out.is_open())
     return;
   out << std::setprecision(17);

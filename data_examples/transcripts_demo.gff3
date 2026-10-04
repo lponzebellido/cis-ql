@@ -1,7 +1,7 @@
 ##gff-version 3
-chrDemo	CisQL_demo	gene	101	900	.	+	.	ID=gene_1;Name=gene_1
-chrDemo	CisQL_demo	region	101	900	.	+	.	ID=locus_1;Parent=gene_1
-chrDemo	CisQL_demo	mRNA	201	700	.	+	.	ID=tx1;Parent=locus_1;tag=canonical
-chrDemo	CisQL_demo	transcript	301	800	.	+	.	ID=tx2;Parent=locus_1;tag=alternative
-chrDemo	CisQL_demo	exon	201	250	.	+	.	ID=exon_1;Parent=tx1
-chrDemo	CisQL_demo	exon	301	350	.	+	.	ID=exon_2;Parent=tx2
+chrDemo	GRQL_demo	gene	101	900	.	+	.	ID=gene_1;Name=gene_1
+chrDemo	GRQL_demo	region	101	900	.	+	.	ID=locus_1;Parent=gene_1
+chrDemo	GRQL_demo	mRNA	201	700	.	+	.	ID=tx1;Parent=locus_1;tag=canonical
+chrDemo	GRQL_demo	transcript	301	800	.	+	.	ID=tx2;Parent=locus_1;tag=alternative
+chrDemo	GRQL_demo	exon	201	250	.	+	.	ID=exon_1;Parent=tx1
+chrDemo	GRQL_demo	exon	301	350	.	+	.	ID=exon_2;Parent=tx2

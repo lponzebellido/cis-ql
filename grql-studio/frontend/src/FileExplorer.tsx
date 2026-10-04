@@ -14,7 +14,7 @@ interface FileExplorerProps {
 }
 
 const EXT_COLORS: Record<string, string> = {
-  cql: '#3fb950',
+  grql: '#3fb950',
   fasta: '#58a6ff',
   fa: '#58a6ff',
   gff3: '#d29922',
@@ -213,7 +213,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onFileSelect, worksp
   };
 
   const handleDragStart = (e: React.DragEvent, path: string) => {
-    e.dataTransfer.setData('application/x-cisql-filepath', path);
+    e.dataTransfer.setData('application/x-grql-filepath', path);
     e.dataTransfer.effectAllowed = 'move';
   };
 
@@ -228,7 +228,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onFileSelect, worksp
     e.preventDefault();
     if (!targetNode.isDirectory) return;
 
-    const oldPath = e.dataTransfer.getData('application/x-cisql-filepath');
+    const oldPath = e.dataTransfer.getData('application/x-grql-filepath');
     if (!oldPath || oldPath === targetNode.path) return;
 
     const fileName = oldPath.split('/').pop();
@@ -420,7 +420,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onFileSelect, worksp
       }}
       onDrop={(e) => {
         e.preventDefault();
-        const oldPath = e.dataTransfer.getData('application/x-cisql-filepath');
+        const oldPath = e.dataTransfer.getData('application/x-grql-filepath');
         if (!oldPath || oldPath.indexOf('/') === -1) return; 
         
         const fileName = oldPath.split('/').pop();

@@ -1,30 +1,30 @@
-# Cis-QL examples
+# GRQL examples
 
 Each file demonstrates one language operation with a small query. Run them
 from the repository root:
 
 ```bash
-./cisql cql_examples/01_promoters.cql
+./grql grql_examples/01_promoters.grql
 ```
 
 | File | Operation | Input |
 | :--- | :--- | :--- |
-| `01_promoters.cql` | Select `thrA` and derive its promoter | *E. coli* FASTA and GFF3 |
-| `02_pwm.cql` | Scan a PWM with a relative score threshold | synthetic FASTA, JASPAR matrix |
-| `03_pvalues.cql` | Estimate a background and filter by q-value | synthetic FASTA, JASPAR matrix |
-| `04_overlap.cql` | Keep motif matches that overlap promoters | *E. coli* FASTA and GFF3 |
-| `05_count.cql` | Count motif matches per promoter, including zeroes | *E. coli* FASTA and GFF3 |
-| `06_near.cql` | Link nearby motif matches to genes by distance | *E. coli* FASTA and GFF3 |
-| `07_modules.cql` | Pair two patterns under spacing rules | *E. coli* FASTA |
-| `08_filters.cql` | Filter GFF3 records by type, strand, phase, and attribute | *E. coli* GFF3 |
-| `09_tracks.cql` | Load narrowPeak data and filter its fields | synthetic narrowPeak track |
-| `10_track_overlap.cql` | Overlap accessibility and binding tracks | synthetic narrowPeak tracks |
-| `11_consensus.cql` | Require coordinate support across two replicates | synthetic narrowPeak tracks |
-| `12_orfs.cql` | Find start-to-stop patterns in complete codons | *E. coli* FASTA |
-| `13_gff3.cql` | Validate and traverse GFF3; group repeated IDs | *E. coli* FASTA and GFF3 |
-| `14_transcripts.cql` | Select transcript types and derive their promoters | synthetic FASTA and GFF3 |
-| `15_strands.cql` | Compare reference and strand-oriented sequence | synthetic FASTA |
-| `16_translate.cql` | Translate intervals with two genetic codes | synthetic FASTA |
+| `01_promoters.grql` | Select `thrA` and derive its promoter | *E. coli* FASTA and GFF3 |
+| `02_pwm.grql` | Scan a PWM with a relative score threshold | synthetic FASTA, JASPAR matrix |
+| `03_pvalues.grql` | Estimate a background and filter by q-value | synthetic FASTA, JASPAR matrix |
+| `04_overlap.grql` | Keep motif matches that overlap promoters | *E. coli* FASTA and GFF3 |
+| `05_count.grql` | Count motif matches per promoter, including zeroes | *E. coli* FASTA and GFF3 |
+| `06_near.grql` | Link nearby motif matches to genes by distance | *E. coli* FASTA and GFF3 |
+| `07_modules.grql` | Pair two patterns under spacing rules | *E. coli* FASTA |
+| `08_filters.grql` | Filter GFF3 records by type, strand, phase, and attribute | *E. coli* GFF3 |
+| `09_tracks.grql` | Load narrowPeak data and filter its fields | synthetic narrowPeak track |
+| `10_track_overlap.grql` | Overlap accessibility and binding tracks | synthetic narrowPeak tracks |
+| `11_consensus.grql` | Require coordinate support across two replicates | synthetic narrowPeak tracks |
+| `12_orfs.grql` | Find start-to-stop patterns in complete codons | *E. coli* FASTA |
+| `13_gff3.grql` | Validate and traverse GFF3; group repeated IDs | *E. coli* FASTA and GFF3 |
+| `14_transcripts.grql` | Select transcript types and derive their promoters | synthetic FASTA and GFF3 |
+| `15_strands.grql` | Compare reference and strand-oriented sequence | synthetic FASTA |
+| `16_translate.grql` | Translate intervals with two genetic codes | synthetic FASTA |
 
 `ecoli2.fna` and `genomic.gff` use accession `U00096.3`, so sequence and
 annotation coordinates refer to the same assembly. The track and regulatory
@@ -34,7 +34,7 @@ input for testing PWM syntax, not a recommended model for *E. coli*.
 
 Example 14 declares both `mRNA` and `transcript` as accepted input types. Its
 `canonical` tag is fixture metadata queried with `SELECT ATTRIBUTE`, not a
-portable GFF3 convention or an inference made by Cis-QL.
+portable GFF3 convention or an inference made by GRQL.
 
 Example 15 finds the same bounded pattern on both strands. `SEQUENCE` retains
 the bases as stored in the FASTA; `ORIENTED_SEQUENCE` reverse-complements the
@@ -45,7 +45,7 @@ The TGA codon is a stop in table 1 and tryptophan in table 4, so the example
 shows that genetic-code choice is part of the program rather than an implicit
 default. It is a translation example, not an ORF or gene prediction.
 
-The regular expression in `12_orfs.cql` advances three nucleotides at a time
+The regular expression in `12_orfs.grql` advances three nucleotides at a time
 after `ATG` and rejects an in-frame stop in each repeated codon. It therefore
 reaches `TAA`, `TAG`, or `TGA` in the same frame. The `LENGTH MOD 3 = 0`
 condition makes that requirement visible in the query. The result is a set of
