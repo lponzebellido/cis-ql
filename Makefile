@@ -13,7 +13,7 @@ SRCS = src/main.cpp \
        src/bioinfo/BEDReader.cpp \
        src/bioinfo/SmithWaterman.cpp src/bioinfo/SetOperations.cpp src/bioinfo/PWMScanner.cpp \
        src/bioinfo/GCAnalyzer.cpp src/bioinfo/RegulatoryRegions.cpp \
-       src/bioinfo/BackgroundModel.cpp
+       src/bioinfo/BackgroundModel.cpp src/bioinfo/GeneticCode.cpp
 
 OBJS = $(SRCS:.cpp=.o)
 DEPS = $(OBJS:.o=.d)
@@ -37,7 +37,7 @@ $(CORE_TEST_TARGET): tests/test_core.cpp \
        src/bioinfo/SetOperations.cpp src/bioinfo/PWMScanner.cpp \
        src/bioinfo/BEDReader.cpp \
        src/bioinfo/GCAnalyzer.cpp src/bioinfo/RegulatoryRegions.cpp \
-       src/bioinfo/BackgroundModel.cpp
+       src/bioinfo/BackgroundModel.cpp src/bioinfo/GeneticCode.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 test: $(TARGET) $(CORE_TEST_TARGET)

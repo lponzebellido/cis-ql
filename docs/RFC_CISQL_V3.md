@@ -3,8 +3,8 @@
 Status: incremental implementation. Explicit promoters, transcript selection,
 strand-aware sequence predicates, calibrated PWM scans, evidence-preserving
 interval operations, two-member modules, imported regulatory tracks, replicate
-consensus, and modular coordinate filters are implemented. Later sections are
-a design contract, not yet accepted syntax.
+consensus, modular coordinate filters, and explicit interval translation are
+implemented. Later sections are a design contract, not yet accepted syntax.
 
 ## Product definition
 
@@ -30,7 +30,7 @@ how many new statements it adds.
 
 | Priority | Missing capability | Why it matters | Smallest useful acceptance target |
 | :--- | :--- | :--- | :--- |
-| 1 | Richer scalar expressions, captures, and translation | Reference and strand-oriented sequences can now be queried, but programmers still need slicing, captures, translation, and genetic-code policy outside the regex itself | Add reusable string/numeric expressions and translation with an explicit genetic code |
+| 1 | Richer scalar expressions, captures, and CDS translation policy | Interval translation now has an explicit code and frame, but programmers still need slicing, capture binding, joined CDS assembly, phase handling, and an explicit initiation policy | Add reusable string/numeric expressions and captures; specify a separate CDS mode for joined records and initiator codons |
 | 2 | Enrichment with matched backgrounds | Counts alone cannot distinguish motif enrichment from length or composition effects | Declare foreground/background regions, matching policy, effect size, test, and multiple-testing correction |
 | 3 | CRE-to-gene evidence tables | `NEAR` is useful but genomic proximity is only one candidate-linking rule | Import relationship/contact tables and retain typed promoter, distance, contact, expression, and binding evidence per link |
 | 4 | General regulatory grammars | Two-site modules cannot express larger heterotypic architectures | Named members, more than two sites, transcript-relative orientation, and grouped aggregation |
@@ -310,7 +310,7 @@ Still planned:
 - richer JASPAR metadata such as TF family and matrix release/version;
 - installed-FIMO parity fixtures in continuous integration.
 
-### Part 2C: explicit modular coordinate constraints
+### Part 2C1: explicit modular coordinate constraints
 
 Implemented syntax:
 
@@ -338,7 +338,46 @@ negative-strand interval for comparison without changing its coordinates or
 stored evidence. Both accept literal `=`, `STARTS_WITH`, `ENDS_WITH`, and
 `CONTAINS` predicates. Unstranded records do not satisfy
 `ORIENTED_SEQUENCE`. Materialized sequence expressions, slicing, capture
-groups, translation, and explicit genetic-code selection remain planned.
+groups, and reusable scalar values remain planned.
+
+### Part 2C2: explicit interval translation
+
+Implemented syntax:
+
+```cql
+TRANSLATE candidates CODE 1 FRAME 0 AS standard;
+TRANSLATE candidates CODE 4 FRAME 0 AS table4;
+
+EXTRACT table4 AS tga_trp
+  WHERE PROTEIN_SEQUENCE = "MW*";
+```
+
+The source must be a region or motif-hit alias and an active FASTA must be
+available. Translation uses each interval's oriented 5'-to-3' sequence, so a
+negative-strand interval is reverse-complemented and an unstranded interval is
+rejected. `FRAME` is an offset of 0, 1, or 2 from the first oriented base.
+Trailing bases that do not form a complete codon are ignored, ambiguous codons
+produce `X`, and stop codons produce `*`.
+
+`CODE` accepts the translation-table identifiers currently published in the
+[NCBI genetic-code catalog](https://www.ncbi.nlm.nih.gov/datasets/docs/v2/data-processing/taxonomy-processing/genetic-codes/):
+1–6, 9–16, and 21–33. Translation uses the table's amino-acid assignments but
+does not apply its separate initiator row. A general interval cannot be assumed
+to begin at a biological translation start; applying alternative initiators
+there would silently turn a positional query into a CDS policy.
+
+The result is a regular region set with unchanged coordinates and reference
+DNA plus typed `translationEvidence`: genetic code, frame, and protein string.
+`PROTEIN_SEQUENCE` makes that protein available to case-insensitive literal
+`=`, `STARTS_WITH`, `ENDS_WITH`, and `CONTAINS` predicates. JSON, TSV, GFF3,
+and Studio retain the evidence. `INTERSECT`, `UNION`, and `EXCEPT` invalidate
+it when they alter interval geometry.
+
+This is not yet transcript translation. A later CDS-specific mode must define
+how discontinuous members are ordered and concatenated, how GFF3 phase is
+applied on both strands, which initiator row is used, and whether terminal stop
+or completeness checks are required. Those choices should remain visible in
+the program instead of being inferred from feature names.
 
 ### Part 3: regulatory interval algebra
 

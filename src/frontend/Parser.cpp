@@ -58,6 +58,7 @@ void Parser::synchronize() {
     case TokenType::DEFINE:
     case TokenType::VALIDATE:
     case TokenType::GROUP:
+    case TokenType::TRANSLATE:
     case TokenType::FIND:
     case TokenType::EXTRACT:
     case TokenType::INTERSECT:
@@ -101,6 +102,8 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
     return parseValidate();
   if (match(TokenType::GROUP))
     return parseGroup();
+  if (match(TokenType::TRANSLATE))
+    return parseTranslate();
   if (match(TokenType::DEFINE)) {
     if (check(TokenType::PROMOTERS))
       return parseDefinePromoters();
@@ -136,7 +139,7 @@ std::unique_ptr<StatementNode> Parser::parseStatement() {
 
   reportError(peek(), "Expected start of a statement (LOAD, USE, EXPORT, FIND, "
                       "EXTRACT, INTERSECT, UNION, EXCEPT, OVERLAPS, NEAR, "
-                      "CONSENSUS, SCAN, COUNT, ANALYZE, VALIDATE, GROUP, IF, FOREACH, "
+                      "CONSENSUS, SCAN, COUNT, ANALYZE, VALIDATE, GROUP, TRANSLATE, IF, FOREACH, "
                       "DEFINE)");
   throw std::runtime_error("Parse error");
 }
@@ -171,6 +174,24 @@ std::unique_ptr<GroupStmtNode> Parser::parseGroup() {
   const std::string alias = previous().lexeme;
   consume(TokenType::SEMICOLON, "Expected ';' at the end of GROUP.");
   return std::unique_ptr<GroupStmtNode>(new GroupStmtNode(sourceAlias, alias));
+}
+
+std::unique_ptr<TranslateStmtNode> Parser::parseTranslate() {
+  consume(TokenType::ID, "Expected a source alias after TRANSLATE.");
+  const std::string sourceAlias = previous().lexeme;
+  consume(TokenType::CODE, "Expected 'CODE' after the translation source.");
+  consume(TokenType::NUM, "Expected an NCBI genetic-code table number.");
+  const std::string geneticCode = previous().lexeme;
+  consume(TokenType::FRAME,
+          "Expected 'FRAME' after the genetic-code table number.");
+  consume(TokenType::NUM, "Expected translation frame 0, 1, or 2.");
+  const std::string frame = previous().lexeme;
+  consume(TokenType::AS, "Expected 'AS' after the translation frame.");
+  consume(TokenType::ID, "Expected a translated result alias after AS.");
+  const std::string alias = previous().lexeme;
+  consume(TokenType::SEMICOLON, "Expected ';' at the end of TRANSLATE.");
+  return std::unique_ptr<TranslateStmtNode>(
+      new TranslateStmtNode(sourceAlias, geneticCode, frame, alias));
 }
 
 std::unique_ptr<DefinePromotersStmtNode> Parser::parseDefinePromoters() {
@@ -989,6 +1010,7 @@ std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
   } else if (match(TokenType::LENGTH) || match(TokenType::START) ||
       match(TokenType::END) || match(TokenType::STRAND) ||
       match(TokenType::SEQUENCE) || match(TokenType::ORIENTED_SEQUENCE) ||
+      match(TokenType::PROTEIN_SEQUENCE) ||
       match(TokenType::SIMILARITY) ||
       match(TokenType::GC_CONTENT) || match(TokenType::COUNT) ||
       match(TokenType::TRACK_SCORE) || match(TokenType::SIGNAL_VALUE) ||

@@ -38,6 +38,7 @@ private:
   std::unique_ptr<AnalyzeStmtNode> parseAnalyze();
   std::unique_ptr<ValidateStmtNode> parseValidate();
   std::unique_ptr<GroupStmtNode> parseGroup();
+  std::unique_ptr<TranslateStmtNode> parseTranslate();
   std::unique_ptr<IfStmtNode> parseIf();
   std::unique_ptr<ForeachStmtNode> parseForeach();
 

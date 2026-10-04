@@ -63,6 +63,8 @@ temp_script.cql
 /canonical_transcript.gff3
 /transcript_promoters.bed
 /strands.tsv
+/standard_translation.tsv
+/table4_translation.gff3
 
 *.tex
 

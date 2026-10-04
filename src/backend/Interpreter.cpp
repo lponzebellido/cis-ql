@@ -566,6 +566,12 @@ void Interpreter::printRegions(const std::vector<GenomicRegion> &regions,
       }
       std::cout << "      seq: " << display << std::endl;
     }
+    if (r.translationEvidence.present) {
+      std::cout << "      protein: "
+                << r.translationEvidence.proteinSequence << "  code:"
+                << r.translationEvidence.geneticCode << "  frame:"
+                << r.translationEvidence.frame << std::endl;
+    }
     shown++;
   }
 }
@@ -970,6 +976,68 @@ void Interpreter::executeGroupAnnotation(const IRInstruction &instr) {
   }
 }
 
+void Interpreter::executeTranslate(const IRInstruction &instr) {
+  const std::string &sourceAlias = instr.arg1;
+  const int geneticCode = std::atoi(instr.arg2.c_str());
+  const size_t frame = static_cast<size_t>(std::atoi(instr.arg3.c_str()));
+  const std::string &resultAlias = instr.arg4;
+  const auto source = resultSets.find(sourceAlias);
+  if (source == resultSets.end()) {
+    reportRuntimeError("Translation source alias '" + sourceAlias +
+                       "' is not available.");
+    return;
+  }
+  const auto dataset = sequenceChrMaps.find(activeSequenceAlias);
+  if (dataset == sequenceChrMaps.end()) {
+    reportRuntimeError("TRANSLATE requires an active sequence dataset.");
+    return;
+  }
+  std::vector<GenomicRegion> translated = source->second;
+  for (size_t index = 0; index < translated.size(); ++index) {
+    GenomicRegion &region = translated[index];
+    if (region.strand != "+" && region.strand != "-") {
+      reportRuntimeError("TRANSLATE source alias '" + sourceAlias +
+                         "' contains an unstranded region at position " +
+                         std::to_string(index + 1) + ".");
+      return;
+    }
+    std::string sequence = region.sequence;
+    if (sequence.empty()) {
+      const auto chromosome = dataset->second.find(region.chr);
+      if (chromosome != dataset->second.end() &&
+          region.end <= chromosome->second.sequence.size()) {
+        sequence = chromosome->second.sequence.substr(
+            region.start, region.end - region.start);
+      }
+    }
+    if (sequence.empty()) {
+      reportRuntimeError("TRANSLATE source alias '" + sourceAlias +
+                         "' has no resolvable sequence at position " +
+                         std::to_string(index + 1) + ".");
+      return;
+    }
+    if (region.strand == "-")
+      sequence = MotifFinder::reverseComplement(sequence);
+    std::string protein;
+    std::string error;
+    if (!GeneticCode::translate(sequence, geneticCode, frame, protein,
+                                error)) {
+      reportRuntimeError(error);
+      return;
+    }
+    region.translationEvidence.present = true;
+    region.translationEvidence.geneticCode = geneticCode;
+    region.translationEvidence.frame = static_cast<int>(frame);
+    region.translationEvidence.proteinSequence = protein;
+  }
+  resultSets[resultAlias] = translated;
+  namedRegions[resultAlias] = std::move(translated);
+  if (debugMode) {
+    std::cout << "> TRANSLATE " << sourceAlias << " CODE " << geneticCode
+              << " FRAME " << frame << " AS " << resultAlias << std::endl;
+  }
+}
+
 void Interpreter::executeExport(const IRInstruction &instr) {
   const std::string &alias = instr.arg1;
   const std::string filename = stripQuotes(instr.arg2);
@@ -1331,6 +1399,13 @@ void Interpreter::executeExport(const IRInstruction &instr) {
           out << ";PeakOffset=" << track.peakOffset
               << ";PeakPosition=" << track.peakPosition;
       }
+      if (region.translationEvidence.present) {
+        out << ";GeneticCode=" << region.translationEvidence.geneticCode
+            << ";TranslationFrame=" << region.translationEvidence.frame
+            << ";ProteinSequence="
+            << gffAttributeEscape(
+                   region.translationEvidence.proteinSequence);
+      }
       if (!region.overlapEvidence.empty()) {
         out << ";OverlapEvidenceCount=" << region.overlapEvidence.size()
             << ";OverlapEvidenceJSON="
@@ -1378,7 +1453,8 @@ void Interpreter::executeExport(const IRInstruction &instr) {
            "\tconsensus_evidence_json"
            "\tannotation_source\tannotation_id\tannotation_name"
            "\tannotation_score\tannotation_phase"
-           "\tannotation_parents_json\tannotation_attributes_json\n";
+           "\tannotation_parents_json\tannotation_attributes_json"
+           "\ttranslation_code\ttranslation_frame\tprotein_sequence\n";
     for (const auto &region : regionsIt->second) {
       out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
           << region.end << '\t' << cleanTabularField(region.strand) << '\t'
@@ -1555,6 +1631,15 @@ void Interpreter::executeExport(const IRInstruction &instr) {
             serializeAnnotationAttributesJSON(region.annotationEvidence));
       } else {
         out << "\t\t\t\t\t\t";
+      }
+      out << '\t';
+      if (region.translationEvidence.present) {
+        out << region.translationEvidence.geneticCode << '\t'
+            << region.translationEvidence.frame << '\t'
+            << cleanTabularField(
+                   region.translationEvidence.proteinSequence);
+      } else {
+        out << "\t\t";
       }
       out << '\n';
     }
@@ -2330,6 +2415,12 @@ bool Interpreter::evaluateRegionCondition(
     return compareSequenceText(observed, condition->op,
                                stripQuotes(condition->value));
   }
+  if (condition->property == "PROTEIN_SEQUENCE") {
+    return region.translationEvidence.present &&
+           compareSequenceText(region.translationEvidence.proteinSequence,
+                               condition->op,
+                               stripQuotes(condition->value));
+  }
   if (condition->property == "EVIDENCE_CLASS" ||
       condition->property == "ASSAY" || condition->property == "SAMPLE" ||
       condition->property == "CONDITION" ||
@@ -2540,6 +2631,7 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
             instr.condition,
             {"LENGTH", "START", "END", "STRAND", "SIMILARITY",
              "GC_CONTENT", "SEQUENCE", "ORIENTED_SEQUENCE", "COUNT",
+             "PROTEIN_SEQUENCE",
              "ID", "NAME", "TYPE", "PARENT",
              "SOURCE", "PHASE", "ATTRIBUTE",
              "TRACK_SCORE", "SIGNAL_VALUE", "MINUS_LOG10_PVALUE",
@@ -3279,6 +3371,16 @@ void Interpreter::dumpResultsJSON() const {
         out << ",\n        \"annotationEvidence\": "
             << serializeAnnotationEvidenceJSON(r.annotationEvidence);
       }
+      if (r.translationEvidence.present) {
+        out << ",\n        \"translationEvidence\": {\n"
+            << "          \"geneticCode\": "
+            << r.translationEvidence.geneticCode << ",\n"
+            << "          \"frame\": " << r.translationEvidence.frame
+            << ",\n"
+            << "          \"proteinSequence\": \""
+            << jsonEscape(r.translationEvidence.proteinSequence) << "\"\n"
+            << "        }";
+      }
       if (r.motifEvidence.present) {
         out << ",\n        \"motifEvidence\": {\n"
             << "          \"matrixAlias\": \""
@@ -3740,6 +3842,9 @@ void Interpreter::execute(const std::vector<IRInstruction> &program,
       break;
     case IROpCode::GROUP_ANNOTATION:
       executeGroupAnnotation(instr);
+      break;
+    case IROpCode::TRANSLATE_REGIONS:
+      executeTranslate(instr);
       break;
     default:
       break;

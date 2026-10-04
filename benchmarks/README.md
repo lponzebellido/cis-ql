@@ -53,9 +53,9 @@ make validate
 
 The Python reference suite independently checks motif coordinates, PSSM
 thresholds and tail probabilities, interval subtraction, overlap, nearest
-selection, counting, consensus, motif modules, reading frame, and normalized
-Smith-Waterman scoring. BEDTools, Biopython, and FIMO comparisons run when those
-programs are installed.
+selection, counting, consensus, motif modules, reading frame, strand-aware
+translation, and normalized Smith-Waterman scoring. BEDTools, Biopython, and
+FIMO comparisons run when those programs are installed.
 
 Before publishing a comparison, use identical records, coordinate conventions,
 strand rules, thresholds, and output definitions. Verify coordinates before

@@ -178,6 +178,19 @@
           "spans": 2
         }
       }
+    },
+    {
+      "id": "16",
+      "file": "16_translate.cql",
+      "exports": ["standard_translation.tsv", "table4_translation.gff3"],
+      "resultCounts": {
+        "resultSets": {
+          "tga_trp": 2,
+          "table4": 2,
+          "standard": 2,
+          "candidates": 2
+        }
+      }
     }
   ]
 }

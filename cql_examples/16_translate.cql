@@ -1,0 +1,14 @@
+LOAD SEQUENCE "data_examples/strand_demo.fasta" AS genome;
+
+FIND MOTIF "ATGNNNTAA" AS spans
+  WHERE ORIENTED_SEQUENCE STARTS_WITH "ATG"
+    AND ORIENTED_SEQUENCE ENDS_WITH "TAA"
+    AND ORIENTED_SEQUENCE CONTAINS "CCC";
+
+EXTRACT spans AS forward_reference
+  WHERE SEQUENCE STARTS_WITH "ATG";
+
+EXTRACT spans AS reverse_reference
+  WHERE SEQUENCE ENDS_WITH "CAT";
+
+// EXPORT spans TO "strands.tsv" FORMAT TSV;

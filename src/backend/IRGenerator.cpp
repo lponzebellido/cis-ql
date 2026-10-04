@@ -40,6 +40,7 @@ std::string irOpcodeToString(IROpCode op) {
     case IROpCode::ANALYZE_CPG:      return "ANALYZE_CPG";
     case IROpCode::VALIDATE_ANNOTATION:return "VALIDATE_ANNOTATION";
     case IROpCode::GROUP_ANNOTATION:   return "GROUP_ANNOTATION";
+    case IROpCode::TRANSLATE_REGIONS:  return "TRANSLATE_REGIONS";
     case IROpCode::DEFINE_PROMOTERS: return "DEFINE_PROMOTERS";
     case IROpCode::DEFINE_MODULE:    return "DEFINE_MODULE";
     case IROpCode::IF_BEGIN:         return "IF_BEGIN";
@@ -480,6 +481,22 @@ void IRGenerator::visit(GroupStmtNode *node) {
   group.arg1 = node->sourceAlias;
   group.arg2 = node->alias;
   instructions.push_back(group);
+}
+
+void IRGenerator::visit(TranslateStmtNode *node) {
+  IRInstruction translate;
+  translate.opcode = IROpCode::TRANSLATE_REGIONS;
+  translate.arg1 = node->sourceAlias;
+  translate.arg2 = node->geneticCode;
+  translate.arg3 = node->frame;
+  translate.arg4 = node->alias;
+  instructions.push_back(translate);
+
+  IRInstruction print;
+  print.opcode = IROpCode::PRINT_RESULTS;
+  print.arg1 = node->alias;
+  print.arg2 = "TRANSLATE";
+  instructions.push_back(print);
 }
 
 void IRGenerator::visit(IfStmtNode *node) {

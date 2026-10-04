@@ -181,6 +181,10 @@ def main() -> int:
         (workspace / "oriented.fasta").write_text(
             ">chrOrient\nATGCAT\n", encoding="utf-8"
         )
+        (workspace / "translation.fasta").write_text(
+            ">chrTranslate\nATGTGATAAGGGGTTATCACAT\n",
+            encoding="utf-8",
+        )
         (workspace / "oriented.gff3").write_text(
             "##gff-version 3\n"
             "chrOrient\ttest\tregion\t1\t3\t.\t.\t.\tID=unstranded\n",
@@ -345,7 +349,7 @@ def main() -> int:
         track_tsv = (workspace / "accessible.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(track_tsv) == 110 and track_tsv[81:96] == [
+        require(len(track_tsv) == 113 and track_tsv[81:96] == [
                     "accessible", "accessibility.narrowPeak", "NARROWPEAK",
                     "ACCESSIBILITY", "ATAC-seq", "leaf", "pigmented",
                     "R1", "input", "500", "12.5",
@@ -356,7 +360,7 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()[1].split("\t")
         combined_overlap = json.loads(combined_tsv[96])
-        require(len(combined_tsv) == 110 and
+        require(len(combined_tsv) == 113 and
                 combined_overlap[0]["referenceSet"] == "bound" and
                 combined_overlap[0]["trackEvidence"]["evidenceClass"]
                 == "BINDING" and
@@ -642,7 +646,7 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()[1].split("\t")
         require(
-            len(coding_tsv) == 110 and
+            len(coding_tsv) == 113 and
             coding_tsv[103:109] == ["curated", "cds1", "", "7.5", "0",
                                       '["tx1"]'] and
             json.loads(coding_tsv[109])["protein_id"] == "P1",
@@ -1153,7 +1157,8 @@ def main() -> int:
                 "\tconsensus_evidence_json"
                 "\tannotation_source\tannotation_id\tannotation_name"
                 "\tannotation_score\tannotation_phase"
-                "\tannotation_parents_json\tannotation_attributes_json",
+                "\tannotation_parents_json\tannotation_attributes_json"
+                "\ttranslation_code\ttranslation_frame\tprotein_sequence",
                 "region TSV export")
         profile_lines = (workspace / "profile.tsv").read_text(
             encoding="utf-8"
@@ -1256,6 +1261,111 @@ def main() -> int:
              for item in data["resultSets"]["triplets"]] == [(0, 3)],
             "sequence text comparators compose with boolean conditions",
         )
+
+        data, _ = run_query(
+            workspace,
+            "translation",
+            'LOAD SEQUENCE "translation.fasta" AS genome;\n'
+            'FIND MOTIF "ATGTGATAA" AS candidates;\n'
+            'TRANSLATE candidates CODE 1 FRAME 0 AS standard;\n'
+            'TRANSLATE candidates CODE 4 FRAME 0 AS table_four;\n'
+            'TRANSLATE candidates CODE 11 FRAME 1 AS offset;\n'
+            'EXTRACT table_four AS reassigned '
+            'WHERE PROTEIN_SEQUENCE = "MW*";\n'
+            'EXTRACT standard AS terminated '
+            'WHERE PROTEIN_SEQUENCE ENDS_WITH "**";\n'
+            'EXPORT standard TO "translation.tsv" FORMAT TSV;\n'
+            'EXPORT table_four TO "translation.gff3" FORMAT GFF3;\n',
+        )
+        require(
+            [(item["start"], item["strand"])
+             for item in data["resultSets"]["candidates"]]
+            == [(0, "+"), (13, "-")],
+            "translation candidates include both DNA strands",
+        )
+        require(
+            [item["translationEvidence"]
+             for item in data["resultSets"]["standard"]]
+            == [
+                {"geneticCode": 1, "frame": 0, "proteinSequence": "M**"},
+                {"geneticCode": 1, "frame": 0, "proteinSequence": "M**"},
+            ],
+            "standard translation keeps typed evidence",
+        )
+        require(
+            all(item["translationEvidence"]["proteinSequence"] == "MW*"
+                for item in data["resultSets"]["table_four"])
+            and len(data["resultSets"]["reassigned"]) == 2,
+            "genetic-code selection changes translation and remains queryable",
+        )
+        require(
+            all(item["translationEvidence"]["proteinSequence"] == "CD"
+                for item in data["resultSets"]["offset"])
+            and len(data["resultSets"]["terminated"]) == 2,
+            "frame offsets and protein text predicates are explicit",
+        )
+        translation_tsv = (workspace / "translation.tsv").read_text(
+            encoding="utf-8"
+        ).splitlines()
+        translation_header = translation_tsv[0].split("\t")
+        translation_row = dict(zip(
+            translation_header, translation_tsv[1].split("\t")
+        ))
+        require(
+            translation_row["translation_code"] == "1"
+            and translation_row["translation_frame"] == "0"
+            and translation_row["protein_sequence"] == "M**",
+            "TSV export preserves translation evidence",
+        )
+        require(
+            ";GeneticCode=4;TranslationFrame=0;ProteinSequence=MW%2A"
+            in (workspace / "translation.gff3").read_text(encoding="utf-8"),
+            "GFF3 export preserves translation evidence",
+        )
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "translation_code",
+            'LOAD SEQUENCE "translation.fasta" AS genome;\n'
+            'FIND MOTIF "ATG" AS candidates;\n'
+            'TRANSLATE candidates CODE 7 FRAME 0 AS invalid;\n',
+            3,
+        )
+        require("Unsupported NCBI genetic code table 7" in semantic_error,
+                "unsupported translation tables are rejected")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "translation_frame",
+            'LOAD SEQUENCE "translation.fasta" AS genome;\n'
+            'FIND MOTIF "ATG" AS candidates;\n'
+            'TRANSLATE candidates CODE 1 FRAME 3 AS invalid;\n',
+            3,
+        )
+        require("FRAME must be 0, 1, or 2" in semantic_error,
+                "translation frames are validated")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "translation_source_type",
+            'LOAD SEQUENCE "translation.fasta" AS genome;\n'
+            'TRANSLATE genome CODE 1 FRAME 0 AS invalid;\n',
+            3,
+        )
+        require("expects a region or motif-hit alias" in semantic_error,
+                "translation requires an interval set")
+
+        runtime_error = run_invalid_query(
+            workspace,
+            "translation_strand",
+            'LOAD SEQUENCE "oriented.fasta" AS genome;\n'
+            'LOAD ANNOTATION "oriented.gff3" AS annotation;\n'
+            'EXTRACT REGION AS unstranded;\n'
+            'TRANSLATE unstranded CODE 1 FRAME 0 AS invalid;\n',
+            4,
+        )
+        require("contains an unstranded region" in runtime_error,
+                "translation requires a known strand")
 
         semantic_error = run_invalid_query(
             workspace,
@@ -1471,7 +1581,7 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()
         first_tsv_site = tsv_rows[1].split("\t")
-        require(len(tsv_rows) == 10 and len(first_tsv_site) == 110 and
+        require(len(tsv_rows) == 10 and len(first_tsv_site) == 113 and
                 first_tsv_site[7:11]
                 == ["matrix", "TEST", "test", "fixture.pwm"] and
                 float(first_tsv_site[11]) > 0 and
@@ -1487,7 +1597,7 @@ def main() -> int:
                 abs(float(first_tsv_site[31]) - 0.1) < 1e-12 and
                 first_tsv_site[32:34] == ["short_promoter", "promoter"] and
                 first_tsv_site[36] == "0" and
-                first_tsv_site[37:] == [""] * 73,
+                first_tsv_site[37:] == [""] * 76,
                 "motif TSV export retains evidence columns")
 
         data, _ = run_query(
@@ -1525,7 +1635,7 @@ def main() -> int:
         promoter_overlap_tsv = (workspace / "promoter_sites.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(promoter_overlap_tsv) == 110 and
+        require(len(promoter_overlap_tsv) == 113 and
                 json.loads(promoter_overlap_tsv[96])[0]["reference"]
                     ["name"] == "short_promoter",
                 "OVERLAPS TSV evidence identifies the matching reference")
@@ -1577,10 +1687,10 @@ def main() -> int:
         linked_tsv = (workspace / "linked.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(linked_tsv) == 110 and linked_tsv[37:48] == [
+        require(len(linked_tsv) == 113 and linked_tsv[37:48] == [
                     "NEAR", "GENE", "chr1", "0", "1200", "+", "gene",
                     "short", "0", "0", "true",
-                ] and linked_tsv[48:] == [""] * 62,
+                ] and linked_tsv[48:] == [""] * 65,
                 "TSV export retains typed nearest-reference evidence")
 
         data, _ = run_query(
@@ -1624,9 +1734,9 @@ def main() -> int:
         count_tsv = (workspace / "counts.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(count_tsv) == 110 and count_tsv[48:52] == [
+        require(len(count_tsv) == 113 and count_tsv[48:52] == [
                     "OVERLAPS", "sites", "promoters", "20",
-                ] and count_tsv[52:] == [""] * 58,
+                ] and count_tsv[52:] == [""] * 61,
                 "TSV export retains count provenance")
 
         data, _ = run_query(
@@ -1686,7 +1796,7 @@ def main() -> int:
         module_tsv = (workspace / "modules.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(module_tsv) == 110 and
+        require(len(module_tsv) == 113 and
                 module_tsv[52:59] == [
                     "2", "2", "2", "ANY", "FIRST_BEFORE_SECOND",
                     "SAME", "SAME",
@@ -1923,7 +2033,7 @@ def main() -> int:
             workspace / "consensus.tsv"
         ).read_text(encoding="utf-8").splitlines()[1].split("\t")
         require(
-            len(consensus_tsv) == 110 and
+            len(consensus_tsv) == 113 and
             consensus_tsv[97:100] == ["filtered_1", "2", "2"] and
             consensus_tsv[100] == "50" and
             consensus_tsv[101] == "5" and

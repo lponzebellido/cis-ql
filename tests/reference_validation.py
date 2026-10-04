@@ -64,6 +64,24 @@ def first_in_frame_start_stop_regions(
     return regions
 
 
+def reverse_complement(sequence: str) -> str:
+    return sequence.translate(str.maketrans("ACGTacgt", "TGCAtgca"))[::-1]
+
+
+def translate_reference(sequence: str, table: int, frame: int) -> str:
+    assignments = {
+        "ATG": "M",
+        "TAA": "*",
+        "TGA": "W" if table == 4 else "*",
+        "TGT": "C",
+        "GAT": "D",
+    }
+    return "".join(
+        assignments.get(sequence[offset:offset + 3].upper(), "X")
+        for offset in range(frame, len(sequence) - 2, 3)
+    )
+
+
 def subtract_intervals(
     intervals: list[tuple[int, int]], masks: list[tuple[int, int]]
 ) -> list[tuple[int, int]]:
@@ -516,6 +534,53 @@ def main() -> int:
             "in-frame regex and MOD differ from codon-stepping reference",
         )
         print("[ok] in-frame start-to-stop candidates")
+
+        translation_sequence = "ATGTGATAAGGGGTTATCACAT"
+        (workspace / "translation.fasta").write_text(
+            f">chrTranslate\n{translation_sequence}\n", encoding="utf-8"
+        )
+        translation_data = run_query(
+            workspace,
+            "translation_reference",
+            'LOAD SEQUENCE "translation.fasta" AS genome;\n'
+            'FIND MOTIF "ATGTGATAA" AS candidates;\n'
+            'TRANSLATE candidates CODE 1 FRAME 0 AS standard;\n'
+            'TRANSLATE candidates CODE 4 FRAME 0 AS table_four;\n'
+            'TRANSLATE candidates CODE 11 FRAME 1 AS offset;\n',
+        )
+        candidates = translation_data["resultSets"]["candidates"]
+        oriented = [
+            reverse_complement(
+                translation_sequence[region["start"]:region["end"]]
+            ) if region["strand"] == "-" else
+            translation_sequence[region["start"]:region["end"]]
+            for region in candidates
+        ]
+        observed_standard = [
+            region["translationEvidence"]["proteinSequence"]
+            for region in translation_data["resultSets"]["standard"]
+        ]
+        observed_table_four = [
+            region["translationEvidence"]["proteinSequence"]
+            for region in translation_data["resultSets"]["table_four"]
+        ]
+        observed_offset = [
+            region["translationEvidence"]["proteinSequence"]
+            for region in translation_data["resultSets"]["offset"]
+        ]
+        require(
+            observed_standard
+            == [translate_reference(item, 1, 0) for item in oriented]
+            == ["M**", "M**"] and
+            observed_table_four
+            == [translate_reference(item, 4, 0) for item in oriented]
+            == ["MW*", "MW*"] and
+            observed_offset
+            == [translate_reference(item, 11, 1) for item in oriented]
+            == ["CD", "CD"],
+            "TRANSLATE differs from independent codon lookup",
+        )
+        print("[ok] strand-aware explicit genetic-code translation")
 
         expected_modules = define_homotypic_modules(
             [("chr1", start, start + 3, "+")

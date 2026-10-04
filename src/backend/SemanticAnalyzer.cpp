@@ -1,4 +1,5 @@
 #include "SemanticAnalyzer.h"
+#include "../bioinfo/GeneticCode.h"
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
@@ -520,7 +521,7 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
   static const std::set<std::string> supportedProperties = {
       "LENGTH", "START", "END", "STRAND", "SIMILARITY", "GC_CONTENT",
       "COUNT", "ID", "NAME", "TYPE", "PARENT", "SOURCE", "PHASE",
-      "ATTRIBUTE", "SEQUENCE", "ORIENTED_SEQUENCE",
+      "ATTRIBUTE", "SEQUENCE", "ORIENTED_SEQUENCE", "PROTEIN_SEQUENCE",
       "TRACK_SCORE", "SIGNAL_VALUE", "MINUS_LOG10_PVALUE",
       "MINUS_LOG10_QVALUE", "EVIDENCE_CLASS", "ASSAY", "SAMPLE",
       "CONDITION", "REPLICATE", "CONTROL", "SUPPORT_COUNT"};
@@ -531,8 +532,11 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
   if ((node->op == "STARTS_WITH" || node->op == "ENDS_WITH" ||
        node->op == "CONTAINS") &&
       node->property != "SEQUENCE" &&
-      node->property != "ORIENTED_SEQUENCE") {
-    reportError(node->op + " requires SEQUENCE or ORIENTED_SEQUENCE.");
+      node->property != "ORIENTED_SEQUENCE" &&
+      node->property != "PROTEIN_SEQUENCE") {
+    reportError(node->op +
+                " requires SEQUENCE, ORIENTED_SEQUENCE, or "
+                "PROTEIN_SEQUENCE.");
   }
   if (!supportedProperties.count(node->property)) {
     reportError("Unsupported condition property '" + node->property + "'.");
@@ -623,7 +627,8 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
       reportError("STRAND supports only equality comparison.");
     }
   } else if (node->property == "SEQUENCE" ||
-             node->property == "ORIENTED_SEQUENCE") {
+             node->property == "ORIENTED_SEQUENCE" ||
+             node->property == "PROTEIN_SEQUENCE") {
     if (node->value.size() < 2 || node->value.front() != '"' ||
         node->value.back() != '"') {
       reportError(node->property + " must be compared with a string value.");
@@ -803,6 +808,36 @@ void SemanticAnalyzer::visit(GroupStmtNode *node) {
     reportError("Alias '" + node->alias + "' is already defined.");
   } else {
     symbolTable.insert(node->alias, "FEATURE_GROUPS");
+  }
+}
+
+void SemanticAnalyzer::visit(TranslateStmtNode *node) {
+  if (!sequenceLoaded) {
+    reportError("TRANSLATE requires sequence data.");
+  }
+  if (!symbolTable.lookup(node->sourceAlias)) {
+    reportError("Translation source alias '" + node->sourceAlias +
+                "' is not defined.");
+  } else if (!isResultAlias(symbolTable, node->sourceAlias)) {
+    reportError("TRANSLATE expects a region or motif-hit alias, but '" +
+                node->sourceAlias + "' has type " +
+                symbolTable.typeOf(node->sourceAlias) + ".");
+  }
+  const long codeValue = std::strtol(node->geneticCode.c_str(), nullptr, 10);
+  if (codeValue < 0 ||
+      codeValue > std::numeric_limits<int>::max() ||
+      !GeneticCode::supports(static_cast<int>(codeValue))) {
+    reportError("Unsupported NCBI genetic code table " + node->geneticCode +
+                ".");
+  }
+  const long frame = std::strtol(node->frame.c_str(), nullptr, 10);
+  if (frame < 0 || frame > 2) {
+    reportError("TRANSLATE FRAME must be 0, 1, or 2.");
+  }
+  if (symbolTable.lookup(node->alias)) {
+    reportError("Alias '" + node->alias + "' is already defined.");
+  } else {
+    symbolTable.insert(node->alias, "RESULT_SET");
   }
 }
 

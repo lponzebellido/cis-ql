@@ -9,6 +9,7 @@
 #include "ModuleEvidence.h"
 #include "OverlapEvidence.h"
 #include "TrackEvidence.h"
+#include "TranslationEvidence.h"
 #include <string>
 #include <algorithm>
 #include <vector>
@@ -28,6 +29,7 @@ struct GenomicRegion {
   ConsensusEvidence consensusEvidence;
   ModuleEvidence moduleEvidence;
   TrackEvidence trackEvidence;
+  TranslationEvidence translationEvidence;
   std::vector<OverlapEvidence> overlapEvidence;
 
   size_t length() const { return end - start; }

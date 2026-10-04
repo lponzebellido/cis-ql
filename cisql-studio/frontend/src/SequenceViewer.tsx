@@ -132,6 +132,12 @@ interface ModuleEvidence {
   members: ModuleMemberEvidence[];
 }
 
+interface TranslationEvidence {
+  geneticCode: number;
+  frame: number;
+  proteinSequence: string;
+}
+
 interface GenomicRegion {
   chr: string;
   start: number;
@@ -147,6 +153,7 @@ interface GenomicRegion {
   consensusEvidence?: ConsensusEvidence;
   moduleEvidence?: ModuleEvidence;
   trackEvidence?: TrackEvidence;
+  translationEvidence?: TranslationEvidence;
   overlapEvidence?: OverlapEvidence[];
 }
 
@@ -389,6 +396,12 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
                                   {region.motifEvidence.sourceRegion && (
                                     <span>Source: {region.motifEvidence.sourceRegion.name} +{region.motifEvidence.sourceRegion.relativeStart} bp</span>
                                   )}
+                                </>
+                              )}
+                              {region.translationEvidence && (
+                                <>
+                                  <span>Translation: code {region.translationEvidence.geneticCode}; frame {region.translationEvidence.frame}</span>
+                                  <span style={{ wordBreak: 'break-all' }}>Protein: {region.translationEvidence.proteinSequence}</span>
                                 </>
                               )}
                               {region.spatialRelation && (

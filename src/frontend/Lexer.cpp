@@ -21,6 +21,7 @@ void Lexer::initKeywords() {
     keywords["DEFINE"] = TokenType::DEFINE;
     keywords["VALIDATE"] = TokenType::VALIDATE;
     keywords["GROUP"] = TokenType::GROUP;
+    keywords["TRANSLATE"] = TokenType::TRANSLATE;
     keywords["MOTIF"] = TokenType::MOTIF;
     keywords["MODULE"] = TokenType::MODULE;
     keywords["GENE"] = TokenType::GENE;
@@ -85,9 +86,12 @@ void Lexer::initKeywords() {
     keywords["MOD"] = TokenType::MOD;
     keywords["AS"] = TokenType::AS;
     keywords["ORIENTED_SEQUENCE"] = TokenType::ORIENTED_SEQUENCE;
+    keywords["PROTEIN_SEQUENCE"] = TokenType::PROTEIN_SEQUENCE;
     keywords["STARTS_WITH"] = TokenType::STARTS_WITH;
     keywords["ENDS_WITH"] = TokenType::ENDS_WITH;
     keywords["CONTAINS"] = TokenType::CONTAINS;
+    keywords["CODE"] = TokenType::CODE;
+    keywords["FRAME"] = TokenType::FRAME;
 
     keywords["EXON"] = TokenType::EXON;
     keywords["INTRON"] = TokenType::INTRON;
@@ -411,6 +415,7 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::DEFINE: return "DEFINE";
         case TokenType::VALIDATE: return "VALIDATE";
         case TokenType::GROUP: return "GROUP";
+        case TokenType::TRANSLATE: return "TRANSLATE";
         case TokenType::MOTIF: return "MOTIF";
         case TokenType::MODULE: return "MODULE";
         case TokenType::GENE: return "GENE";
@@ -475,9 +480,12 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::MOD: return "MOD";
         case TokenType::AS: return "AS";
         case TokenType::ORIENTED_SEQUENCE: return "ORIENTED_SEQUENCE";
+        case TokenType::PROTEIN_SEQUENCE: return "PROTEIN_SEQUENCE";
         case TokenType::STARTS_WITH: return "STARTS_WITH";
         case TokenType::ENDS_WITH: return "ENDS_WITH";
         case TokenType::CONTAINS: return "CONTAINS";
+        case TokenType::CODE: return "CODE";
+        case TokenType::FRAME: return "FRAME";
         case TokenType::EXON: return "EXON";
         case TokenType::INTRON: return "INTRON";
         case TokenType::UTR: return "UTR";

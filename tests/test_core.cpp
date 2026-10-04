@@ -1,4 +1,5 @@
 #include "../src/bioinfo/GCAnalyzer.h"
+#include "../src/bioinfo/GeneticCode.h"
 #include "../src/bioinfo/MotifFinder.h"
 #include "../src/bioinfo/PWMScanner.h"
 #include "../src/bioinfo/RegulatoryRegions.h"
@@ -38,6 +39,37 @@ GenomicRegion region(size_t start, size_t end,
 
 
 int main() {
+  require(GeneticCode::supportedTables().size() == 27,
+          "current NCBI genetic-code tables are available");
+  std::string protein;
+  std::string translationError;
+  for (int table : GeneticCode::supportedTables()) {
+    require(GeneticCode::translate("TTT", table, 0, protein,
+                                   translationError) &&
+                protein.size() == 1,
+            "genetic-code table has 64 codon assignments");
+  }
+  require(GeneticCode::translate("ATGTGATAA", 1, 0, protein,
+                                 translationError) &&
+              protein == "M**",
+          "standard-code translation");
+  require(GeneticCode::translate("ATGTGATAA", 4, 0, protein,
+                                 translationError) &&
+              protein == "MW*",
+          "table 4 translates TGA as tryptophan");
+  require(GeneticCode::translate("AUGNNNTAA", 11, 0, protein,
+                                 translationError) &&
+              protein == "MX*",
+          "translation accepts RNA bases and marks ambiguous codons");
+  require(GeneticCode::translate("AATGTGATAAT", 1, 1, protein,
+                                 translationError) &&
+              protein == "M**",
+          "translation applies frame before ignoring a trailing base");
+  require(!GeneticCode::translate("ATG", 7, 0, protein,
+                                  translationError) &&
+              translationError.find("Unsupported") != std::string::npos,
+          "unsupported genetic-code tables are rejected");
+
   const auto exact = MotifFinder::findAll("ACGTACGT", "ACG", "chr1", false);
   require(exact.size() == 2 && exact[0].position == 0 &&
               exact[1].position == 4,
@@ -83,6 +115,17 @@ int main() {
   require(overlap.size() == 1 && overlap[0].start == 5 &&
               overlap[0].end == 10,
           "geometric interval intersection");
+
+  GenomicRegion translatedRegion = region(0, 9);
+  translatedRegion.translationEvidence.present = true;
+  translatedRegion.translationEvidence.geneticCode = 1;
+  translatedRegion.translationEvidence.frame = 0;
+  translatedRegion.translationEvidence.proteinSequence = "M**";
+  const auto clippedTranslation = SetOperations::intersect(
+      {translatedRegion}, {region(3, 9)});
+  require(clippedTranslation.size() == 1 &&
+              !clippedTranslation[0].translationEvidence.present,
+          "coordinate clipping invalidates translation evidence");
 
   const auto difference =
       SetOperations::except({region(0, 10)}, {region(3, 7)});

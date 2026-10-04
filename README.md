@@ -10,7 +10,7 @@ viewer.
 
 | Area | Operations |
 | :--- | :--- |
-| Sequence | literal, IUPAC, and regular-expression search; strand-aware sequence predicates; PWM scanning; GC analysis |
+| Sequence | literal, IUPAC, and regular-expression search; strand-aware predicates; interval translation; PWM scanning; GC analysis |
 | Annotation | GFF3 validation, filtering, hierarchy traversal, transcript selection, repeated-ID grouping, promoter derivation |
 | Intervals | set operations, overlap, counting, distance, two-pattern modules, replicate consensus |
 | Results | structured JSON and BED, GFF3, or TSV export |
@@ -201,6 +201,40 @@ unstranded record. Sequence literals are compared case-insensitively with `=`,
 `STARTS_WITH`, `ENDS_WITH`, or `CONTAINS`; they are literal strings rather than
 regular expressions or implicit IUPAC patterns.
 
+### 2.1 Interval Translation (`TRANSLATE`)
+
+Translate a named interval set with an explicit genetic code and reading-frame
+offset:
+
+```sql
+FIND MOTIF "ATGTGATAA" AS candidates;
+
+TRANSLATE candidates CODE 1 FRAME 0 AS standard;
+TRANSLATE candidates CODE 4 FRAME 0 AS table4;
+
+EXTRACT table4 AS tga_trp
+    WHERE PROTEIN_SEQUENCE = "MW*";
+```
+
+`TRANSLATE` reads each interval from 5' to 3' on its declared strand. Negative
+strands are reverse-complemented; unstranded records are rejected. `FRAME` is
+an offset of 0, 1, or 2 from the first oriented base. Complete codons are
+translated, an ambiguous codon becomes `X`, a stop becomes `*`, and incomplete
+trailing bases are ignored.
+
+`CODE` accepts the current NCBI translation-table identifiers: 1–6, 9–16, and
+21–33. Cis-QL uses the amino-acid assignment row from the selected table. It
+does not apply the separate initiator row because an arbitrary interval is not
+assumed to be a complete CDS. Alternative-initiation policy remains a distinct
+future CDS mode. The table definitions follow the
+[NCBI genetic-code catalog](https://www.ncbi.nlm.nih.gov/datasets/docs/v2/data-processing/taxonomy-processing/genetic-codes/).
+
+The result keeps the original genomic coordinates and reference-oriented DNA,
+and adds typed translation evidence containing the table, frame, and protein.
+`PROTEIN_SEQUENCE` supports `=`, `STARTS_WITH`, `ENDS_WITH`, and `CONTAINS` in
+later filters. JSON, GFF3, TSV, and Studio expose the evidence. Geometric set
+operations discard it when they clip or merge the translated interval.
+
 ### 3. Position Weight Matrix Scanning (`SCAN`)
 
 Scan loaded sequences using Position Weight Matrices with log-odds scoring:
@@ -366,7 +400,8 @@ FIND MOTIF "ATG" AS phase_zero_starts
 ```
 
 Condition properties are result-specific. Region sets support `LENGTH`,
-`START`, `END`, `STRAND`, `SEQUENCE`, `ORIENTED_SEQUENCE`, `SIMILARITY`,
+`START`, `END`, `STRAND`, `SEQUENCE`, `ORIENTED_SEQUENCE`,
+`PROTEIN_SEQUENCE`, `SIMILARITY`,
 `GC_CONTENT`, and `ID`, plus `COUNT` when count evidence is attached.
 Annotation-backed regions also support
 `NAME`, `TYPE`, `PARENT`, `SOURCE`, `PHASE`, and arbitrary
@@ -480,7 +515,7 @@ Program            ::= StatementList
 StatementList      ::= Statement StatementList | λ
 
 Statement          ::= LoadStmt | UseStmt | ValidateStmt | GroupStmt | ExportStmt | FindStmt | ExtractStmt
-                     | DefinePromotersStmt | DefineModuleStmt
+                     | DefinePromotersStmt | DefineModuleStmt | TranslateStmt
                      | SetOperationStmt | ConsensusStmt | CountStmt
                      | ScanStmt | AnalyzeStmt
                      | IfStmt | ForeachStmt
@@ -503,6 +538,7 @@ DefineModuleStmt   ::= DEFINE MODULE FROM ID WITH ID
                                (NUM | FLOAT) RequiredUnit
                        ORDER (ANY | AS_WRITTEN)
                        ORIENTATION (ANY | SAME | OPPOSITE) AS ID SEMICOLON
+TranslateStmt      ::= TRANSLATE ID CODE NUM FRAME NUM AS ID SEMICOLON
 
 AnalyzeStmt        ::= ANALYZE (GC_CONTENT | CPG_ISLANDS) (WINDOW (NUM | FLOAT) Unit)? AliasOpt WhereClause SEMICOLON
 
@@ -568,7 +604,7 @@ NumericProperty    ::= LENGTH | START | END | GC_CONTENT | COUNT
 StringProperty     ::= ID | NAME | STRAND | TYPE | PARENT | SOURCE | PHASE
                      | EVIDENCE_CLASS | ASSAY | SAMPLE | CONDITION
                      | REPLICATE | CONTROL
-SequenceProperty   ::= SEQUENCE | ORIENTED_SEQUENCE
+SequenceProperty   ::= SEQUENCE | ORIENTED_SEQUENCE | PROTEIN_SEQUENCE
 SequenceRelOp      ::= "=" | STARTS_WITH | ENDS_WITH | CONTAINS
 SimilarityRefOpt   ::= TO ID | λ
 RelOp              ::= ">" | "<" | ">=" | "<=" | "="
@@ -636,6 +672,7 @@ track, transcript, and strand examples use small synthetic fixtures. See
 | `13_gff3.cql` | Validate and traverse GFF3; group repeated IDs | `VALIDATE`, hierarchy queries, `GROUP` |
 | `14_transcripts.cql` | Select declared transcript types and derive promoters | `EXTRACT TRANSCRIPTS`, `SELECT` |
 | `15_strands.cql` | Compare reference and strand-oriented sequence | `SEQUENCE`, `ORIENTED_SEQUENCE` |
+| `16_translate.cql` | Translate intervals under two genetic codes | `TRANSLATE`, `PROTEIN_SEQUENCE` |
 
 ---
 

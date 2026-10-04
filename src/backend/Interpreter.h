@@ -11,6 +11,7 @@
 #include "../bioinfo/PWMScanner.h"
 #include "../bioinfo/RegulatoryRegions.h"
 #include "../bioinfo/GCAnalyzer.h"
+#include "../bioinfo/GeneticCode.h"
 #include "../bioinfo/AnnotationValidation.h"
 #include "../bioinfo/AnnotationFeatureGroup.h"
 #include "IRGenerator.h"
@@ -133,6 +134,7 @@ private:
   void executeAnalyzeCpG(const IRInstruction &instr);
   void executeValidateAnnotation(const IRInstruction &instr);
   void executeGroupAnnotation(const IRInstruction &instr);
+  void executeTranslate(const IRInstruction &instr);
   bool compareValues(double left, const std::string &op,
                      const std::string &right) const;
   bool compareConditionValue(

@@ -24,6 +24,7 @@ class ScanStmtNode;
 class AnalyzeStmtNode;
 class ValidateStmtNode;
 class GroupStmtNode;
+class TranslateStmtNode;
 class IfStmtNode;
 class ForeachStmtNode;
 class ProgramNode;
@@ -48,6 +49,7 @@ public:
   virtual void visit(AnalyzeStmtNode* node) = 0;
   virtual void visit(ValidateStmtNode* node) = 0;
   virtual void visit(GroupStmtNode* node) = 0;
+  virtual void visit(TranslateStmtNode* node) = 0;
   virtual void visit(IfStmtNode* node) = 0;
   virtual void visit(ForeachStmtNode* node) = 0;
   virtual void visit(ProgramNode* node) = 0;
@@ -327,6 +329,20 @@ public:
   std::string alias;
   GroupStmtNode(std::string source, std::string groupAlias)
       : sourceAlias(source), alias(groupAlias) {}
+  void print(std::string prefix = "", bool isLast = true) const override;
+  void accept(ASTVisitor& visitor) override;
+};
+
+class TranslateStmtNode : public StatementNode {
+public:
+  std::string sourceAlias;
+  std::string geneticCode;
+  std::string frame;
+  std::string alias;
+  TranslateStmtNode(std::string source, std::string code,
+                    std::string readingFrame, std::string resultAlias)
+      : sourceAlias(source), geneticCode(code), frame(readingFrame),
+        alias(resultAlias) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;
 };

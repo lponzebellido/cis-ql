@@ -132,6 +132,12 @@ interface ModuleEvidence {
   members: ModuleMemberEvidence[];
 }
 
+interface TranslationEvidence {
+  geneticCode: number;
+  frame: number;
+  proteinSequence: string;
+}
+
 interface GenomicRegion {
   chr: string;
   start: number;
@@ -147,6 +153,7 @@ interface GenomicRegion {
   consensusEvidence?: ConsensusEvidence;
   moduleEvidence?: ModuleEvidence;
   trackEvidence?: TrackEvidence;
+  translationEvidence?: TranslationEvidence;
   overlapEvidence?: OverlapEvidence[];
 }
 
@@ -695,6 +702,12 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                   )}
                 </>
               )}
+              {hoveredRegion.translationEvidence && (
+                <>
+                  <br /><span className="tt-label">Protein:</span> {hoveredRegion.translationEvidence.proteinSequence}
+                  <br /><span className="tt-label">Code / frame:</span> {hoveredRegion.translationEvidence.geneticCode} / {hoveredRegion.translationEvidence.frame}
+                </>
+              )}
               {hoveredRegion.spatialRelation && (
                 <>
                   <br /><span className="tt-label">{hoveredRegion.spatialRelation.relation}:</span> {hoveredRegion.spatialRelation.reference.name || hoveredRegion.spatialRelation.reference.type}
@@ -846,6 +859,15 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                     </div>
                   )}
                 </>
+              )}
+              {selectedRegion.translationEvidence && (
+                <div className="detail-field">
+                  <span className="detail-label">Translation</span>
+                  <span className="detail-value" style={{ wordBreak: 'break-all' }}>
+                    code {selectedRegion.translationEvidence.geneticCode} · frame {selectedRegion.translationEvidence.frame}<br />
+                    {selectedRegion.translationEvidence.proteinSequence}
+                  </span>
+                </div>
               )}
               {selectedRegion.spatialRelation && (
                 <>

@@ -24,6 +24,7 @@ from the repository root:
 | `13_gff3.cql` | Validate and traverse GFF3; group repeated IDs | *E. coli* FASTA and GFF3 |
 | `14_transcripts.cql` | Select transcript types and derive their promoters | synthetic FASTA and GFF3 |
 | `15_strands.cql` | Compare reference and strand-oriented sequence | synthetic FASTA |
+| `16_translate.cql` | Translate intervals with two genetic codes | synthetic FASTA |
 
 `ecoli2.fna` and `genomic.gff` use accession `U00096.3`, so sequence and
 annotation coordinates refer to the same assembly. The track and regulatory
@@ -38,6 +39,11 @@ portable GFF3 convention or an inference made by Cis-QL.
 Example 15 finds the same bounded pattern on both strands. `SEQUENCE` retains
 the bases as stored in the FASTA; `ORIENTED_SEQUENCE` reverse-complements the
 negative-strand match before applying the text predicates.
+
+Example 16 translates both strand-oriented matches with NCBI tables 1 and 4.
+The TGA codon is a stop in table 1 and tryptophan in table 4, so the example
+shows that genetic-code choice is part of the program rather than an implicit
+default. It is a translation example, not an ORF or gene prediction.
 
 The regular expression in `12_orfs.cql` advances three nucleotides at a time
 after `ATG` and rejects an in-frame stop in each repeated codon. It therefore
