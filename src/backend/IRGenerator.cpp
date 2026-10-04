@@ -64,6 +64,8 @@ IRGenerator::lowerCondition(const ConditionNode *node) const {
     lowered->reference = simple->reference;
     lowered->modifier = simple->modifier;
     lowered->modifierValue = simple->modifierValue;
+    lowered->sliceStart = simple->sliceStart;
+    lowered->sliceEnd = simple->sliceEnd;
     lowered->op = simple->op;
     lowered->value = simple->value;
   } else if (const auto *binary =

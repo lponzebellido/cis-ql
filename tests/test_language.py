@@ -1241,6 +1241,31 @@ def main() -> int:
 
         data, _ = run_query(
             workspace,
+            "sequence_slice_filter",
+            'LOAD SEQUENCE "oriented.fasta" AS genome;\n'
+            'FIND MOTIF "ATG" AS starts '
+            'WHERE SLICE ORIENTED_SEQUENCE FROM 0 TO 1 = "A";\n'
+            'EXTRACT starts AS suffixes '
+            'WHERE SLICE ORIENTED_SEQUENCE FROM 1 TO 3 = "TG";\n'
+            'EXTRACT starts AS reference_prefix '
+            'WHERE SLICE SEQUENCE FROM 0 TO 1 = "A";\n',
+        )
+        require(
+            [(item["start"], item["strand"])
+             for item in data["resultSets"]["starts"]]
+            == [(0, "+"), (3, "-")]
+            and len(data["resultSets"]["suffixes"]) == 2,
+            "SLICE evaluates motif and region sequences in strand order",
+        )
+        require(
+            [(item["start"], item["strand"])
+             for item in data["resultSets"]["reference_prefix"]]
+            == [(0, "+")],
+            "SLICE preserves reference orientation for SEQUENCE",
+        )
+
+        data, _ = run_query(
+            workspace,
             "reference_sequence_filter",
             'LOAD SEQUENCE "oriented.fasta" AS genome;\n'
             'FIND MOTIF "ATG" AS reference_starts '
@@ -1272,6 +1297,10 @@ def main() -> int:
             'TRANSLATE candidates CODE 11 FRAME 1 AS offset;\n'
             'EXTRACT table_four AS reassigned '
             'WHERE PROTEIN_SEQUENCE = "MW*";\n'
+            'EXTRACT table_four AS methionine_prefix '
+            'WHERE SLICE PROTEIN_SEQUENCE FROM 0 TO 2 = "MW";\n'
+            'EXTRACT table_four AS out_of_bounds '
+            'WHERE SLICE PROTEIN_SEQUENCE FROM 0 TO 10 CONTAINS "M";\n'
             'EXTRACT standard AS terminated '
             'WHERE PROTEIN_SEQUENCE ENDS_WITH "**";\n'
             'EXPORT standard TO "translation.tsv" FORMAT TSV;\n'
@@ -1295,8 +1324,10 @@ def main() -> int:
         require(
             all(item["translationEvidence"]["proteinSequence"] == "MW*"
                 for item in data["resultSets"]["table_four"])
-            and len(data["resultSets"]["reassigned"]) == 2,
-            "genetic-code selection changes translation and remains queryable",
+            and len(data["resultSets"]["reassigned"]) == 2
+            and len(data["resultSets"]["methionine_prefix"]) == 2
+            and data["resultSets"]["out_of_bounds"] == [],
+            "translation text supports bounded sequence slices",
         )
         require(
             all(item["translationEvidence"]["proteinSequence"] == "CD"
@@ -1396,6 +1427,28 @@ def main() -> int:
         )
         require("supports =, STARTS_WITH" in semantic_error,
                 "sequence properties reject numeric comparison operators")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "empty_sequence_slice",
+            'LOAD SEQUENCE "oriented.fasta" AS genome;\n'
+            'FIND MOTIF "ATG" AS invalid '
+            'WHERE SLICE SEQUENCE FROM 2 TO 2 = "A";\n',
+            3,
+        )
+        require("FROM index to be smaller" in semantic_error,
+                "SLICE rejects empty or reversed ranges")
+
+        parser_error = run_invalid_query(
+            workspace,
+            "slice_property_scope",
+            'LOAD SEQUENCE "oriented.fasta" AS genome;\n'
+            'FIND MOTIF "ATG" AS invalid '
+            'WHERE SLICE LENGTH FROM 0 TO 1 = "A";\n',
+            2,
+        )
+        require("Expected SEQUENCE, ORIENTED_SEQUENCE" in parser_error,
+                "SLICE accepts only sequence-valued properties")
 
         data, _ = run_query(
             workspace,

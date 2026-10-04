@@ -179,6 +179,9 @@ FIND MOTIF "ATG(?:(?!TAA|TAG|TGA)[ACGT]{3})*(?:TAA|TAG|TGA)"
 FIND MOTIF "ATGNNNTAA" AS bounded_patterns
     WHERE ORIENTED_SEQUENCE STARTS_WITH "ATG"
       AND ORIENTED_SEQUENCE ENDS_WITH "TAA";
+
+EXTRACT bounded_patterns AS alanine_second_codon
+    WHERE SLICE ORIENTED_SEQUENCE FROM 3 TO 6 = "GCT";
 ```
 
 `FIND MOTIF` is appropriate for exact strings, regular expressions, or
@@ -200,6 +203,12 @@ unstranded record. Sequence literals are compared case-insensitively with `=`,
 `STARTS_WITH`, `ENDS_WITH`, or `CONTAINS`; they are literal strings rather than
 regular expressions or implicit IUPAC patterns.
 
+`SLICE property FROM start TO end` selects a zero-based, half-open portion of
+`SEQUENCE`, `ORIENTED_SEQUENCE`, or `PROTEIN_SEQUENCE` before applying a text
+comparison. Both indices are non-negative integers, `start` must be smaller
+than `end`, and a range beyond the available string does not match. Slices can
+be combined with other conditions using `AND`, `OR`, and `NOT`.
+
 ### 2.1 Interval Translation (`TRANSLATE`)
 
 Translate a named interval set with an explicit genetic code and reading-frame
@@ -212,7 +221,8 @@ TRANSLATE candidates CODE 1 FRAME 0 AS standard;
 TRANSLATE candidates CODE 4 FRAME 0 AS table4;
 
 EXTRACT table4 AS tga_trp
-    WHERE PROTEIN_SEQUENCE = "MW*";
+    WHERE SLICE PROTEIN_SEQUENCE FROM 0 TO 2 = "MW"
+      AND PROTEIN_SEQUENCE ENDS_WITH "*";
 ```
 
 `TRANSLATE` reads each interval from 5' to 3' on its declared strand. Negative

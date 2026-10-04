@@ -70,13 +70,17 @@ public:
   std::string reference;
   std::string modifier;
   std::string modifierValue;
+  std::string sliceStart;
+  std::string sliceEnd;
   std::string op;
   std::string value;
   SimpleConditionNode(std::string prop, std::string o, std::string val,
                       std::string ref = "", std::string mod = "",
-                      std::string modValue = "")
+                      std::string modValue = "", std::string sliceFrom = "",
+                      std::string sliceTo = "")
       : property(prop), reference(ref), modifier(mod),
-        modifierValue(modValue), op(o), value(val) {}
+        modifierValue(modValue), sliceStart(sliceFrom), sliceEnd(sliceTo),
+        op(o), value(val) {}
   void print(std::string prefix = "", bool isLast = true) const override;
   void accept(ASTVisitor& visitor) override;
 };

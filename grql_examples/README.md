@@ -42,8 +42,9 @@ negative-strand match before applying the text predicates.
 
 Example 16 translates both strand-oriented matches with NCBI tables 1 and 4.
 The TGA codon is a stop in table 1 and tryptophan in table 4, so the example
-shows that genetic-code choice is part of the program rather than an implicit
-default. It is a translation example, not an ORF or gene prediction.
+uses a protein slice to show that genetic-code choice is part of the program
+rather than an implicit default. It is a translation example, not an ORF or
+gene prediction.
 
 The regular expression in `12_orfs.grql` advances three nucleotides at a time
 after `ATG` and rejects an in-frame stop in each repeated codon. It therefore

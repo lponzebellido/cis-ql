@@ -6,7 +6,8 @@ TRANSLATE candidates CODE 1 FRAME 0 AS standard;
 TRANSLATE candidates CODE 4 FRAME 0 AS table4;
 
 EXTRACT table4 AS tga_trp
-  WHERE PROTEIN_SEQUENCE = "MW*";
+  WHERE SLICE PROTEIN_SEQUENCE FROM 0 TO 2 = "MW"
+    AND PROTEIN_SEQUENCE ENDS_WITH "*";
 
 EXPORT standard TO "standard_translation.tsv" FORMAT TSV;
 EXPORT table4 TO "table4_translation.gff3" FORMAT GFF3;

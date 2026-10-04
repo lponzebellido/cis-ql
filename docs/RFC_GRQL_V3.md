@@ -3,8 +3,9 @@
 Status: incremental implementation. Explicit promoters, transcript selection,
 strand-aware sequence predicates, calibrated PWM scans, evidence-preserving
 interval operations, two-member modules, imported regulatory tracks, replicate
-consensus, modular coordinate filters, and explicit interval translation are
-implemented. Later sections are a design contract, not yet accepted syntax.
+consensus, modular coordinate filters, fixed-index sequence slicing, and
+explicit interval translation are implemented. Later sections are a design
+contract, not yet accepted syntax.
 
 ## Product definition
 
@@ -30,7 +31,7 @@ how many new statements it adds.
 
 | Priority | Missing capability | Why it matters | Smallest useful acceptance target |
 | :--- | :--- | :--- | :--- |
-| 1 | Richer scalar expressions, captures, and CDS translation policy | Interval translation now has an explicit code and frame, but programmers still need slicing, capture binding, joined CDS assembly, phase handling, and an explicit initiation policy | Add reusable string/numeric expressions and captures; specify a separate CDS mode for joined records and initiator codons |
+| 1 | Richer scalar expressions, captures, and CDS translation policy | Fixed-index string slicing and interval translation are explicit, but programmers still need capture binding, reusable values, joined CDS assembly, phase handling, and an explicit initiation policy | Add reusable string/numeric expressions and captures; specify a separate CDS mode for joined records and initiator codons |
 | 2 | Enrichment with matched backgrounds | Counts alone cannot distinguish motif enrichment from length or composition effects | Declare foreground/background regions, matching policy, effect size, test, and multiple-testing correction |
 | 3 | CRE-to-gene evidence tables | `NEAR` is useful but genomic proximity is only one candidate-linking rule | Import relationship/contact tables and retain typed promoter, distance, contact, expression, and binding evidence per link |
 | 4 | General regulatory grammars | Two-site modules cannot express larger heterotypic architectures | Named members, more than two sites, transcript-relative orientation, and grouped aggregation |
@@ -322,6 +323,9 @@ FIND MOTIF "ATG(?:(?!TAA|TAG|TGA)[ACGT]{3})*(?:TAA|TAG|TGA)"
 FIND MOTIF "ATGNNNTAA" AS bounded_patterns
   WHERE ORIENTED_SEQUENCE STARTS_WITH "ATG"
     AND ORIENTED_SEQUENCE ENDS_WITH "TAA";
+
+EXTRACT bounded_patterns AS alanine_second_codon
+  WHERE SLICE ORIENTED_SEQUENCE FROM 3 TO 6 = "GCT";
 ```
 
 Numeric conditions may apply `MOD` before their relational comparison.
@@ -337,8 +341,16 @@ that representation, while `ORIENTED_SEQUENCE` reverse-complements a
 negative-strand interval for comparison without changing its coordinates or
 stored evidence. Both accept literal `=`, `STARTS_WITH`, `ENDS_WITH`, and
 `CONTAINS` predicates. Unstranded records do not satisfy
-`ORIENTED_SEQUENCE`. Materialized sequence expressions, slicing, capture
-groups, and reusable scalar values remain planned.
+`ORIENTED_SEQUENCE`.
+
+`SLICE property FROM start TO end` applies zero-based, half-open offsets to
+`SEQUENCE`, `ORIENTED_SEQUENCE`, or `PROTEIN_SEQUENCE` before the text
+comparison. Indices must be non-negative whole numbers and define a non-empty
+range. An out-of-bounds range evaluates as no match instead of being clamped,
+so a program cannot silently compare a shorter string. Slicing composes with
+the existing Boolean condition tree and works on motif hits and named region
+sets. Materialized sequence expressions, capture groups, negative indices,
+and reusable scalar values remain planned.
 
 ### Part 2C2: explicit interval translation
 

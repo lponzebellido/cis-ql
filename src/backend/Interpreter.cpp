@@ -2310,6 +2310,22 @@ bool Interpreter::compareConditionValue(
   return compareValues(left, condition->op, condition->value);
 }
 
+bool Interpreter::compareSequenceCondition(
+    std::string observed,
+    const std::shared_ptr<IRCondition> &condition) const {
+  if (!condition->sliceStart.empty()) {
+    const size_t start = static_cast<size_t>(
+        std::strtoull(condition->sliceStart.c_str(), nullptr, 10));
+    const size_t end = static_cast<size_t>(
+        std::strtoull(condition->sliceEnd.c_str(), nullptr, 10));
+    if (start >= end || end > observed.size())
+      return false;
+    observed = observed.substr(start, end - start);
+  }
+  return compareSequenceText(observed, condition->op,
+                             stripQuotes(condition->value));
+}
+
 bool Interpreter::evaluateRegionCondition(
     const std::shared_ptr<IRCondition> &condition, const GenomicRegion &region,
     const std::string &referenceSequence) const {
@@ -2412,14 +2428,12 @@ bool Interpreter::evaluateRegionCondition(
       else if (region.strand != "+")
         return false;
     }
-    return compareSequenceText(observed, condition->op,
-                               stripQuotes(condition->value));
+    return compareSequenceCondition(observed, condition);
   }
   if (condition->property == "PROTEIN_SEQUENCE") {
     return region.translationEvidence.present &&
-           compareSequenceText(region.translationEvidence.proteinSequence,
-                               condition->op,
-                               stripQuotes(condition->value));
+           compareSequenceCondition(
+               region.translationEvidence.proteinSequence, condition);
   }
   if (condition->property == "EVIDENCE_CLASS" ||
       condition->property == "ASSAY" || condition->property == "SAMPLE" ||
@@ -2569,8 +2583,7 @@ bool Interpreter::evaluateMotifCondition(
       else if (match.strand != "+")
         return false;
     }
-    return compareSequenceText(observed, condition->op,
-                               stripQuotes(condition->value));
+    return compareSequenceCondition(observed, condition);
   }
   if (condition->property == "GC_CONTENT") {
     const auto dataset = sequenceChrMaps.find(activeSequenceAlias);

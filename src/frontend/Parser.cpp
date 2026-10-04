@@ -1002,7 +1002,27 @@ std::unique_ptr<ConditionNode> Parser::parseFactor() {
 std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
   std::string prop;
   std::string reference;
-  if (match(TokenType::ATTRIBUTE)) {
+  std::string sliceStart;
+  std::string sliceEnd;
+  if (match(TokenType::SLICE)) {
+    if (match(TokenType::SEQUENCE) || match(TokenType::ORIENTED_SEQUENCE) ||
+        match(TokenType::PROTEIN_SEQUENCE)) {
+      prop = previous().lexeme;
+    } else {
+      reportError(peek(),
+                  "Expected SEQUENCE, ORIENTED_SEQUENCE, or "
+                  "PROTEIN_SEQUENCE after SLICE.");
+      throw std::runtime_error("Parse error");
+    }
+    consume(TokenType::FROM, "Expected 'FROM' after the sliced value.");
+    consume(TokenType::NUM,
+            "Expected a non-negative whole start index after FROM.");
+    sliceStart = previous().lexeme;
+    consume(TokenType::TO, "Expected 'TO' after the slice start index.");
+    consume(TokenType::NUM,
+            "Expected a non-negative whole end index after TO.");
+    sliceEnd = previous().lexeme;
+  } else if (match(TokenType::ATTRIBUTE)) {
     prop = previous().lexeme;
     consume(TokenType::STRING,
             "Expected a GFF3 attribute name after ATTRIBUTE.");
@@ -1073,7 +1093,7 @@ std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
 
   return std::unique_ptr<SimpleConditionNode>(
       new SimpleConditionNode(prop, op, val, reference, modifier,
-                              modifierValue));
+                              modifierValue, sliceStart, sliceEnd));
 }
 
 std::unique_ptr<AnalyzeStmtNode> Parser::parseAnalyze() {

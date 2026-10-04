@@ -139,6 +139,9 @@ private:
                      const std::string &right) const;
   bool compareConditionValue(
       double left, const std::shared_ptr<IRCondition> &condition) const;
+  bool compareSequenceCondition(
+      std::string observed,
+      const std::shared_ptr<IRCondition> &condition) const;
   bool evaluateRegionCondition(const std::shared_ptr<IRCondition> &condition,
                                const GenomicRegion &region,
                                const std::string &referenceSequence) const;

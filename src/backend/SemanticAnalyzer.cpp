@@ -548,6 +548,21 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
       !sequenceLoaded) {
     reportError(node->property + " requires sequence data.");
   }
+  if (!node->sliceStart.empty()) {
+    const long double start = std::strtold(node->sliceStart.c_str(), nullptr);
+    const long double end = std::strtold(node->sliceEnd.c_str(), nullptr);
+    const long double maximum =
+        static_cast<long double>(std::numeric_limits<size_t>::max());
+    if (!std::isfinite(start) || !std::isfinite(end) || start < 0.0L ||
+        end < 0.0L || std::floor(start) != start ||
+        std::floor(end) != end || start > maximum || end > maximum) {
+      reportError("SLICE indices must be non-negative whole numbers within "
+                  "the supported index range.");
+    } else if (start >= end) {
+      reportError("SLICE requires its FROM index to be smaller than its TO "
+                  "index.");
+    }
+  }
   if (!node->modifier.empty()) {
     if (!numericProperties.count(node->property)) {
       reportError(node->modifier + " requires a numeric condition property.");

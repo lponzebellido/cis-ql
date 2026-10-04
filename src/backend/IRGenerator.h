@@ -14,6 +14,8 @@ struct IRCondition {
   std::string reference;
   std::string modifier;
   std::string modifierValue;
+  std::string sliceStart;
+  std::string sliceEnd;
   std::string op;
   std::string value;
   std::shared_ptr<IRCondition> left;
