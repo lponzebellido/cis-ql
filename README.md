@@ -188,7 +188,8 @@ EXTRACT start_stop_candidates AS terminal_taa
 
 FIND MOTIF "ATG([ACGT]{3})(TAA|TAG|TGA)" AS codon_patterns;
 EXTRACT codon_patterns AS tga_middle
-    WHERE CAPTURE 1 = "TGA" AND CAPTURE 2 = "TAA";
+    WHERE SLICE CAPTURE 1 FROM -2 TO END = "GA"
+      AND CAPTURE 2 = "TAA";
 ```
 
 `FIND MOTIF` is appropriate for exact strings, regular expressions, or
@@ -210,19 +211,21 @@ unstranded record. Sequence literals are compared case-insensitively with `=`,
 `STARTS_WITH`, `ENDS_WITH`, or `CONTAINS`; they are literal strings rather than
 regular expressions or implicit IUPAC patterns.
 
-`SLICE property FROM start TO end` selects a half-open portion of `SEQUENCE`,
-`ORIENTED_SEQUENCE`, or `PROTEIN_SEQUENCE` before applying a text comparison.
-Non-negative indices count from the start, negative indices count from the end,
-and `END` denotes the string length. For example, `FROM -3 TO END` selects the
-last three characters. A range that is empty, reversed, or outside the string
-does not match. Slices can be combined with other conditions using `AND`, `OR`,
-and `NOT`.
+`SLICE value FROM start TO end` selects a half-open portion of `SEQUENCE`,
+`ORIENTED_SEQUENCE`, `PROTEIN_SEQUENCE`, or `CAPTURE n` before applying a text
+comparison. Non-negative indices count from the start, negative indices count
+from the end, and `END` denotes the string length. For example,
+`FROM -3 TO END` selects the last three characters. A range that is empty,
+reversed, or outside the string does not match. Slices can be combined with
+other conditions using `AND`, `OR`, and `NOT`.
 
 `CAPTURE n` queries the nth explicit group of the regular expression passed to
 `FIND MOTIF`; numbering begins at one. Capture values and their zero-based,
 half-open offsets are retained in `patternEvidence`. Offsets follow the
 oriented matched text, so a negative-strand capture is still described from
-5' to 3'. A missing or unmatched group does not satisfy the condition.
+5' to 3'. `SLICE CAPTURE n` applies the same absolute or end-relative bounds
+used for sequence values. A missing or unmatched group does not satisfy the
+condition.
 
 ### 2.1 Interval Translation (`TRANSLATE`)
 
@@ -619,7 +622,6 @@ Factor             ::= NOT Factor | SimpleCondition | "(" Condition ")"
 SimpleCondition    ::= NumericProperty NumericModifierOpt RelOp Value
                      | SIMILARITY SimilarityRefOpt NumericModifierOpt RelOp Value
                      | StringExpression SequenceRelOp STRING
-                     | CAPTURE NUM SequenceRelOp STRING
                      | StringProperty RelOp STRING
                      | ATTRIBUTE STRING RelOp STRING
 NumericModifierOpt ::= MOD (NUM | FLOAT) | λ
@@ -630,8 +632,9 @@ StringProperty     ::= ID | NAME | STRAND | TYPE | PARENT | SOURCE | PHASE
                      | EVIDENCE_CLASS | ASSAY | SAMPLE | CONDITION
                      | REPLICATE | CONTROL
 SequenceProperty   ::= SEQUENCE | ORIENTED_SEQUENCE | PROTEIN_SEQUENCE
-StringExpression   ::= SequenceProperty
-                     | SLICE SequenceProperty FROM SliceBound TO SliceBound
+StringValue        ::= SequenceProperty | CAPTURE NUM
+StringExpression   ::= StringValue
+                     | SLICE StringValue FROM SliceBound TO SliceBound
 SliceBound         ::= NUM | "-" NUM | END
 SequenceRelOp      ::= "=" | STARTS_WITH | ENDS_WITH | CONTAINS
 SimilarityRefOpt   ::= TO ID | λ

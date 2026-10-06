@@ -1013,10 +1013,15 @@ std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
     if (match(TokenType::SEQUENCE) || match(TokenType::ORIENTED_SEQUENCE) ||
         match(TokenType::PROTEIN_SEQUENCE)) {
       prop = previous().lexeme;
+    } else if (match(TokenType::CAPTURE)) {
+      prop = previous().lexeme;
+      consume(TokenType::NUM,
+              "Expected a positive capture-group index after CAPTURE.");
+      reference = previous().lexeme;
     } else {
       reportError(peek(),
                   "Expected SEQUENCE, ORIENTED_SEQUENCE, or "
-                  "PROTEIN_SEQUENCE after SLICE.");
+                  "PROTEIN_SEQUENCE, or CAPTURE after SLICE.");
       throw std::runtime_error("Parse error");
     }
     consume(TokenType::FROM, "Expected 'FROM' after the sliced value.");

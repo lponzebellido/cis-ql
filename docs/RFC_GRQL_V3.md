@@ -332,7 +332,8 @@ EXTRACT start_stop_candidates AS terminal_taa
 
 FIND MOTIF "ATG([ACGT]{3})(TAA|TAG|TGA)" AS codon_patterns;
 EXTRACT codon_patterns AS tga_middle
-  WHERE CAPTURE 1 = "TGA" AND CAPTURE 2 = "TAA";
+  WHERE SLICE CAPTURE 1 FROM -2 TO END = "GA"
+    AND CAPTURE 2 = "TAA";
 ```
 
 Numeric conditions may apply `MOD` before their relational comparison.
@@ -350,15 +351,16 @@ stored evidence. Both accept literal `=`, `STARTS_WITH`, `ENDS_WITH`, and
 `CONTAINS` predicates. Unstranded records do not satisfy
 `ORIENTED_SEQUENCE`.
 
-`SLICE property FROM start TO end` applies half-open offsets to `SEQUENCE`,
-`ORIENTED_SEQUENCE`, or `PROTEIN_SEQUENCE` before the text comparison.
-Non-negative indices count from the start, negative indices count from the end,
-and `END` denotes the string length. Thus `FROM -3 TO END` selects the final
-three characters regardless of sequence length. An empty, reversed, or
-out-of-bounds range evaluates as no match instead of being clamped, so a
-program cannot silently compare a shorter string. Slicing composes with the
-existing Boolean condition tree and works on motif hits and named region sets.
-Materialized sequence expressions and reusable scalar values remain planned.
+`SLICE value FROM start TO end` applies half-open offsets to `SEQUENCE`,
+`ORIENTED_SEQUENCE`, `PROTEIN_SEQUENCE`, or `CAPTURE n` before the text
+comparison. Non-negative indices count from the start, negative indices count
+from the end, and `END` denotes the string length. Thus `FROM -3 TO END`
+selects the final three characters regardless of value length. An empty,
+reversed, or out-of-bounds range evaluates as no match instead of being
+clamped, so a program cannot silently compare a shorter string. Slicing
+composes with the existing Boolean condition tree and works on motif hits and
+named region sets. Materialized sequence expressions and reusable scalar
+values remain planned.
 
 `CAPTURE n` addresses the nth explicit capturing group in a `FIND MOTIF`
 regular expression, beginning at one. The engine's lookahead group is not part
@@ -367,12 +369,14 @@ group's matched state, value, and zero-based half-open offsets relative to the
 oriented full match. Negative-strand captures therefore use the 5'-to-3'
 matched text rather than reference-left coordinates. Optional unmatched groups
 remain explicit and do not satisfy text predicates; a group index absent from
-the pattern also evaluates as no match. JSON preserves typed capture objects,
-while TSV and GFF3 carry the same structure as JSON. Geometry-preserving
-selection keeps the evidence, whereas clipping and merging discard it.
+the pattern also evaluates as no match. `SLICE CAPTURE n` applies the same
+absolute and end-relative bounds as other text values. JSON preserves typed
+capture objects, while TSV and GFF3 carry the same structure as JSON.
+Geometry-preserving selection keeps the evidence, whereas clipping and merging
+discard it.
 
-Named captures, capture slicing, materialized expressions, and reusable scalar
-values remain planned.
+Named captures, materialized expressions, and reusable scalar values remain
+planned.
 
 ### Part 2C2: explicit interval translation
 

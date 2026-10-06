@@ -98,7 +98,6 @@ Factor             -> NOT Factor | SimpleCondition | LPAREN Condition RPAREN
 SimpleCondition    -> NumericProperty NumericModifierOpt RelOp Value
                     | SIMILARITY SimilarityRefOpt NumericModifierOpt RelOp Value
                     | StringExpression SequenceRelOp STRING
-                    | CAPTURE NUM SequenceRelOp STRING
                     | StringProperty RelOp STRING
                     | ATTRIBUTE STRING RelOp STRING
 NumericModifierOpt -> MOD (NUM | FLOAT) | λ
@@ -109,8 +108,9 @@ StringProperty     -> ID | NAME | STRAND | TYPE | PARENT | SOURCE | PHASE
                     | EVIDENCE_CLASS | ASSAY | SAMPLE | CONDITION
                     | REPLICATE | CONTROL
 SequenceProperty   -> SEQUENCE | ORIENTED_SEQUENCE | PROTEIN_SEQUENCE
-StringExpression   -> SequenceProperty
-                    | SLICE SequenceProperty FROM SliceBound TO SliceBound
+StringValue        -> SequenceProperty | CAPTURE NUM
+StringExpression   -> StringValue
+                    | SLICE StringValue FROM SliceBound TO SliceBound
 SliceBound         -> NUM | MINUS NUM | END
 SequenceRelOp      -> ASSIGN | STARTS_WITH | ENDS_WITH | CONTAINS
 SimilarityRefOpt   -> TO ID | λ

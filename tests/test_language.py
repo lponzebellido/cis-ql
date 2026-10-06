@@ -1290,6 +1290,12 @@ def main() -> int:
             'AS direct_aaa WHERE CAPTURE 1 = "AAA";\n'
             'EXTRACT candidates AS aaa_codons WHERE CAPTURE 1 = "AAA";\n'
             'EXTRACT candidates AS tag_stops WHERE CAPTURE 2 = "TAG";\n'
+            'EXTRACT candidates AS aa_suffixes '
+            'WHERE SLICE CAPTURE 1 FROM -2 TO END = "AA";\n'
+            'EXTRACT candidates AS capture_prefixes '
+            'WHERE SLICE CAPTURE 2 FROM 0 TO 1 = "T";\n'
+            'EXTRACT candidates AS short_captures '
+            'WHERE SLICE CAPTURE 1 FROM 0 TO 4 CONTAINS "A";\n'
             'EXTRACT candidates AS missing_group WHERE CAPTURE 3 = "AAA";\n',
         )
         require(
@@ -1302,8 +1308,13 @@ def main() -> int:
             and [(item["start"], item["strand"])
                  for item in data["resultSets"]["direct_aaa"]]
             == [(0, "+")]
+            and [(item["start"], item["strand"])
+                 for item in data["resultSets"]["aa_suffixes"]]
+            == [(0, "+"), (21, "-")]
+            and len(data["resultSets"]["capture_prefixes"]) == 3
+            and data["resultSets"]["short_captures"] == []
             and data["resultSets"]["missing_group"] == [],
-            "CAPTURE filters regex groups during and after FIND",
+            "CAPTURE and SLICE filter regex groups during and after FIND",
         )
         capture = data["resultSets"]["aaa_codons"][0]["patternEvidence"]
         require(

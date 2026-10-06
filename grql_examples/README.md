@@ -48,8 +48,9 @@ rather than an implicit default. It is a translation example, not an ORF or
 gene prediction.
 
 Example 17 retains the explicit groups of a regular expression and filters
-their values with `CAPTURE`. Capture offsets are relative to the matched text
-in its 5'-to-3' orientation, including matches on the negative strand.
+their values with `CAPTURE`, including a suffix selected with `SLICE`. Capture
+offsets are relative to the matched text in its 5'-to-3' orientation, including
+matches on the negative strand.
 
 The regular expression in `12_orfs.grql` advances three nucleotides at a time
 after `ATG` and rejects an in-frame stop in each repeated codon. It therefore
