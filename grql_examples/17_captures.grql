@@ -1,0 +1,9 @@
+LOAD SEQUENCE "data_examples/code_demo.fasta" AS genome;
+
+FIND MOTIF "ATG([ACGT]{3})(TAA|TAG|TGA)" AS candidates;
+
+EXTRACT candidates AS tga_middle
+  WHERE CAPTURE 1 = "TGA"
+    AND CAPTURE 2 = "TAA";
+
+EXPORT tga_middle TO "captures.tsv" FORMAT TSV;

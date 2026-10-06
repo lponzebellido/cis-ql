@@ -182,6 +182,10 @@ FIND MOTIF "ATGNNNTAA" AS bounded_patterns
 
 EXTRACT bounded_patterns AS alanine_second_codon
     WHERE SLICE ORIENTED_SEQUENCE FROM 3 TO 6 = "GCT";
+
+FIND MOTIF "ATG([ACGT]{3})(TAA|TAG|TGA)" AS codon_patterns;
+EXTRACT codon_patterns AS tga_middle
+    WHERE CAPTURE 1 = "TGA" AND CAPTURE 2 = "TAA";
 ```
 
 `FIND MOTIF` is appropriate for exact strings, regular expressions, or
@@ -208,6 +212,12 @@ regular expressions or implicit IUPAC patterns.
 comparison. Both indices are non-negative integers, `start` must be smaller
 than `end`, and a range beyond the available string does not match. Slices can
 be combined with other conditions using `AND`, `OR`, and `NOT`.
+
+`CAPTURE n` queries the nth explicit group of the regular expression passed to
+`FIND MOTIF`; numbering begins at one. Capture values and their zero-based,
+half-open offsets are retained in `patternEvidence`. Offsets follow the
+oriented matched text, so a negative-strand capture is still described from
+5' to 3'. A missing or unmatched group does not satisfy the condition.
 
 ### 2.1 Interval Translation (`TRANSLATE`)
 
@@ -682,6 +692,7 @@ track, transcript, and strand examples use small synthetic fixtures. See
 | `14_transcripts.grql` | Select declared transcript types and derive promoters | `EXTRACT TRANSCRIPTS`, `SELECT` |
 | `15_strands.grql` | Compare reference and strand-oriented sequence | `SEQUENCE`, `ORIENTED_SEQUENCE` |
 | `16_translate.grql` | Translate intervals under two genetic codes | `TRANSLATE`, `PROTEIN_SEQUENCE` |
+| `17_captures.grql` | Filter regular-expression groups | `CAPTURE` |
 
 ---
 

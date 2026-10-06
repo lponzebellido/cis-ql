@@ -185,6 +185,23 @@ std::vector<MotifMatch> MotifFinder::regexSearch(const std::string &text,
       m.position = (size_t)it->position();
       m.matchLength = (size_t)(*it)[1].length();
       m.strand = strand;
+      if (it->size() > 2) {
+        m.patternEvidence.present = true;
+        m.patternEvidence.pattern = rawPattern;
+        for (size_t group = 2; group < it->size(); ++group) {
+          PatternCapture capture;
+          capture.index = group - 1;
+          capture.matched = (*it)[group].matched;
+          if (capture.matched) {
+            capture.value = (*it)[group].str();
+            const std::ptrdiff_t groupPosition = it->position(group);
+            const std::ptrdiff_t matchPosition = it->position(1);
+            capture.start = static_cast<size_t>(groupPosition - matchPosition);
+            capture.end = capture.start + capture.value.size();
+          }
+          m.patternEvidence.captures.push_back(capture);
+        }
+      }
       size_t ctxStart =
           (m.position > contextSize) ? m.position - contextSize : 0;
       size_t ctxEnd =

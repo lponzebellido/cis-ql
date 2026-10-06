@@ -191,6 +191,17 @@
           "candidates": 2
         }
       }
+    },
+    {
+      "id": "17",
+      "file": "17_captures.grql",
+      "exports": ["captures.tsv"],
+      "resultCounts": {
+        "resultSets": {
+          "tga_middle": 2,
+          "candidates": 2
+        }
+      }
     }
   ]
 }

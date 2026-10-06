@@ -3,9 +3,9 @@
 Status: incremental implementation. Explicit promoters, transcript selection,
 strand-aware sequence predicates, calibrated PWM scans, evidence-preserving
 interval operations, two-member modules, imported regulatory tracks, replicate
-consensus, modular coordinate filters, fixed-index sequence slicing, and
-explicit interval translation are implemented. Later sections are a design
-contract, not yet accepted syntax.
+consensus, modular coordinate filters, fixed-index sequence slicing, numbered
+regular-expression captures, and explicit interval translation are
+implemented. Later sections are a design contract, not yet accepted syntax.
 
 ## Product definition
 
@@ -31,7 +31,7 @@ how many new statements it adds.
 
 | Priority | Missing capability | Why it matters | Smallest useful acceptance target |
 | :--- | :--- | :--- | :--- |
-| 1 | Richer scalar expressions, captures, and CDS translation policy | Fixed-index string slicing and interval translation are explicit, but programmers still need capture binding, reusable values, joined CDS assembly, phase handling, and an explicit initiation policy | Add reusable string/numeric expressions and captures; specify a separate CDS mode for joined records and initiator codons |
+| 1 | Richer scalar expressions and CDS translation policy | Fixed-index slicing, numbered regex captures, and interval translation are explicit, but programmers still need reusable values, joined CDS assembly, phase handling, and an explicit initiation policy | Add reusable string/numeric expressions; specify a separate CDS mode for joined records and initiator codons |
 | 2 | Enrichment with matched backgrounds | Counts alone cannot distinguish motif enrichment from length or composition effects | Declare foreground/background regions, matching policy, effect size, test, and multiple-testing correction |
 | 3 | CRE-to-gene evidence tables | `NEAR` is useful but genomic proximity is only one candidate-linking rule | Import relationship/contact tables and retain typed promoter, distance, contact, expression, and binding evidence per link |
 | 4 | General regulatory grammars | Two-site modules cannot express larger heterotypic architectures | Named members, more than two sites, transcript-relative orientation, and grouped aggregation |
@@ -326,6 +326,10 @@ FIND MOTIF "ATGNNNTAA" AS bounded_patterns
 
 EXTRACT bounded_patterns AS alanine_second_codon
   WHERE SLICE ORIENTED_SEQUENCE FROM 3 TO 6 = "GCT";
+
+FIND MOTIF "ATG([ACGT]{3})(TAA|TAG|TGA)" AS codon_patterns;
+EXTRACT codon_patterns AS tga_middle
+  WHERE CAPTURE 1 = "TGA" AND CAPTURE 2 = "TAA";
 ```
 
 Numeric conditions may apply `MOD` before their relational comparison.
@@ -349,8 +353,22 @@ comparison. Indices must be non-negative whole numbers and define a non-empty
 range. An out-of-bounds range evaluates as no match instead of being clamped,
 so a program cannot silently compare a shorter string. Slicing composes with
 the existing Boolean condition tree and works on motif hits and named region
-sets. Materialized sequence expressions, capture groups, negative indices,
-and reusable scalar values remain planned.
+sets. Materialized sequence expressions, negative slice indices, and reusable
+scalar values remain planned.
+
+`CAPTURE n` addresses the nth explicit capturing group in a `FIND MOTIF`
+regular expression, beginning at one. The engine's lookahead group is not part
+of public numbering. Every match retains the original pattern plus each
+group's matched state, value, and zero-based half-open offsets relative to the
+oriented full match. Negative-strand captures therefore use the 5'-to-3'
+matched text rather than reference-left coordinates. Optional unmatched groups
+remain explicit and do not satisfy text predicates; a group index absent from
+the pattern also evaluates as no match. JSON preserves typed capture objects,
+while TSV and GFF3 carry the same structure as JSON. Geometry-preserving
+selection keeps the evidence, whereas clipping and merging discard it.
+
+Named captures, capture slicing, materialized expressions, negative slice
+indices, and reusable scalar values remain planned.
 
 ### Part 2C2: explicit interval translation
 

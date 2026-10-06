@@ -25,6 +25,7 @@ from the repository root:
 | `14_transcripts.grql` | Select transcript types and derive their promoters | synthetic FASTA and GFF3 |
 | `15_strands.grql` | Compare reference and strand-oriented sequence | synthetic FASTA |
 | `16_translate.grql` | Translate intervals with two genetic codes | synthetic FASTA |
+| `17_captures.grql` | Query numbered regular-expression groups | synthetic FASTA |
 
 `ecoli2.fna` and `genomic.gff` use accession `U00096.3`, so sequence and
 annotation coordinates refer to the same assembly. The track and regulatory
@@ -45,6 +46,10 @@ The TGA codon is a stop in table 1 and tryptophan in table 4, so the example
 uses a protein slice to show that genetic-code choice is part of the program
 rather than an implicit default. It is a translation example, not an ORF or
 gene prediction.
+
+Example 17 retains the explicit groups of a regular expression and filters
+their values with `CAPTURE`. Capture offsets are relative to the matched text
+in its 5'-to-3' orientation, including matches on the negative strand.
 
 The regular expression in `12_orfs.grql` advances three nucleotides at a time
 after `ATG` and rejects an in-frame stop in each repeated codon. It therefore

@@ -138,6 +138,19 @@ interface TranslationEvidence {
   proteinSequence: string;
 }
 
+interface PatternCapture {
+  index: number;
+  matched: boolean;
+  value: string;
+  start: number;
+  end: number;
+}
+
+interface PatternEvidence {
+  pattern: string;
+  captures: PatternCapture[];
+}
+
 interface GenomicRegion {
   chr: string;
   start: number;
@@ -148,6 +161,7 @@ interface GenomicRegion {
   sequence?: string;
   annotationEvidence?: AnnotationEvidence;
   motifEvidence?: MotifEvidence;
+  patternEvidence?: PatternEvidence;
   spatialRelation?: SpatialRelation;
   countEvidence?: CountEvidence;
   consensusEvidence?: ConsensusEvidence;
@@ -859,6 +873,15 @@ export const TrackViewer: React.FC<TrackViewerProps> = ({ results, gcProfiles = 
                     </div>
                   )}
                 </>
+              )}
+              {selectedRegion.patternEvidence && (
+                <div className="detail-field">
+                  <span className="detail-label">Pattern captures</span>
+                  <span className="detail-value" style={{ wordBreak: 'break-all' }}>
+                    {selectedRegion.patternEvidence.pattern}<br />
+                    {selectedRegion.patternEvidence.captures.map(capture => capture.matched ? `${capture.index}: ${capture.value} [${capture.start},${capture.end})` : `${capture.index}: unmatched`).join(' · ')}
+                  </span>
+                </div>
               )}
               {selectedRegion.translationEvidence && (
                 <div className="detail-field">

@@ -1004,7 +1004,12 @@ std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
   std::string reference;
   std::string sliceStart;
   std::string sliceEnd;
-  if (match(TokenType::SLICE)) {
+  if (match(TokenType::CAPTURE)) {
+    prop = previous().lexeme;
+    consume(TokenType::NUM,
+            "Expected a positive capture-group index after CAPTURE.");
+    reference = previous().lexeme;
+  } else if (match(TokenType::SLICE)) {
     if (match(TokenType::SEQUENCE) || match(TokenType::ORIENTED_SEQUENCE) ||
         match(TokenType::PROTEIN_SEQUENCE)) {
       prop = previous().lexeme;

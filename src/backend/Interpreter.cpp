@@ -338,6 +338,25 @@ std::string Interpreter::serializeAnnotationFeatureGroupJSON(
   return out.str();
 }
 
+std::string Interpreter::serializePatternEvidenceJSON(
+    const PatternEvidence &evidence) const {
+  std::ostringstream out;
+  out << "{\"pattern\":\"" << jsonEscape(evidence.pattern)
+      << "\",\"captures\":[";
+  for (size_t index = 0; index < evidence.captures.size(); ++index) {
+    if (index > 0)
+      out << ',';
+    const PatternCapture &capture = evidence.captures[index];
+    out << "{\"index\":" << capture.index
+        << ",\"matched\":" << (capture.matched ? "true" : "false")
+        << ",\"value\":\"" << jsonEscape(capture.value)
+        << "\",\"start\":" << capture.start
+        << ",\"end\":" << capture.end << '}';
+  }
+  out << "]}";
+  return out.str();
+}
+
 std::string
 Interpreter::serializeTrackEvidenceJSON(const TrackEvidence &track) const {
   std::ostringstream out;
@@ -608,6 +627,7 @@ GenomicRegion Interpreter::motifMatchToRegion(const MotifMatch &match,
     region.name += "_in_" + match.evidence.sourceRegionName;
   }
   region.motifEvidence = match.evidence;
+  region.patternEvidence = match.patternEvidence;
   region.trackEvidence = match.evidence.sourceTrackEvidence;
 
   const auto chromosomeMap = sequenceChrMaps.find(activeSequenceAlias);
@@ -1281,6 +1301,13 @@ void Interpreter::executeExport(const IRInstruction &instr) {
               << ";RelativeStart=" << region.motifEvidence.relativeStart;
         }
       }
+      if (region.patternEvidence.present) {
+        out << ";Pattern="
+            << gffAttributeEscape(region.patternEvidence.pattern)
+            << ";PatternCapturesJSON="
+            << gffAttributeEscape(
+                   serializePatternEvidenceJSON(region.patternEvidence));
+      }
       if (region.spatialRelation.present) {
         out << ";SpatialRelation="
             << gffAttributeEscape(region.spatialRelation.relation)
@@ -1454,7 +1481,8 @@ void Interpreter::executeExport(const IRInstruction &instr) {
            "\tannotation_source\tannotation_id\tannotation_name"
            "\tannotation_score\tannotation_phase"
            "\tannotation_parents_json\tannotation_attributes_json"
-           "\ttranslation_code\ttranslation_frame\tprotein_sequence\n";
+           "\ttranslation_code\ttranslation_frame\tprotein_sequence"
+           "\tpattern\tpattern_captures_json\n";
     for (const auto &region : regionsIt->second) {
       out << cleanTabularField(region.chr) << '\t' << region.start << '\t'
           << region.end << '\t' << cleanTabularField(region.strand) << '\t'
@@ -1640,6 +1668,14 @@ void Interpreter::executeExport(const IRInstruction &instr) {
                    region.translationEvidence.proteinSequence);
       } else {
         out << "\t\t";
+      }
+      out << '\t';
+      if (region.patternEvidence.present) {
+        out << cleanTabularField(region.patternEvidence.pattern) << '\t'
+            << cleanTabularField(
+                   serializePatternEvidenceJSON(region.patternEvidence));
+      } else {
+        out << '\t';
       }
       out << '\n';
     }
@@ -2326,6 +2362,21 @@ bool Interpreter::compareSequenceCondition(
                              stripQuotes(condition->value));
 }
 
+bool Interpreter::compareCaptureCondition(
+    const PatternEvidence &evidence,
+    const std::shared_ptr<IRCondition> &condition) const {
+  if (!evidence.present)
+    return false;
+  const size_t index = static_cast<size_t>(
+      std::strtoull(condition->reference.c_str(), nullptr, 10));
+  for (const auto &capture : evidence.captures) {
+    if (capture.index == index)
+      return capture.matched &&
+             compareSequenceCondition(capture.value, condition);
+  }
+  return false;
+}
+
 bool Interpreter::evaluateRegionCondition(
     const std::shared_ptr<IRCondition> &condition, const GenomicRegion &region,
     const std::string &referenceSequence) const {
@@ -2435,6 +2486,8 @@ bool Interpreter::evaluateRegionCondition(
            compareSequenceCondition(
                region.translationEvidence.proteinSequence, condition);
   }
+  if (condition->property == "CAPTURE")
+    return compareCaptureCondition(region.patternEvidence, condition);
   if (condition->property == "EVIDENCE_CLASS" ||
       condition->property == "ASSAY" || condition->property == "SAMPLE" ||
       condition->property == "CONDITION" ||
@@ -2585,6 +2638,8 @@ bool Interpreter::evaluateMotifCondition(
     }
     return compareSequenceCondition(observed, condition);
   }
+  if (condition->property == "CAPTURE")
+    return compareCaptureCondition(match.patternEvidence, condition);
   if (condition->property == "GC_CONTENT") {
     const auto dataset = sequenceChrMaps.find(activeSequenceAlias);
     if (dataset == sequenceChrMaps.end())
@@ -2644,7 +2699,7 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
             instr.condition,
             {"LENGTH", "START", "END", "STRAND", "SIMILARITY",
              "GC_CONTENT", "SEQUENCE", "ORIENTED_SEQUENCE", "COUNT",
-             "PROTEIN_SEQUENCE",
+             "PROTEIN_SEQUENCE", "CAPTURE",
              "ID", "NAME", "TYPE", "PARENT",
              "SOURCE", "PHASE", "ATTRIBUTE",
              "TRACK_SCORE", "SIGNAL_VALUE", "MINUS_LOG10_PVALUE",
@@ -2762,10 +2817,10 @@ void Interpreter::executeFilterCondition(const IRInstruction &instr) {
     if (!conditionUsesOnly(
             instr.condition,
             {"LENGTH", "START", "END", "STRAND", "GC_CONTENT",
-             "SEQUENCE", "ORIENTED_SEQUENCE"})) {
+             "SEQUENCE", "ORIENTED_SEQUENCE", "CAPTURE"})) {
       reportRuntimeError(
           "Motif matches support LENGTH, START, END, STRAND, GC_CONTENT, "
-          "SEQUENCE, and ORIENTED_SEQUENCE filters.");
+          "SEQUENCE, ORIENTED_SEQUENCE, and CAPTURE filters.");
       return;
     }
     auto &matches = motifResults[resultId];
@@ -3393,6 +3448,10 @@ void Interpreter::dumpResultsJSON() const {
             << "          \"proteinSequence\": \""
             << jsonEscape(r.translationEvidence.proteinSequence) << "\"\n"
             << "        }";
+      }
+      if (r.patternEvidence.present) {
+        out << ",\n        \"patternEvidence\": "
+            << serializePatternEvidenceJSON(r.patternEvidence);
       }
       if (r.motifEvidence.present) {
         out << ",\n        \"motifEvidence\": {\n"

@@ -185,6 +185,10 @@ def main() -> int:
             ">chrTranslate\nATGTGATAAGGGGTTATCACAT\n",
             encoding="utf-8",
         )
+        (workspace / "captures.fasta").write_text(
+            ">chrCapture\nATGAAATAATTTATGCCCTAGTTATTTCAT\n",
+            encoding="utf-8",
+        )
         (workspace / "oriented.gff3").write_text(
             "##gff-version 3\n"
             "chrOrient\ttest\tregion\t1\t3\t.\t.\t.\tID=unstranded\n",
@@ -349,7 +353,7 @@ def main() -> int:
         track_tsv = (workspace / "accessible.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(track_tsv) == 113 and track_tsv[81:96] == [
+        require(len(track_tsv) == 115 and track_tsv[81:96] == [
                     "accessible", "accessibility.narrowPeak", "NARROWPEAK",
                     "ACCESSIBILITY", "ATAC-seq", "leaf", "pigmented",
                     "R1", "input", "500", "12.5",
@@ -360,7 +364,7 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()[1].split("\t")
         combined_overlap = json.loads(combined_tsv[96])
-        require(len(combined_tsv) == 113 and
+        require(len(combined_tsv) == 115 and
                 combined_overlap[0]["referenceSet"] == "bound" and
                 combined_overlap[0]["trackEvidence"]["evidenceClass"]
                 == "BINDING" and
@@ -646,7 +650,7 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()[1].split("\t")
         require(
-            len(coding_tsv) == 113 and
+            len(coding_tsv) == 115 and
             coding_tsv[103:109] == ["curated", "cds1", "", "7.5", "0",
                                       '["tx1"]'] and
             json.loads(coding_tsv[109])["protein_id"] == "P1",
@@ -1158,7 +1162,8 @@ def main() -> int:
                 "\tannotation_source\tannotation_id\tannotation_name"
                 "\tannotation_score\tannotation_phase"
                 "\tannotation_parents_json\tannotation_attributes_json"
-                "\ttranslation_code\ttranslation_frame\tprotein_sequence",
+                "\ttranslation_code\ttranslation_frame\tprotein_sequence"
+                "\tpattern\tpattern_captures_json",
                 "region TSV export")
         profile_lines = (workspace / "profile.tsv").read_text(
             encoding="utf-8"
@@ -1262,6 +1267,71 @@ def main() -> int:
              for item in data["resultSets"]["reference_prefix"]]
             == [(0, "+")],
             "SLICE preserves reference orientation for SEQUENCE",
+        )
+
+        data, _ = run_query(
+            workspace,
+            "regex_capture_filter",
+            'LOAD SEQUENCE "captures.fasta" AS genome;\n'
+            'FIND MOTIF "ATG([ACGT]{3})(TAA|TAG|TGA)" AS candidates;\n'
+            'FIND MOTIF "ATG([ACGT]{3})(TAA|TAG|TGA)" STRAND POSITIVE '
+            'AS direct_aaa WHERE CAPTURE 1 = "AAA";\n'
+            'EXTRACT candidates AS aaa_codons WHERE CAPTURE 1 = "AAA";\n'
+            'EXTRACT candidates AS tag_stops WHERE CAPTURE 2 = "TAG";\n'
+            'EXTRACT candidates AS missing_group WHERE CAPTURE 3 = "AAA";\n',
+        )
+        require(
+            [(item["start"], item["strand"])
+             for item in data["resultSets"]["aaa_codons"]]
+            == [(0, "+"), (21, "-")]
+            and [(item["start"], item["strand"])
+                 for item in data["resultSets"]["tag_stops"]]
+            == [(12, "+")]
+            and [(item["start"], item["strand"])
+                 for item in data["resultSets"]["direct_aaa"]]
+            == [(0, "+")]
+            and data["resultSets"]["missing_group"] == [],
+            "CAPTURE filters regex groups during and after FIND",
+        )
+        capture = data["resultSets"]["aaa_codons"][0]["patternEvidence"]
+        require(
+            capture["pattern"] == "ATG([ACGT]{3})(TAA|TAG|TGA)"
+            and capture["captures"] == [
+                {"index": 1, "matched": True, "value": "AAA",
+                 "start": 3, "end": 6},
+                {"index": 2, "matched": True, "value": "TAA",
+                 "start": 6, "end": 9},
+            ],
+            "regex captures retain typed values and oriented offsets",
+        )
+
+        data, _ = run_query(
+            workspace,
+            "regex_capture_export",
+            'LOAD SEQUENCE "captures.fasta" AS genome;\n'
+            'FIND MOTIF "ATG([ACGT]{3})(TAA|TAG|TGA)" STRAND POSITIVE '
+            'AS candidates;\n'
+            'EXPORT candidates TO "captures.tsv" FORMAT TSV;\n'
+            'EXPORT candidates TO "captures.gff3" FORMAT GFF3;\n',
+        )
+        capture_tsv = (workspace / "captures.tsv").read_text(
+            encoding="utf-8"
+        ).splitlines()
+        capture_row = dict(zip(capture_tsv[0].split("\t"),
+                               capture_tsv[1].split("\t")))
+        require(
+            capture_row["pattern"] == "ATG([ACGT]{3})(TAA|TAG|TGA)"
+            and json.loads(capture_row["pattern_captures_json"])
+            == data["resultSets"]["candidates"][0]["patternEvidence"],
+            "TSV export preserves pattern captures as structured JSON",
+        )
+        capture_gff = (workspace / "captures.gff3").read_text(
+            encoding="utf-8"
+        ).splitlines()[1]
+        require(
+            "Pattern=ATG%28%5BACGT%5D%7B3%7D%29" in capture_gff
+            and "PatternCapturesJSON=" in capture_gff,
+            "GFF3 export preserves pattern and capture evidence",
         )
 
         data, _ = run_query(
@@ -1450,6 +1520,17 @@ def main() -> int:
         require("Expected SEQUENCE, ORIENTED_SEQUENCE" in parser_error,
                 "SLICE accepts only sequence-valued properties")
 
+        semantic_error = run_invalid_query(
+            workspace,
+            "capture_index_zero",
+            'LOAD SEQUENCE "captures.fasta" AS genome;\n'
+            'FIND MOTIF "ATG([ACGT]{3})" AS invalid '
+            'WHERE CAPTURE 0 = "AAA";\n',
+            3,
+        )
+        require("positive whole group index" in semantic_error,
+                "CAPTURE indices start at one")
+
         data, _ = run_query(
             workspace,
             "unstranded_oriented_sequence",
@@ -1634,7 +1715,7 @@ def main() -> int:
             encoding="utf-8"
         ).splitlines()
         first_tsv_site = tsv_rows[1].split("\t")
-        require(len(tsv_rows) == 10 and len(first_tsv_site) == 113 and
+        require(len(tsv_rows) == 10 and len(first_tsv_site) == 115 and
                 first_tsv_site[7:11]
                 == ["matrix", "TEST", "test", "fixture.pwm"] and
                 float(first_tsv_site[11]) > 0 and
@@ -1650,7 +1731,7 @@ def main() -> int:
                 abs(float(first_tsv_site[31]) - 0.1) < 1e-12 and
                 first_tsv_site[32:34] == ["short_promoter", "promoter"] and
                 first_tsv_site[36] == "0" and
-                first_tsv_site[37:] == [""] * 76,
+                first_tsv_site[37:] == [""] * 78,
                 "motif TSV export retains evidence columns")
 
         data, _ = run_query(
@@ -1688,7 +1769,7 @@ def main() -> int:
         promoter_overlap_tsv = (workspace / "promoter_sites.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(promoter_overlap_tsv) == 113 and
+        require(len(promoter_overlap_tsv) == 115 and
                 json.loads(promoter_overlap_tsv[96])[0]["reference"]
                     ["name"] == "short_promoter",
                 "OVERLAPS TSV evidence identifies the matching reference")
@@ -1740,10 +1821,10 @@ def main() -> int:
         linked_tsv = (workspace / "linked.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(linked_tsv) == 113 and linked_tsv[37:48] == [
+        require(len(linked_tsv) == 115 and linked_tsv[37:48] == [
                     "NEAR", "GENE", "chr1", "0", "1200", "+", "gene",
                     "short", "0", "0", "true",
-                ] and linked_tsv[48:] == [""] * 65,
+                ] and linked_tsv[48:] == [""] * 67,
                 "TSV export retains typed nearest-reference evidence")
 
         data, _ = run_query(
@@ -1787,9 +1868,9 @@ def main() -> int:
         count_tsv = (workspace / "counts.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(count_tsv) == 113 and count_tsv[48:52] == [
+        require(len(count_tsv) == 115 and count_tsv[48:52] == [
                     "OVERLAPS", "sites", "promoters", "20",
-                ] and count_tsv[52:] == [""] * 61,
+                ] and count_tsv[52:] == [""] * 63,
                 "TSV export retains count provenance")
 
         data, _ = run_query(
@@ -1849,7 +1930,7 @@ def main() -> int:
         module_tsv = (workspace / "modules.tsv").read_text(
             encoding="utf-8"
         ).splitlines()[1].split("\t")
-        require(len(module_tsv) == 113 and
+        require(len(module_tsv) == 115 and
                 module_tsv[52:59] == [
                     "2", "2", "2", "ANY", "FIRST_BEFORE_SECOND",
                     "SAME", "SAME",
@@ -2086,7 +2167,7 @@ def main() -> int:
             workspace / "consensus.tsv"
         ).read_text(encoding="utf-8").splitlines()[1].split("\t")
         require(
-            len(consensus_tsv) == 113 and
+            len(consensus_tsv) == 115 and
             consensus_tsv[97:100] == ["filtered_1", "2", "2"] and
             consensus_tsv[100] == "50" and
             consensus_tsv[101] == "5" and

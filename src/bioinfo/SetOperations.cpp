@@ -42,6 +42,8 @@ SetOperations::intersect(std::vector<GenomicRegion> a,
       if (start != a[i].start || end != a[i].end)
         overlap.motifEvidence = MotifEvidence();
       if (start != a[i].start || end != a[i].end)
+        overlap.patternEvidence = PatternEvidence();
+      if (start != a[i].start || end != a[i].end)
         overlap.spatialRelation = SpatialRelationEvidence();
       if (start != a[i].start || end != a[i].end)
         overlap.countEvidence = CountEvidence();
@@ -88,6 +90,7 @@ std::vector<GenomicRegion> SetOperations::unite(std::vector<GenomicRegion> a,
       last.type = "union";
       last.annotationEvidence = AnnotationEvidence();
       last.motifEvidence = MotifEvidence();
+      last.patternEvidence = PatternEvidence();
       last.spatialRelation = SpatialRelationEvidence();
       last.countEvidence = CountEvidence();
       last.moduleEvidence = ModuleEvidence();
@@ -133,6 +136,7 @@ std::vector<GenomicRegion> SetOperations::except(std::vector<GenomicRegion> a,
               fragment.start - region.start, fragment.end - fragment.start);
         }
         fragment.motifEvidence = MotifEvidence();
+        fragment.patternEvidence = PatternEvidence();
         fragment.annotationEvidence = AnnotationEvidence();
         fragment.spatialRelation = SpatialRelationEvidence();
         fragment.countEvidence = CountEvidence();
@@ -160,6 +164,8 @@ std::vector<GenomicRegion> SetOperations::except(std::vector<GenomicRegion> a,
         fragment.annotationEvidence = AnnotationEvidence();
       if (fragment.start != region.start || fragment.end != region.end)
         fragment.motifEvidence = MotifEvidence();
+      if (fragment.start != region.start || fragment.end != region.end)
+        fragment.patternEvidence = PatternEvidence();
       if (fragment.start != region.start || fragment.end != region.end)
         fragment.spatialRelation = SpatialRelationEvidence();
       if (fragment.start != region.start || fragment.end != region.end)

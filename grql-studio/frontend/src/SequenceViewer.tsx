@@ -138,6 +138,19 @@ interface TranslationEvidence {
   proteinSequence: string;
 }
 
+interface PatternCapture {
+  index: number;
+  matched: boolean;
+  value: string;
+  start: number;
+  end: number;
+}
+
+interface PatternEvidence {
+  pattern: string;
+  captures: PatternCapture[];
+}
+
 interface GenomicRegion {
   chr: string;
   start: number;
@@ -148,6 +161,7 @@ interface GenomicRegion {
   sequence?: string;
   annotationEvidence?: AnnotationEvidence;
   motifEvidence?: MotifEvidence;
+  patternEvidence?: PatternEvidence;
   spatialRelation?: SpatialRelation;
   countEvidence?: CountEvidence;
   consensusEvidence?: ConsensusEvidence;
@@ -396,6 +410,12 @@ export const SequenceViewer: React.FC<SequenceViewerProps> = ({ results, highlig
                                   {region.motifEvidence.sourceRegion && (
                                     <span>Source: {region.motifEvidence.sourceRegion.name} +{region.motifEvidence.sourceRegion.relativeStart} bp</span>
                                   )}
+                                </>
+                              )}
+                              {region.patternEvidence && (
+                                <>
+                                  <span>Pattern: {region.patternEvidence.pattern}</span>
+                                  <span>Captures: {region.patternEvidence.captures.map(capture => capture.matched ? `${capture.index}=${capture.value} [${capture.start},${capture.end})` : `${capture.index}=unmatched`).join('; ')}</span>
                                 </>
                               )}
                               {region.translationEvidence && (

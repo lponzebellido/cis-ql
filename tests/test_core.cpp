@@ -87,6 +87,38 @@ int main() {
   require(!MotifFinder::isValidPattern("("),
           "invalid regular expressions are rejected");
 
+  const auto captured = MotifFinder::findAll(
+      "ATGAAATAA", "ATG([ACGT]{3})(TAA|TAG|TGA)", "chr1", false);
+  require(
+      captured.size() == 1 && captured[0].patternEvidence.present &&
+          captured[0].patternEvidence.pattern ==
+              "ATG([ACGT]{3})(TAA|TAG|TGA)" &&
+          captured[0].patternEvidence.captures.size() == 2 &&
+          captured[0].patternEvidence.captures[0].index == 1 &&
+          captured[0].patternEvidence.captures[0].matched &&
+          captured[0].patternEvidence.captures[0].value == "AAA" &&
+          captured[0].patternEvidence.captures[0].start == 3 &&
+          captured[0].patternEvidence.captures[0].end == 6 &&
+          captured[0].patternEvidence.captures[1].value == "TAA" &&
+          captured[0].patternEvidence.captures[1].start == 6 &&
+          captured[0].patternEvidence.captures[1].end == 9,
+      "regular-expression capture values and offsets");
+  const auto optionalCapture = MotifFinder::findAll(
+      "ATGTAA", "ATG(AAA)?(TAA)", "chr1", false);
+  require(optionalCapture.size() == 1 &&
+              optionalCapture[0].patternEvidence.captures.size() == 2 &&
+              !optionalCapture[0].patternEvidence.captures[0].matched &&
+              optionalCapture[0].patternEvidence.captures[0].value.empty() &&
+              optionalCapture[0].patternEvidence.captures[1].matched &&
+              optionalCapture[0].patternEvidence.captures[1].value == "TAA",
+          "optional unmatched capture groups remain explicit");
+  const auto negativeCapture = MotifFinder::findAll(
+      "TTATTTCAT", "ATG([ACGT]{3})(TAA)", "chr1", true);
+  require(negativeCapture.size() == 1 && negativeCapture[0].strand == "-" &&
+              negativeCapture[0].patternEvidence.captures[0].value == "AAA" &&
+              negativeCapture[0].patternEvidence.captures[0].start == 3,
+          "negative-strand captures use oriented offsets");
+
   const double identical =
       SmithWaterman::computeSimilarity("ACGTACGT", "ACGTACGT");
   require(std::abs(identical - 100.0) < 1e-9,
@@ -126,6 +158,15 @@ int main() {
   require(clippedTranslation.size() == 1 &&
               !clippedTranslation[0].translationEvidence.present,
           "coordinate clipping invalidates translation evidence");
+
+  GenomicRegion capturedRegion = region(0, 9);
+  capturedRegion.patternEvidence.present = true;
+  capturedRegion.patternEvidence.pattern = "ATG([ACGT]{3})TAA";
+  const auto clippedCapture = SetOperations::intersect(
+      {capturedRegion}, {region(3, 9)});
+  require(clippedCapture.size() == 1 &&
+              !clippedCapture[0].patternEvidence.present,
+          "coordinate clipping invalidates pattern evidence");
 
   const auto difference =
       SetOperations::except({region(0, 10)}, {region(3, 7)});

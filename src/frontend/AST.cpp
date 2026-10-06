@@ -5,7 +5,7 @@ void SimpleConditionNode::print(std::string prefix, bool isLast) const {
     std::cout << prefix << (isLast ? "└── " : "├── ") << "SimpleCondition(";
     if (!sliceStart.empty()) std::cout << "SLICE ";
     std::cout << property;
-    if (!reference.empty()) std::cout << (property == "ATTRIBUTE" ? " " : " TO ") << reference;
+    if (!reference.empty()) std::cout << (property == "ATTRIBUTE" || property == "CAPTURE" ? " " : " TO ") << reference;
     if (!modifier.empty()) std::cout << " " << modifier << " " << modifierValue;
     if (!sliceStart.empty()) std::cout << " FROM " << sliceStart << " TO " << sliceEnd;
     std::cout << " " << op << " " << value << ")" << std::endl;

@@ -85,6 +85,8 @@ private:
       const AnnotationValidationReport &report) const;
   std::string serializeAnnotationFeatureGroupJSON(
       const AnnotationFeatureGroup &group) const;
+  std::string serializePatternEvidenceJSON(
+      const PatternEvidence &evidence) const;
   std::string serializeTrackEvidenceJSON(const TrackEvidence &track) const;
   std::string serializeConsensusEvidenceJSON(
       const ConsensusEvidence &evidence) const;
@@ -141,6 +143,9 @@ private:
       double left, const std::shared_ptr<IRCondition> &condition) const;
   bool compareSequenceCondition(
       std::string observed,
+      const std::shared_ptr<IRCondition> &condition) const;
+  bool compareCaptureCondition(
+      const PatternEvidence &evidence,
       const std::shared_ptr<IRCondition> &condition) const;
   bool evaluateRegionCondition(const std::shared_ptr<IRCondition> &condition,
                                const GenomicRegion &region,

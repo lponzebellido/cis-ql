@@ -522,6 +522,7 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
       "LENGTH", "START", "END", "STRAND", "SIMILARITY", "GC_CONTENT",
       "COUNT", "ID", "NAME", "TYPE", "PARENT", "SOURCE", "PHASE",
       "ATTRIBUTE", "SEQUENCE", "ORIENTED_SEQUENCE", "PROTEIN_SEQUENCE",
+      "CAPTURE",
       "TRACK_SCORE", "SIGNAL_VALUE", "MINUS_LOG10_PVALUE",
       "MINUS_LOG10_QVALUE", "EVIDENCE_CLASS", "ASSAY", "SAMPLE",
       "CONDITION", "REPLICATE", "CONTROL", "SUPPORT_COUNT"};
@@ -533,10 +534,11 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
        node->op == "CONTAINS") &&
       node->property != "SEQUENCE" &&
       node->property != "ORIENTED_SEQUENCE" &&
-      node->property != "PROTEIN_SEQUENCE") {
+      node->property != "PROTEIN_SEQUENCE" &&
+      node->property != "CAPTURE") {
     reportError(node->op +
                 " requires SEQUENCE, ORIENTED_SEQUENCE, or "
-                "PROTEIN_SEQUENCE.");
+                "PROTEIN_SEQUENCE, or CAPTURE.");
   }
   if (!supportedProperties.count(node->property)) {
     reportError("Unsupported condition property '" + node->property + "'.");
@@ -643,7 +645,8 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
     }
   } else if (node->property == "SEQUENCE" ||
              node->property == "ORIENTED_SEQUENCE" ||
-             node->property == "PROTEIN_SEQUENCE") {
+             node->property == "PROTEIN_SEQUENCE" ||
+             node->property == "CAPTURE") {
     if (node->value.size() < 2 || node->value.front() != '"' ||
         node->value.back() != '"') {
       reportError(node->property + " must be compared with a string value.");
@@ -655,6 +658,12 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
         node->op != "CONTAINS") {
       reportError(node->property +
                   " supports =, STARTS_WITH, ENDS_WITH, or CONTAINS.");
+    }
+    if (node->property == "CAPTURE") {
+      const double index = parseValue(node->reference);
+      if (!std::isfinite(index) || index < 1.0 || std::floor(index) != index) {
+        reportError("CAPTURE requires a positive whole group index.");
+      }
     }
   } else if (node->property == "TYPE" || node->property == "PARENT" ||
              node->property == "SOURCE" || node->property == "PHASE" ||

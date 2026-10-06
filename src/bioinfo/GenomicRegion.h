@@ -8,6 +8,7 @@
 #include "ConsensusEvidence.h"
 #include "ModuleEvidence.h"
 #include "OverlapEvidence.h"
+#include "PatternEvidence.h"
 #include "TrackEvidence.h"
 #include "TranslationEvidence.h"
 #include <string>
@@ -24,6 +25,7 @@ struct GenomicRegion {
   std::string sequence;
   AnnotationEvidence annotationEvidence;
   MotifEvidence motifEvidence;
+  PatternEvidence patternEvidence;
   SpatialRelationEvidence spatialRelation;
   CountEvidence countEvidence;
   ConsensusEvidence consensusEvidence;

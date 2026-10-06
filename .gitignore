@@ -65,6 +65,7 @@ temp_script.grql
 /strands.tsv
 /standard_translation.tsv
 /table4_translation.gff3
+/captures.tsv
 
 *.tex
 
