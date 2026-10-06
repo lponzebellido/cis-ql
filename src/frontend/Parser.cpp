@@ -1020,13 +1020,19 @@ std::unique_ptr<SimpleConditionNode> Parser::parseSimpleCondition() {
       throw std::runtime_error("Parse error");
     }
     consume(TokenType::FROM, "Expected 'FROM' after the sliced value.");
-    consume(TokenType::NUM,
-            "Expected a non-negative whole start index after FROM.");
-    sliceStart = previous().lexeme;
+    auto parseSliceBound = [this](const std::string &position) {
+      if (match(TokenType::END))
+        return previous().lexeme;
+      std::string bound;
+      if (match(TokenType::MINUS))
+        bound = previous().lexeme;
+      consume(TokenType::NUM,
+              "Expected a whole index or END after " + position + ".");
+      return bound + previous().lexeme;
+    };
+    sliceStart = parseSliceBound("FROM");
     consume(TokenType::TO, "Expected 'TO' after the slice start index.");
-    consume(TokenType::NUM,
-            "Expected a non-negative whole end index after TO.");
-    sliceEnd = previous().lexeme;
+    sliceEnd = parseSliceBound("TO");
   } else if (match(TokenType::ATTRIBUTE)) {
     prop = previous().lexeme;
     consume(TokenType::STRING,

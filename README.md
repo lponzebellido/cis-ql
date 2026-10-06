@@ -183,6 +183,9 @@ FIND MOTIF "ATGNNNTAA" AS bounded_patterns
 EXTRACT bounded_patterns AS alanine_second_codon
     WHERE SLICE ORIENTED_SEQUENCE FROM 3 TO 6 = "GCT";
 
+EXTRACT start_stop_candidates AS terminal_taa
+    WHERE SLICE ORIENTED_SEQUENCE FROM -3 TO END = "TAA";
+
 FIND MOTIF "ATG([ACGT]{3})(TAA|TAG|TGA)" AS codon_patterns;
 EXTRACT codon_patterns AS tga_middle
     WHERE CAPTURE 1 = "TGA" AND CAPTURE 2 = "TAA";
@@ -207,11 +210,13 @@ unstranded record. Sequence literals are compared case-insensitively with `=`,
 `STARTS_WITH`, `ENDS_WITH`, or `CONTAINS`; they are literal strings rather than
 regular expressions or implicit IUPAC patterns.
 
-`SLICE property FROM start TO end` selects a zero-based, half-open portion of
-`SEQUENCE`, `ORIENTED_SEQUENCE`, or `PROTEIN_SEQUENCE` before applying a text
-comparison. Both indices are non-negative integers, `start` must be smaller
-than `end`, and a range beyond the available string does not match. Slices can
-be combined with other conditions using `AND`, `OR`, and `NOT`.
+`SLICE property FROM start TO end` selects a half-open portion of `SEQUENCE`,
+`ORIENTED_SEQUENCE`, or `PROTEIN_SEQUENCE` before applying a text comparison.
+Non-negative indices count from the start, negative indices count from the end,
+and `END` denotes the string length. For example, `FROM -3 TO END` selects the
+last three characters. A range that is empty, reversed, or outside the string
+does not match. Slices can be combined with other conditions using `AND`, `OR`,
+and `NOT`.
 
 `CAPTURE n` queries the nth explicit group of the regular expression passed to
 `FIND MOTIF`; numbering begins at one. Capture values and their zero-based,
@@ -613,7 +618,8 @@ Factor             ::= NOT Factor | SimpleCondition | "(" Condition ")"
 
 SimpleCondition    ::= NumericProperty NumericModifierOpt RelOp Value
                      | SIMILARITY SimilarityRefOpt NumericModifierOpt RelOp Value
-                     | SequenceProperty SequenceRelOp STRING
+                     | StringExpression SequenceRelOp STRING
+                     | CAPTURE NUM SequenceRelOp STRING
                      | StringProperty RelOp STRING
                      | ATTRIBUTE STRING RelOp STRING
 NumericModifierOpt ::= MOD (NUM | FLOAT) | λ
@@ -624,6 +630,9 @@ StringProperty     ::= ID | NAME | STRAND | TYPE | PARENT | SOURCE | PHASE
                      | EVIDENCE_CLASS | ASSAY | SAMPLE | CONDITION
                      | REPLICATE | CONTROL
 SequenceProperty   ::= SEQUENCE | ORIENTED_SEQUENCE | PROTEIN_SEQUENCE
+StringExpression   ::= SequenceProperty
+                     | SLICE SequenceProperty FROM SliceBound TO SliceBound
+SliceBound         ::= NUM | "-" NUM | END
 SequenceRelOp      ::= "=" | STARTS_WITH | ENDS_WITH | CONTAINS
 SimilarityRefOpt   ::= TO ID | λ
 RelOp              ::= ">" | "<" | ">=" | "<=" | "="

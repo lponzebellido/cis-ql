@@ -1,6 +1,7 @@
 #include "Interpreter.h"
 #include <algorithm>
 #include <atomic>
+#include <cerrno>
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
@@ -2350,11 +2351,36 @@ bool Interpreter::compareSequenceCondition(
     std::string observed,
     const std::shared_ptr<IRCondition> &condition) const {
   if (!condition->sliceStart.empty()) {
-    const size_t start = static_cast<size_t>(
-        std::strtoull(condition->sliceStart.c_str(), nullptr, 10));
-    const size_t end = static_cast<size_t>(
-        std::strtoull(condition->sliceEnd.c_str(), nullptr, 10));
-    if (start >= end || end > observed.size())
+    auto resolveBound = [&observed](const std::string &text,
+                                    size_t &resolved) {
+      if (text == "END") {
+        resolved = observed.size();
+        return true;
+      }
+      char *remaining = nullptr;
+      errno = 0;
+      const long long index = std::strtoll(text.c_str(), &remaining, 10);
+      if (errno == ERANGE || remaining == text.c_str() || *remaining != '\0')
+        return false;
+      if (index >= 0) {
+        const unsigned long long absolute =
+            static_cast<unsigned long long>(index);
+        if (absolute > observed.size())
+          return false;
+        resolved = static_cast<size_t>(absolute);
+        return true;
+      }
+      const unsigned long long offset =
+          static_cast<unsigned long long>(-(index + 1)) + 1;
+      if (offset > observed.size())
+        return false;
+      resolved = observed.size() - static_cast<size_t>(offset);
+      return true;
+    };
+    size_t start = 0;
+    size_t end = 0;
+    if (!resolveBound(condition->sliceStart, start) ||
+        !resolveBound(condition->sliceEnd, end) || start >= end)
       return false;
     observed = observed.substr(start, end - start);
   }

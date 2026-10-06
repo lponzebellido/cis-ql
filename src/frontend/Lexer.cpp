@@ -365,6 +365,7 @@ std::vector<Token> Lexer::tokenize() {
                 case '[': tokens.push_back(createToken(TokenType::LBRACKET, lexeme, startLine, startCol)); break;
                 case ']': tokens.push_back(createToken(TokenType::RBRACKET, lexeme, startLine, startCol)); break;
                 case '%': tokens.push_back(createToken(TokenType::PERCENT, lexeme, startLine, startCol)); break;
+                case '-': tokens.push_back(createToken(TokenType::MINUS, lexeme, startLine, startCol)); break;
                 case '=': 
                     tokens.push_back(createToken(TokenType::ASSIGN, lexeme, startLine, startCol)); 
                     break;
@@ -542,6 +543,7 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::LPAREN: return "LPAREN";
         case TokenType::RPAREN: return "RPAREN";
         case TokenType::PERCENT: return "PERCENT";
+        case TokenType::MINUS: return "MINUS";
         case TokenType::BACKGROUND: return "BACKGROUND";
         case TokenType::UNIFORM: return "UNIFORM";
         case TokenType::END_OF_FILE: return "EOF";

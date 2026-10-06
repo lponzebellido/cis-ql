@@ -54,7 +54,8 @@ in its 5'-to-3' orientation, including matches on the negative strand.
 The regular expression in `12_orfs.grql` advances three nucleotides at a time
 after `ATG` and rejects an in-frame stop in each repeated codon. It therefore
 reaches `TAA`, `TAG`, or `TGA` in the same frame. The `LENGTH MOD 3 = 0`
-condition makes that requirement visible in the query. The result is a set of
+condition makes that requirement visible, while `SLICE` checks the first and
+last codons without assuming a fixed match length. The result is a set of
 sequence matches, not a gene prediction.
 
 Interpret interval operations literally. `OVERLAPS` reports coordinate

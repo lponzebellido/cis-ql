@@ -327,6 +327,9 @@ FIND MOTIF "ATGNNNTAA" AS bounded_patterns
 EXTRACT bounded_patterns AS alanine_second_codon
   WHERE SLICE ORIENTED_SEQUENCE FROM 3 TO 6 = "GCT";
 
+EXTRACT start_stop_candidates AS terminal_taa
+  WHERE SLICE ORIENTED_SEQUENCE FROM -3 TO END = "TAA";
+
 FIND MOTIF "ATG([ACGT]{3})(TAA|TAG|TGA)" AS codon_patterns;
 EXTRACT codon_patterns AS tga_middle
   WHERE CAPTURE 1 = "TGA" AND CAPTURE 2 = "TAA";
@@ -347,14 +350,15 @@ stored evidence. Both accept literal `=`, `STARTS_WITH`, `ENDS_WITH`, and
 `CONTAINS` predicates. Unstranded records do not satisfy
 `ORIENTED_SEQUENCE`.
 
-`SLICE property FROM start TO end` applies zero-based, half-open offsets to
-`SEQUENCE`, `ORIENTED_SEQUENCE`, or `PROTEIN_SEQUENCE` before the text
-comparison. Indices must be non-negative whole numbers and define a non-empty
-range. An out-of-bounds range evaluates as no match instead of being clamped,
-so a program cannot silently compare a shorter string. Slicing composes with
-the existing Boolean condition tree and works on motif hits and named region
-sets. Materialized sequence expressions, negative slice indices, and reusable
-scalar values remain planned.
+`SLICE property FROM start TO end` applies half-open offsets to `SEQUENCE`,
+`ORIENTED_SEQUENCE`, or `PROTEIN_SEQUENCE` before the text comparison.
+Non-negative indices count from the start, negative indices count from the end,
+and `END` denotes the string length. Thus `FROM -3 TO END` selects the final
+three characters regardless of sequence length. An empty, reversed, or
+out-of-bounds range evaluates as no match instead of being clamped, so a
+program cannot silently compare a shorter string. Slicing composes with the
+existing Boolean condition tree and works on motif hits and named region sets.
+Materialized sequence expressions and reusable scalar values remain planned.
 
 `CAPTURE n` addresses the nth explicit capturing group in a `FIND MOTIF`
 regular expression, beginning at one. The engine's lookahead group is not part
@@ -367,8 +371,8 @@ the pattern also evaluates as no match. JSON preserves typed capture objects,
 while TSV and GFF3 carry the same structure as JSON. Geometry-preserving
 selection keeps the evidence, whereas clipping and merging discard it.
 
-Named captures, capture slicing, materialized expressions, negative slice
-indices, and reusable scalar values remain planned.
+Named captures, capture slicing, materialized expressions, and reusable scalar
+values remain planned.
 
 ### Part 2C2: explicit interval translation
 

@@ -1,5 +1,6 @@
 #include "SemanticAnalyzer.h"
 #include "../bioinfo/GeneticCode.h"
+#include <cerrno>
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
@@ -20,6 +21,17 @@ static bool isResultAlias(const SymbolTable &symbolTable,
   const std::string type = symbolTable.typeOf(name);
   return type == "RESULT_SET" || type == "MOTIF_HITS" ||
          type == "REGULATORY_TRACK";
+}
+
+static bool parseSliceBound(const std::string &text, long long &value,
+                            bool &isEnd) {
+  isEnd = text == "END";
+  if (isEnd)
+    return true;
+  char *remaining = nullptr;
+  errno = 0;
+  value = std::strtoll(text.c_str(), &remaining, 10);
+  return errno != ERANGE && remaining != text.c_str() && *remaining == '\0';
 }
 
 // Decimal genomic distances such as 0.004 KB are mathematically integral
@@ -551,16 +563,16 @@ void SemanticAnalyzer::visit(SimpleConditionNode *node) {
     reportError(node->property + " requires sequence data.");
   }
   if (!node->sliceStart.empty()) {
-    const long double start = std::strtold(node->sliceStart.c_str(), nullptr);
-    const long double end = std::strtold(node->sliceEnd.c_str(), nullptr);
-    const long double maximum =
-        static_cast<long double>(std::numeric_limits<size_t>::max());
-    if (!std::isfinite(start) || !std::isfinite(end) || start < 0.0L ||
-        end < 0.0L || std::floor(start) != start ||
-        std::floor(end) != end || start > maximum || end > maximum) {
-      reportError("SLICE indices must be non-negative whole numbers within "
-                  "the supported index range.");
-    } else if (start >= end) {
+    long long start = 0;
+    long long end = 0;
+    bool startIsEnd = false;
+    bool endIsEnd = false;
+    if (!parseSliceBound(node->sliceStart, start, startIsEnd) ||
+        !parseSliceBound(node->sliceEnd, end, endIsEnd)) {
+      reportError("SLICE bounds must be whole indices within the supported "
+                  "range or END.");
+    } else if (startIsEnd ||
+               (!endIsEnd && ((start < 0) == (end < 0)) && start >= end)) {
       reportError("SLICE requires its FROM index to be smaller than its TO "
                   "index.");
     }

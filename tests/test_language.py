@@ -1252,6 +1252,14 @@ def main() -> int:
             'WHERE SLICE ORIENTED_SEQUENCE FROM 0 TO 1 = "A";\n'
             'EXTRACT starts AS suffixes '
             'WHERE SLICE ORIENTED_SEQUENCE FROM 1 TO 3 = "TG";\n'
+            'EXTRACT starts AS terminal_triplets '
+            'WHERE SLICE ORIENTED_SEQUENCE FROM -3 TO END = "ATG";\n'
+            'EXTRACT starts AS without_last '
+            'WHERE SLICE ORIENTED_SEQUENCE FROM 0 TO -1 = "AT";\n'
+            'EXTRACT starts AS middle_bases '
+            'WHERE SLICE ORIENTED_SEQUENCE FROM -2 TO -1 = "T";\n'
+            'EXTRACT starts AS out_of_bounds_relative '
+            'WHERE SLICE ORIENTED_SEQUENCE FROM -4 TO END = "ATG";\n'
             'EXTRACT starts AS reference_prefix '
             'WHERE SLICE SEQUENCE FROM 0 TO 1 = "A";\n',
         )
@@ -1259,7 +1267,11 @@ def main() -> int:
             [(item["start"], item["strand"])
              for item in data["resultSets"]["starts"]]
             == [(0, "+"), (3, "-")]
-            and len(data["resultSets"]["suffixes"]) == 2,
+            and len(data["resultSets"]["suffixes"]) == 2
+            and len(data["resultSets"]["terminal_triplets"]) == 2
+            and len(data["resultSets"]["without_last"]) == 2
+            and len(data["resultSets"]["middle_bases"]) == 2
+            and data["resultSets"]["out_of_bounds_relative"] == [],
             "SLICE evaluates motif and region sequences in strand order",
         )
         require(
@@ -1508,6 +1520,28 @@ def main() -> int:
         )
         require("FROM index to be smaller" in semantic_error,
                 "SLICE rejects empty or reversed ranges")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "reversed_relative_slice",
+            'LOAD SEQUENCE "oriented.fasta" AS genome;\n'
+            'FIND MOTIF "ATG" AS invalid '
+            'WHERE SLICE SEQUENCE FROM -1 TO -3 = "A";\n',
+            3,
+        )
+        require("FROM index to be smaller" in semantic_error,
+                "SLICE rejects reversed end-relative ranges")
+
+        semantic_error = run_invalid_query(
+            workspace,
+            "slice_starts_at_end",
+            'LOAD SEQUENCE "oriented.fasta" AS genome;\n'
+            'FIND MOTIF "ATG" AS invalid '
+            'WHERE SLICE SEQUENCE FROM END TO END = "A";\n',
+            3,
+        )
+        require("FROM index to be smaller" in semantic_error,
+                "SLICE rejects a range starting at END")
 
         parser_error = run_invalid_query(
             workspace,
